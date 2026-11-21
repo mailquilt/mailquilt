@@ -10,8 +10,7 @@ const healthQuery = queryOptions({
   retry: false,
 });
 
-/** Whether the API is up and can reach its Postgres database. */
-export const HealthStatus = () => {
+const HealthResult = () => {
   const { error, isPending } = useQuery(healthQuery);
 
   if (isPending) {
@@ -20,23 +19,33 @@ export const HealthStatus = () => {
 
   if (error instanceof DatabaseUnreachable) {
     return (
-      <div className="flex flex-col gap-2">
+      <>
         <Badge variant="error">Database unreachable</Badge>
         <Text variant="secondary">
           The API is running but cannot query Postgres.
         </Text>
-      </div>
+      </>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col gap-2">
+      <>
         <Badge variant="error">API unreachable</Badge>
         <Text variant="secondary">The dashboard cannot reach the API.</Text>
-      </div>
+      </>
     );
   }
 
   return <Badge variant="success">Database connected</Badge>;
 };
+
+/**
+ * Whether the API is up and can reach its Postgres database. The result
+ * replaces the loader inside one live region, so screen readers announce it.
+ */
+export const HealthStatus = () => (
+  <output className="flex flex-col items-start gap-2">
+    <HealthResult />
+  </output>
+);

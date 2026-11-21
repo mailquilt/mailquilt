@@ -17,7 +17,7 @@ pnpm --filter dashboard dev  # the dashboard on http://localhost:3001
 pnpm --filter dashboard build
 ```
 
-The static files are written to `dist/client`, with the app shell as `index.html`. Both entry apps serve them next to the API: `apps/server` through `HttpStaticServer`, and `apps/api-worker` through Workers static assets (`assets` in `wrangler.jsonc`). Paths that aren't files or API routes get `index.html`, so the router handles them in the browser. API routes live under `/api` ([ADR 0004](../../docs/adr/0004-api-routes-live-under-api.md)).
+The static files are written to `dist/client`, with the app shell as `index.html`. Both entry apps serve them next to the API: `apps/server` through `HttpStaticServer`, and `apps/api-worker` through Workers static assets (`assets` in `wrangler.jsonc`). A browser asking for a page that isn't a file or an API route gets `index.html`, so the router handles it in the browser. On Node that fallback applies only to paths without a file extension, so dashboard routes never end in one (`/campaigns/cmp_…`, not `/export.csv`). API routes live under `/api` ([ADR 0004](../../docs/adr/0004-api-routes-live-under-api.md)).
 
 ## Test
 

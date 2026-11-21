@@ -28,7 +28,7 @@ describe("health status", () => {
 
   afterAll(() => api.close());
 
-  it("shows the database as connected when the API is healthy", async () => {
+  it("announces the database as connected when the API is healthy", async () => {
     api.use(
       http.get("/health", () => HttpResponse.json({ database: "connected" }))
     );
@@ -38,6 +38,7 @@ describe("health status", () => {
     await expect(
       screen.findByText("Database connected")
     ).resolves.toBeDefined();
+    expect(screen.getByRole("status").textContent).toBe("Database connected");
   });
 
   it("shows the database as unreachable when the API reports it", async () => {
