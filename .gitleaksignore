@@ -1,0 +1,4 @@
+# gitleaks findings that aren't secrets, by fingerprint (commit:file:rule:line).
+
+# A placeholder token in an example test in a vendored agent skill.
+d1d1e28616d5b4a7acb61f1704efef8f94320079:.agents/skills/playwright-best-practices/advanced/authentication-flows.md:generic-api-key:54
