@@ -1,3 +1,74 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Every dependency is pinned exactly here; packages refer to it with `catalog:`.
+catalogMode: strict
+
+# 7 days, in minutes. Exceptions are reviewed one by one (docs/architecture.md#versions).
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  # Drizzle's Effect integration exists only in its newest release candidates.
+  - drizzle-orm
+  - drizzle-kit
+  # Pinned before the policy existed. Remove each once it is 7 days old (all by 2026-11-27).
+  - "@interfere/landmines@0.1.1"
+  - "@tanstack/devtools-vite@0.8.7"
+  - "@tanstack/react-devtools@0.10.15"
+  - "@tanstack/react-router-devtools@1.167.4"
+  - "@tanstack/react-start@1.169.7"
+  - "@tanstack/devtools@0.17.0"
+  - "@tanstack/react-start-rsc@0.1.68"
+  - "@tanstack/router-devtools-core@1.168.4"
+  - "@tanstack/start-plugin-core@1.172.0"
+  - oxfmt@0.79.0
+  - "@oxfmt/binding-*" # versions are pinned by oxfmt
+  - oxlint@1.94.0
+  - "@oxlint/binding-*" # versions are pinned by oxlint
+  - turbo@2.11.13
+  - "@turbo/*" # versions are pinned by turbo
+  - ultracite@8.3.1
+
+catalog:
+  "@astrojs/compiler-rs": 0.5.3
+  "@cloudflare/workers-types": 5.20261114.1
+  "@effect/platform-node": 4.1.4
+  "@effect/sql-pg": 4.1.4
+  "@effect/vitest": 4.1.4
+  "@interfere/landmines": 0.1.1
+  "@shadcn/lint": 0.2.5
+  "@tailwindcss/vite": 4.3.5
+  "@tanstack/devtools-vite": 0.8.7
+  "@tanstack/react-devtools": 0.10.15
+  "@tanstack/react-router": 1.170.46
+  "@tanstack/react-router-devtools": 1.167.4
+  "@tanstack/react-start": 1.169.7
+  "@testcontainers/postgresql": 12.2.1
+  "@types/node": 24.19.2
+  "@types/react": 19.3.0
+  "@types/react-dom": 19.3.0
+  "@vitejs/plugin-react": 6.3.0
+  blume: 2.2.7
+  drizzle-kit: 1.0.0-rc.6
+  drizzle-orm: 1.0.0-rc.6
+  effect: 4.1.4
+  nitro: 3.0.260610-beta
+  oxfmt: 0.79.0
+  oxlint: 1.94.0
+  react: 19.3.1
+  react-dom: 19.3.1
+  tailwindcss: 4.3.5
+  turbo: 2.11.13
+  typescript: 7.0.2
+  ultracite: 8.3.1
+  vite: 8.3.8
+  vitest: 5.1.0
+  wrangler: 4.162.0
+
+allowBuilds:
+  esbuild: true
+  workerd: true
+  # Optional native extras of Testcontainers' Docker client; not needed.
+  cpu-features: false
+  protobufjs: false
+  ssh2: false
