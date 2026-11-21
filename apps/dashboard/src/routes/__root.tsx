@@ -10,6 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 
+import { AccountMenu } from "../auth/account-menu.tsx";
 import { ThemePicker } from "../theme/theme-picker.tsx";
 import { themeScript } from "../theme/theme.ts";
 
@@ -35,7 +36,10 @@ const RootDocument = ({ children }: { children: React.ReactNode }) => (
         <Text as="span" variant="heading">
           Mailquilt
         </Text>
-        <ThemePicker />
+        <div className="flex items-center gap-4">
+          <AccountMenu />
+          <ThemePicker />
+        </div>
       </header>
       <main className="mx-auto max-w-5xl p-6">{children}</main>
       <TanStackDevtools

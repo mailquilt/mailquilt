@@ -11,6 +11,7 @@
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@repo/api": "workspace:*",
+    "@repo/core": "workspace:*",
     "@repo/runtime-node": "workspace:*",
     "effect": "catalog:"
   },

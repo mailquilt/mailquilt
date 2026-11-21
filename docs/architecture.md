@@ -24,13 +24,13 @@ Each entry app serves the JSON API, the public pages, and the dashboard's static
 | `domain` | Schemas, branded and prefixed IDs, domain errors. No input or output | — |
 | `contract` | Effect `HttpApi` groups; the single public contract and the source of the OpenAPI spec and the dashboard's typed client | `domain` |
 | `core` | Use cases, written only against ports (Effect services) | `domain` |
-| `api` | `HttpApi` handlers: each endpoint calls a `core` use case. One `ApiLive` Layer that every entry app serves | `contract`, `core` |
+| `api` | `HttpApi` handlers: each endpoint calls a `core` use case. Better Auth behind our allow list ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)). One `ApiLive` Layer that every entry app serves | `contract`, `core` |
 | `db` | Drizzle Postgres schema, migrations, repository implementations | `domain`, ports in `core` |
 | `providers` | One adapter per Provider: sending plus parsing its webhooks | `domain` |
 | `runtime-cloudflare` | Layers for each port on Cloudflare | ports in `core`, `db` |
 | `runtime-node` | Layers for each port on Node | ports in `core`, `db` |
 
-Apps only assemble Layers. On Workers, the runtime is built once per isolate, not per request. The earlier prototype rebuilt every service on every request. Ports are request requirements of `ApiLive`: Node shares one Postgres pool across requests, and Workers opens Postgres per request through Hyperdrive ([ADR 0003](adr/0003-ports-are-provided-per-request.md)).
+Apps only assemble Layers. On Workers, the runtime is built once per isolate, not per request. The earlier prototype rebuilt every service on every request. Ports are request requirements of `ApiLive`: Node shares one Postgres pool across requests, and Workers opens Postgres per request through Hyperdrive ([ADR 0003](adr/0003-ports-are-provided-per-request.md)). Better Auth is built per request on the same `SqlClient` ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)).
 
 ## Data
 

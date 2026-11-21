@@ -1,16 +1,32 @@
-import { ApiLive } from "@repo/api";
+import { ApiLive, authConfigLayer } from "@repo/api";
+import { SystemMailerNotConfigured } from "@repo/core";
 import { postgresPortsLive, providePerRequest } from "@repo/runtime-cloudflare";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Option, Redacted } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
 interface Env {
   readonly HYPERDRIVE: Hyperdrive;
+  /** Where the dashboard is served, such as `https://mail.example.com`. */
+  readonly APP_URL: string;
+  /** A secret, set with `wrangler secret put AUTH_SECRET` (`.dev.vars` locally). */
+  readonly AUTH_SECRET: string;
 }
+
+// WARNING: trust only `cf-connecting-ip`, which Cloudflare sets itself; a client can forge any other IP header.
+const authConfigLive = (env: Env) =>
+  authConfigLayer({
+    appUrl: env.APP_URL,
+    clientIpHeader: Option.some("cf-connecting-ip"),
+    secret: Redacted.make(env.AUTH_SECRET),
+  });
 
 const makeApp = (env: Env) =>
   HttpRouter.toWebHandler(
     ApiLive.pipe(
       providePerRequest(postgresPortsLive(env.HYPERDRIVE)),
+      HttpRouter.provideRequest(
+        Layer.mergeAll(authConfigLive(env), SystemMailerNotConfigured)
+      ),
       Layer.provide(HttpServer.layerServices),
       Layer.provide(Layer.effectDiscard(Effect.logInfo("Runtime built")))
     )
