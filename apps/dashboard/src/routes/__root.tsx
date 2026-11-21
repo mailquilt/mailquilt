@@ -1,20 +1,41 @@
-import { Text } from "@cloudflare/kumo";
+import { Empty, Text } from "@cloudflare/kumo";
+import { CompassIcon } from "@phosphor-icons/react";
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
+import {
+  HeadContent,
+  Link,
+  ScriptOnce,
+  Scripts,
+  createRootRoute,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+
+import { ThemePicker } from "../theme/theme-picker.tsx";
+import { themeScript } from "../theme/theme.ts";
 
 import appCss from "../styles.css?url";
 
+const NotFound = () => (
+  <Empty
+    contents={<Link to="/">Go to the dashboard</Link>}
+    description="There is no page at this address."
+    icon={<CompassIcon size={48} />}
+    title="Page not found"
+  />
+);
+
 const RootDocument = ({ children }: { children: React.ReactNode }) => (
-  <html lang="en">
+  <html lang="en" suppressHydrationWarning>
     <head>
+      <ScriptOnce>{themeScript}</ScriptOnce>
       <HeadContent />
     </head>
     <body className="bg-kumo-canvas text-kumo-default">
-      <header className="border-b border-kumo-line bg-kumo-base px-6 py-3">
+      <header className="flex items-center justify-between gap-4 border-b border-kumo-line bg-kumo-base px-6 py-3">
         <Text as="span" variant="heading">
           Mailquilt
         </Text>
+        <ThemePicker />
       </header>
       <main className="mx-auto max-w-5xl p-6">{children}</main>
       <TanStackDevtools
@@ -54,5 +75,6 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  notFoundComponent: NotFound,
   shellComponent: RootDocument,
 });
