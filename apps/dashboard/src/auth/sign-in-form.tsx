@@ -1,12 +1,18 @@
 import { Banner, Button, Input } from "@cloudflare/kumo";
 import { useMutation } from "@tanstack/react-query";
-import { useState } from "react";
 
 import {
   authClient,
   authErrorMessage,
-  EMAIL_VERIFIED_PATH,
+  UNREACHABLE_MESSAGE,
 } from "./auth-client.ts";
+import { PasswordField } from "./password-field.tsx";
+import {
+  LINK_NOT_SENT_MESSAGE,
+  LINK_SENT_MESSAGE,
+  SEND_LINK_LABEL,
+  useSendVerificationLink,
+} from "./send-verification-link.ts";
 
 interface Credentials {
   readonly email: string;
@@ -22,19 +28,13 @@ const readCredentials = (form: HTMLFormElement) => {
   } satisfies Credentials;
 };
 
-const ResendVerification = ({ email }: { email: string }) => {
-  const resend = useMutation({
-    mutationFn: () =>
-      authClient.sendVerificationEmail({
-        callbackURL: EMAIL_VERIFIED_PATH,
-        email,
-      }),
-  });
+const VerifyFirst = ({ email }: { email: string }) => {
+  const send = useSendVerificationLink();
 
-  if (resend.data && !resend.data.error) {
+  if (send.isSuccess) {
     return (
       <output>
-        <Banner title={`We sent a new link to ${email}.`} />
+        <Banner className="wrap-anywhere" title={LINK_SENT_MESSAGE(email)} />
       </output>
     );
   }
@@ -43,15 +43,15 @@ const ResendVerification = ({ email }: { email: string }) => {
     <Banner
       action={
         <Banner.Action
-          loading={resend.isPending}
-          onClick={() => resend.mutate()}
+          loading={send.isPending}
+          onClick={() => send.mutate(email)}
         >
-          Send the link again
+          {SEND_LINK_LABEL}
         </Banner.Action>
       }
       description={
-        resend.data?.error
-          ? authErrorMessage(resend.data.error)
+        send.isError
+          ? LINK_NOT_SENT_MESSAGE
           : "Open the link we emailed you to finish signing up."
       }
       role="alert"
@@ -61,39 +61,37 @@ const ResendVerification = ({ email }: { email: string }) => {
   );
 };
 
-/** Email and password sign-in. Calls `onSignedIn` once a session exists. */
-export const SignInForm = ({ onSignedIn }: { onSignedIn: () => void }) => {
-  const [email, setEmail] = useState("");
-
+/**
+ * Email and password sign-in. On success the session changes, and the page's
+ * `SignedOutOnly` gate takes the person into the app.
+ */
+export const SignInForm = () => {
   const signIn = useMutation({
     mutationFn: (credentials: Credentials) =>
       authClient.signIn.email(credentials),
-    onSuccess: (result) => {
-      if (!result.error) {
-        onSignedIn();
-      }
-    },
   });
 
   const error = signIn.data?.error;
   let problem: React.ReactNode = null;
 
-  if (error?.code === "EMAIL_NOT_VERIFIED") {
-    problem = <ResendVerification email={email} />;
+  if (error?.code === "EMAIL_NOT_VERIFIED" && signIn.variables) {
+    problem = <VerifyFirst email={signIn.variables.email} />;
   } else if (error) {
     problem = (
       <Banner role="alert" title={authErrorMessage(error)} variant="error" />
+    );
+  } else if (signIn.isError) {
+    problem = (
+      <Banner role="alert" title={UNREACHABLE_MESSAGE} variant="error" />
     );
   }
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault();
-        const credentials = readCredentials(event.currentTarget);
-        setEmail(credentials.email);
-        signIn.mutate(credentials);
+        signIn.mutate(readCredentials(event.currentTarget));
       }}
     >
       {problem}
@@ -102,16 +100,17 @@ export const SignInForm = ({ onSignedIn }: { onSignedIn: () => void }) => {
         label="Email"
         name="email"
         required
+        size="lg"
         type="email"
       />
-      <Input
-        autoComplete="current-password"
-        label="Password"
-        name="password"
-        required
-        type="password"
-      />
-      <Button loading={signIn.isPending} type="submit" variant="primary">
+      <PasswordField autoComplete="current-password" />
+      <Button
+        className="mt-1 w-full justify-center"
+        loading={signIn.isPending}
+        size="lg"
+        type="submit"
+        variant="primary"
+      >
         Sign in
       </Button>
     </form>

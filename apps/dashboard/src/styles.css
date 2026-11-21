@@ -1,12 +1,202 @@
+@import "@fontsource-variable/instrument-sans";
+@import "@fontsource-variable/space-grotesk";
 @source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import "@cloudflare/kumo/styles/tailwind";
 @import "tailwindcss";
 
-html,
-body {
-  min-height: 100%;
+/*
+ * The Mailquilt theme. Values come from the brand kit: ink #111113, accent
+ * #D4380F, quilt grey #71717A, and their dark-background versions. Kumo
+ * components read the --color-kumo-* and --text-color-kumo-* tokens, so
+ * overriding them here restyles every component.
+ */
+
+@theme {
+  --font-sans: "Instrument Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    "Space Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* Space Grotesk headings, at the typeface's own letter spacing. */
+  --text-display-xl: 3rem;
+  --text-display-xl--line-height: 1;
+  --text-display-lg: 2.5rem;
+  --text-display-lg--line-height: 1.05;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.12;
+  --text-display-sm: 1.25rem;
+  --text-display-sm--line-height: 1.3;
+
+  /* The logo's block geometry: 44-unit blocks with 6-unit corners. */
+  --radius-quilt: 13.6%;
+  --radius-quilt-slot: 11%;
+
+  /* The cost label: its stitched seam's 2px corner plus the seam's 7px inset. */
+  --radius-quilt-label: 0.5625rem;
+
+  /* Every signed-out page lines its logo, form and footer up on this width. */
+  --container-auth-form: 23.75rem;
+
+  /* The cost label sewn onto the quilt lifts well clear of it. */
+  --shadow-quilt-label: 0 30px 60px -20px rgb(0 0 0 / 0.55);
 }
 
-body {
-  margin: 0;
+/*
+ * WARNING: Kumo also declares these tokens unlayered on :root (compiled from
+ * light-dark()), and unlayered rules beat every @layer. So the overrides stay
+ * unlayered too, and win on specificity.
+ */
+:root[data-theme="mailquilt"] {
+  --mq-accent: #d4380f;
+  --mq-accent-text: #d4380f;
+  --mq-logo-ink: #111113;
+  --mq-logo-grey: #71717a;
+  --mq-logo-slot: #a1a1aa;
+  --mq-block-ink: #111113;
+  --mq-body: #52525b;
+  --mq-seam: #d4d4d8;
+  --mq-quilt-sashing: #16161a;
+  --mq-quilt-sky: #0f0f11;
+  --mq-quilt-goose: #2a2a2f;
+  --mq-quilt-goose-alt: #232327;
+
+  --text-color-kumo-default: #27272a;
+  --text-color-kumo-strong: #111113;
+  --text-color-kumo-subtle: #6b6b73;
+  --text-color-kumo-inverse: #ffffff;
+  --text-color-kumo-brand: #d4380f;
+  --text-color-kumo-link: #111113;
+
+  --color-kumo-canvas: #fafafa;
+  --color-kumo-base: #ffffff;
+  --color-kumo-elevated: #fafafa;
+  --color-kumo-recessed: #f4f4f5;
+  --color-kumo-tint: #f4f4f5;
+  --color-kumo-control: #ffffff;
+  --color-kumo-fill: #e4e4e7;
+  --color-kumo-fill-hover: #f4f4f5;
+  --color-kumo-interact: #d4d4d8;
+  --color-kumo-hairline: #e4e4e7;
+  --color-kumo-line: rgb(17 17 19 / 0.12);
+  --color-kumo-brand: #111113;
+  --color-kumo-brand-hover: #3f3f46;
+  --color-kumo-focus: #111113;
+}
+
+:root[data-theme="mailquilt"][data-mode="dark"] {
+  --mq-accent-text: #ec6236;
+  --mq-logo-ink: #f0f6fc;
+  --mq-logo-grey: #8b949e;
+  --mq-logo-slot: #6e7681;
+  --mq-block-ink: #e4e4e7;
+  --mq-body: #a1a1aa;
+  --mq-seam: #3f3f46;
+  --mq-quilt-sashing: #121215;
+  --mq-quilt-sky: #0b0b0d;
+  --mq-quilt-goose: #26262b;
+  --mq-quilt-goose-alt: #1f1f23;
+
+  --text-color-kumo-default: #e4e4e7;
+  --text-color-kumo-strong: #f0f6fc;
+  --text-color-kumo-subtle: #8b949e;
+  --text-color-kumo-inverse: #111113;
+  --text-color-kumo-brand: #ec6236;
+  --text-color-kumo-link: #f0f6fc;
+
+  --color-kumo-canvas: #111113;
+  --color-kumo-base: #18181b;
+  --color-kumo-elevated: #1c1c1f;
+  --color-kumo-recessed: #0c0c0e;
+  --color-kumo-tint: #27272a;
+  --color-kumo-control: #18181b;
+  --color-kumo-fill: #27272a;
+  --color-kumo-fill-hover: #2e2e33;
+  --color-kumo-interact: #3f3f46;
+  --color-kumo-hairline: #27272a;
+  --color-kumo-line: #3f3f46;
+  --color-kumo-brand: #f0f6fc;
+  --color-kumo-brand-hover: #d4d4d8;
+  --color-kumo-focus: #f0f6fc;
+}
+
+@layer base {
+  /*
+   * WARNING: Kumo sets primary-button colours inline, as a gradient mixed from
+   * --color-kumo-brand with white text. Primary actions here are flat ink in
+   * light mode and flat near-white with ink text in dark mode, so these
+   * declarations must be !important to win over the inline style and Kumo's
+   * !text-white utility. Destructive buttons mix --color-kumo-danger instead
+   * and keep Kumo's look.
+   */
+  [data-theme="mailquilt"]
+    :is(
+      [data-kumo-component="Button"],
+      [data-kumo-component="LinkButton"]
+    )[style*="--color-kumo-brand"] {
+    --kumo-button-emphasis-bg: var(--color-kumo-brand) !important;
+    --kumo-button-emphasis-ring: var(--color-kumo-brand) !important;
+    --kumo-button-emphasis-gradient-start: var(--color-kumo-brand) !important;
+    --kumo-button-emphasis-gradient-end: var(--color-kumo-brand) !important;
+    color: var(--text-color-kumo-inverse) !important;
+  }
+
+  [data-theme="mailquilt"]
+    :is(
+      [data-kumo-component="Button"],
+      [data-kumo-component="LinkButton"]
+    )[style*="--color-kumo-brand"]:not(:disabled):hover {
+    --kumo-button-emphasis-bg: var(--color-kumo-brand-hover) !important;
+    --kumo-button-emphasis-gradient-start: var(
+      --color-kumo-brand-hover
+    ) !important;
+    --kumo-button-emphasis-gradient-end: var(
+      --color-kumo-brand-hover
+    ) !important;
+  }
+
+  /*
+   * WARNING: Kumo buttons suppress the outline and show focus as a ring in
+   * the button's own colour, which is invisible on ink buttons. Every button
+   * gets the same visible focus ring instead; !important beats Kumo's
+   * outline-hidden utility from this earlier layer.
+   */
+  [data-theme="mailquilt"]
+    :is(
+      [data-kumo-component="Button"],
+      [data-kumo-component="LinkButton"]
+    ):focus-visible {
+    outline: 2px solid var(--color-kumo-focus) !important;
+    outline-offset: 2px !important;
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* The campaign column lights up from the bottom, once, when an auth page opens. */
+@keyframes mq-goose-lift {
+  from {
+    fill: var(--mq-quilt-goose);
+  }
+
+  to {
+    fill: var(--mq-accent);
+  }
+}
+
+.mq-goose-thread {
+  fill: var(--mq-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mq-goose-thread {
+    animation: mq-goose-lift 420ms ease-out both;
+    animation-delay: var(--mq-goose-delay, 0ms);
+  }
 }

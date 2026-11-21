@@ -18,6 +18,8 @@ Small direct unit tests are only for pure rules with many cases, such as how DNS
 
 Persistence is always tested against real Postgres. An in-memory repository drifts from the real SQL and hides exactly the bugs that matter here: a missing Organization scope, a query per Contact, a broken migration.
 
+Testcontainers needs a running Docker. If the API tests fail with "Could not find a working container runtime strategy", start Docker and wait until `docker info` answers.
+
 ## Test each rule once
 
 - Test a rule at the seam that owns it, once. A dashboard or smoke test shows the UI handles the result; it doesn't repeat the list of values.

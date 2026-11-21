@@ -11,6 +11,23 @@ pnpm --filter dashboard dev  # the dashboard on http://localhost:3001
 
 `vite dev` forwards `/api/*` and `/health` to the API on `http://localhost:3000` (`server.proxy` in `vite.config.ts`). The port is fixed: if 3001 is taken, `vite dev` stops instead of picking another.
 
+## Design
+
+The bar, the process, the brand rules and the review checklist are in [`docs/agents/design.md`](../../docs/agents/design.md); the full logo kit is in [`docs/brand/`](../../docs/brand/). This section covers how the dashboard puts them into practice.
+
+- **Theme:** `src/styles.css` sets Kumo's colour tokens for light and dark (`data-theme="mailquilt"` on `<html>`), plus the `text-display*` type sizes and the quilt radii. Use those tokens, not one-off values. Two things to know before changing it:
+  - Kumo declares its tokens on `:root` outside any cascade layer, so overrides of them must be unlayered too. Inside `@layer` they lose.
+  - Kumo's primary button brings its own gradient and text colour. `styles.css` replaces them, and adds a visible focus outline to every Kumo button, in `@layer base` with `!important`.
+- **Signed-out pages** (`src/layout/auth-layout.tsx`):
+  - The form sits beside a Flying Geese quilt (`src/brand/flying-geese-quilt.tsx`). A goose is the logo's envelope flap, and the orange column is a campaign going out. It lights up from the bottom once, unless reduced motion is on.
+  - The label sewn onto the quilt states the cost in plain numbers.
+- **Signed-in pages** (`src/layout/app-shell.tsx`): Kumo's sidebar with the full navigation, each section dimmed until it exists. Pages own their own layout under `src/routes/_app/`.
+- **Who sees what:** `SignedInOnly` and `SignedOutOnly` (`src/layout/session-gates.tsx`) send people to the right side of the app. `useAccount()` gives signed-in pages the account without asking for the session again.
+- **Verification links:** sending one always goes through `useSendVerificationLink` (`src/auth/send-verification-link.ts`), with one action name, "Send a new link".
+- **Progress:** steps are marked with `StepBlock` (`src/brand/quilt-block.tsx`), drawn in the logo's language: an ink block with a check is done, the orange block lifted off its dashed slot is next, and a grey block is still to come.
+- **The accent is used sparingly:** for brand moments (the logo, the quilt, the cost) and the single next step, never for ordinary actions. Primary actions are ink, because the accent sits next to error red.
+- **Every screen has one job,** and its copy tells people what to do next. See `check-your-inbox` and the setup steps on the home page.
+
 ## Build
 
 ```bash

@@ -8,16 +8,10 @@ import { SignInForm } from "./sign-in-form.tsx";
 
 const api = setupServer();
 
-let signedIn = false;
-
 const renderSignInForm = () =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <SignInForm
-        onSignedIn={() => {
-          signedIn = true;
-        }}
-      />
+      <SignInForm />
     </QueryClientProvider>
   );
 
@@ -49,19 +43,9 @@ describe("sign-in form", () => {
   afterEach(() => {
     cleanup();
     api.resetHandlers();
-    signedIn = false;
   });
 
   afterAll(() => api.close());
-
-  it("signs the person in", async () => {
-    answerSignIn(200, { token: "t" });
-
-    renderSignInForm();
-    submit();
-
-    await expect.poll(() => signedIn).toBe(true);
-  });
 
   it("offers to send the verification link again when the email isn't verified", async () => {
     answerSignIn(403, {
@@ -81,14 +65,13 @@ describe("sign-in form", () => {
     renderSignInForm();
     submit();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Send the link again" })
+      await screen.findByRole("button", { name: "Send a new link" })
     );
 
     await expect(
       screen.findByText("We sent a new link to ada@example.com.")
     ).resolves.toBeDefined();
     expect(resentTo).toBe("ada@example.com");
-    expect(signedIn).toBeFalsy();
   });
 
   it("says the email or password is wrong without saying which", async () => {
@@ -112,7 +95,20 @@ describe("sign-in form", () => {
     submit();
 
     await expect(
-      screen.findByText("Too many attempts. Wait a minute, then try again.")
+      screen.findByText("Too many attempts. Try again later.")
+    ).resolves.toBeDefined();
+  });
+
+  it("says Mailquilt couldn't be reached when the request never arrives", async () => {
+    api.use(http.post("*/api/auth/sign-in/email", () => HttpResponse.error()));
+
+    renderSignInForm();
+    submit();
+
+    await expect(
+      screen.findByText(
+        "Mailquilt couldn’t be reached. Check your connection, then try again."
+      )
     ).resolves.toBeDefined();
   });
 });

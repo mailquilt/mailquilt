@@ -8,6 +8,19 @@ import { SignUpForm } from "./sign-up-form.tsx";
 
 const api = setupServer();
 
+const fillAndSubmit = () => {
+  fireEvent.change(screen.getByLabelText("Your name"), {
+    target: { value: "Ada" },
+  });
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "ada@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "correct horse battery staple" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+};
+
 describe("sign-up form", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
@@ -17,8 +30,9 @@ describe("sign-up form", () => {
 
   afterAll(() => api.close());
 
-  it("asks the person to open the link sent to their email", async () => {
+  it("hands over to the inbox step once the account exists", async () => {
     let callbackURL: unknown;
+    let signedUpAs: unknown;
     api.use(
       http.post("*/api/auth/sign-up/email", async ({ request }) => {
         // SAFETY: the sign-up form sends Better Auth a JSON body.
@@ -32,25 +46,33 @@ describe("sign-up form", () => {
 
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <SignUpForm />
+        <SignUpForm
+          onSignedUp={(email) => {
+            signedUpAs = email;
+          }}
+        />
       </QueryClientProvider>
     );
-    fireEvent.change(screen.getByLabelText("Name"), {
-      target: { value: "Ada" },
-    });
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "ada@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("Password"), {
-      target: { value: "correct horse battery staple" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    fillAndSubmit();
+
+    await expect.poll(() => signedUpAs).toBe("ada@example.com");
+    expect(callbackURL).toBe("/email-verified");
+  });
+
+  it("says Mailquilt couldn't be reached when the request never arrives", async () => {
+    api.use(http.post("*/api/auth/sign-up/email", () => HttpResponse.error()));
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SignUpForm onSignedUp={() => {}} />
+      </QueryClientProvider>
+    );
+    fillAndSubmit();
 
     await expect(
       screen.findByText(
-        "We sent a link to ada@example.com. Open it to verify your email address, then sign in."
+        "Mailquilt couldn’t be reached. Check your connection, then try again."
       )
     ).resolves.toBeDefined();
-    expect(callbackURL).toBe("/email-verified");
   });
 });

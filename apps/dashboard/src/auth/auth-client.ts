@@ -9,10 +9,17 @@ export const authClient = createAuthClient({ basePath: "/api/auth" });
 /** Where the verification link lands after Better Auth checks it. */
 export const EMAIL_VERIFIED_PATH = "/email-verified";
 
+/** Better Auth's default minimum, shown in the sign-up hint and its error. */
+export const MIN_PASSWORD_LENGTH = 8;
+
 interface AuthError {
   readonly status: number;
   readonly code?: string | undefined;
 }
+
+/** Shown when an auth request fails before Mailquilt answers it. */
+export const UNREACHABLE_MESSAGE =
+  "Mailquilt couldn’t be reached. Check your connection, then try again.";
 
 /**
  * What to tell the person about a failed auth request. Sign-in never says
@@ -20,7 +27,7 @@ interface AuthError {
  */
 export const authErrorMessage = (error: AuthError) => {
   if (error.status === 429) {
-    return "Too many attempts. Wait a minute, then try again.";
+    return "Too many attempts. Try again later.";
   }
 
   if (error.code === "INVALID_EMAIL_OR_PASSWORD") {
@@ -28,7 +35,7 @@ export const authErrorMessage = (error: AuthError) => {
   }
 
   if (error.code === "PASSWORD_TOO_SHORT") {
-    return "Use a password of at least 8 characters.";
+    return `Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
 
   return "Something went wrong. Try again.";
