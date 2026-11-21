@@ -1,7 +1,11 @@
 import { Banner, Button, Input } from "@cloudflare/kumo";
 import { useMutation } from "@tanstack/react-query";
 
-import { authClient, authErrorMessage } from "./auth-client.ts";
+import {
+  authClient,
+  authErrorMessage,
+  UNREACHABLE_MESSAGE,
+} from "./auth-client.ts";
 import { PasswordField } from "./password-field.tsx";
 import {
   LINK_NOT_SENT_MESSAGE,
@@ -78,11 +82,7 @@ export const SignInForm = () => {
     );
   } else if (signIn.isError) {
     problem = (
-      <Banner
-        role="alert"
-        title="Mailquilt couldn’t be reached. Check your connection, then try again."
-        variant="error"
-      />
+      <Banner role="alert" title={UNREACHABLE_MESSAGE} variant="error" />
     );
   }
 

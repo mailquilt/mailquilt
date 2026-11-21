@@ -95,7 +95,20 @@ describe("sign-in form", () => {
     submit();
 
     await expect(
-      screen.findByText("Too many attempts. Wait a minute, then try again.")
+      screen.findByText("Too many attempts. Try again later.")
+    ).resolves.toBeDefined();
+  });
+
+  it("says Mailquilt couldn't be reached when the request never arrives", async () => {
+    api.use(http.post("*/api/auth/sign-in/email", () => HttpResponse.error()));
+
+    renderSignInForm();
+    submit();
+
+    await expect(
+      screen.findByText(
+        "Mailquilt couldn’t be reached. Check your connection, then try again."
+      )
     ).resolves.toBeDefined();
   });
 });

@@ -8,6 +8,19 @@ import { SignUpForm } from "./sign-up-form.tsx";
 
 const api = setupServer();
 
+const fillAndSubmit = () => {
+  fireEvent.change(screen.getByLabelText("Your name"), {
+    target: { value: "Ada" },
+  });
+  fireEvent.change(screen.getByLabelText("Email"), {
+    target: { value: "ada@example.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Password"), {
+    target: { value: "correct horse battery staple" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+};
+
 describe("sign-up form", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
@@ -40,18 +53,26 @@ describe("sign-up form", () => {
         />
       </QueryClientProvider>
     );
-    fireEvent.change(screen.getByLabelText("Your name"), {
-      target: { value: "Ada" },
-    });
-    fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "ada@example.com" },
-    });
-    fireEvent.change(screen.getByLabelText("Password"), {
-      target: { value: "correct horse battery staple" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+    fillAndSubmit();
 
     await expect.poll(() => signedUpAs).toBe("ada@example.com");
     expect(callbackURL).toBe("/email-verified");
+  });
+
+  it("says Mailquilt couldn't be reached when the request never arrives", async () => {
+    api.use(http.post("*/api/auth/sign-up/email", () => HttpResponse.error()));
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SignUpForm onSignedUp={() => {}} />
+      </QueryClientProvider>
+    );
+    fillAndSubmit();
+
+    await expect(
+      screen.findByText(
+        "Mailquilt couldn’t be reached. Check your connection, then try again."
+      )
+    ).resolves.toBeDefined();
   });
 });

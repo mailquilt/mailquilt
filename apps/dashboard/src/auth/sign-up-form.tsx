@@ -6,6 +6,7 @@ import {
   authErrorMessage,
   EMAIL_VERIFIED_PATH,
   MIN_PASSWORD_LENGTH,
+  UNREACHABLE_MESSAGE,
 } from "./auth-client.ts";
 import { PasswordField } from "./password-field.tsx";
 
@@ -44,6 +45,15 @@ export const SignUpForm = ({
     },
   });
 
+  const error = signUp.data?.error;
+  let problem: string | null = null;
+
+  if (error) {
+    problem = authErrorMessage(error);
+  } else if (signUp.isError) {
+    problem = UNREACHABLE_MESSAGE;
+  }
+
   return (
     <form
       className="flex flex-col gap-5"
@@ -52,13 +62,7 @@ export const SignUpForm = ({
         signUp.mutate(readNewAccount(event.currentTarget));
       }}
     >
-      {signUp.data?.error ? (
-        <Banner
-          role="alert"
-          title={authErrorMessage(signUp.data.error)}
-          variant="error"
-        />
-      ) : null}
+      {problem ? <Banner role="alert" title={problem} variant="error" /> : null}
       <Input
         autoComplete="name"
         label="Your name"
