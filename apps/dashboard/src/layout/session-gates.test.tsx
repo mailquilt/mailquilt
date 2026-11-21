@@ -1,3 +1,4 @@
+import { Sidebar } from "@cloudflare/kumo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -18,6 +19,7 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { AccountMenu } from "../auth/account-menu.tsx";
 import { authClient } from "../auth/auth-client.ts";
 import { SignInForm } from "../auth/sign-in-form.tsx";
 import { SignedInOnly, SignedOutOnly, useAccount } from "./session-gates.tsx";
@@ -29,7 +31,16 @@ const SESSION = {
   user: { email: "ada@example.com", emailVerified: true, id: "u", name: "Ada" },
 };
 
-const Home = () => <p>Home for {useAccount().name}</p>;
+const Home = () => {
+  const account = useAccount();
+
+  return (
+    <Sidebar.Provider>
+      <p>Home for {account.name}</p>
+      <AccountMenu account={account} />
+    </Sidebar.Provider>
+  );
+};
 
 const renderAt = (path: string) => {
   const root = createRootRoute({ component: Outlet });
@@ -121,6 +132,51 @@ describe("session gates", () => {
       target: { value: "correct horse battery staple" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await expect(screen.findByText("Home for Ada")).resolves.toBeDefined();
+  });
+
+  it("sends the person to sign in once sign-out succeeds", async () => {
+    let signedIn = true;
+    api.use(
+      http.get("*/api/auth/get-session", () =>
+        HttpResponse.json(signedIn ? SESSION : null)
+      ),
+      http.post("*/api/auth/sign-out", () => {
+        signedIn = false;
+
+        return HttpResponse.json({ success: true });
+      })
+    );
+
+    renderAt("/");
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+
+    await expect(
+      screen.findByRole("button", { name: "Sign in" })
+    ).resolves.toBeDefined();
+  });
+
+  it("offers a retry instead of signing the person out when the session check fails", async () => {
+    let available = false;
+    api.use(
+      http.get("*/api/auth/get-session", () =>
+        available
+          ? HttpResponse.json(SESSION)
+          : HttpResponse.json({ message: "Unavailable" }, { status: 503 })
+      )
+    );
+
+    renderAt("/");
+    const retry = await screen.findByRole("button", { name: "Try again" });
+
+    expect(screen.queryByRole("button", { name: "Sign in" })).toBeNull();
+
+    available = true;
+    fireEvent.click(retry);
 
     await expect(screen.findByText("Home for Ada")).resolves.toBeDefined();
   });

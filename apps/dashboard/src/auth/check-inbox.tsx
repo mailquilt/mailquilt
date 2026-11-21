@@ -50,20 +50,35 @@ const inboxFor = (email: string) => {
   );
 };
 
+const MS_PER_SECOND = 1000;
+
 const useCountdown = (seconds: number) => {
-  const [remaining, setRemaining] = useState(seconds);
+  const [deadline, setDeadline] = useState(
+    () => Date.now() + seconds * MS_PER_SECOND
+  );
+
+  const [now, setNow] = useState(Date.now);
+  const remaining = Math.max(0, Math.ceil((deadline - now) / MS_PER_SECOND));
+
+  const counting = remaining > 0;
 
   useEffect(() => {
-    if (remaining <= 0) {
+    if (!counting) {
       return;
     }
 
-    const timer = setTimeout(() => setRemaining(remaining - 1), 1000);
+    const timer = setInterval(() => setNow(Date.now()), MS_PER_SECOND);
 
-    return () => clearTimeout(timer);
-  }, [remaining]);
+    return () => clearInterval(timer);
+  }, [counting]);
 
-  return { remaining, restart: () => setRemaining(seconds) };
+  const restart = () => {
+    const restartedAt = Date.now();
+    setDeadline(restartedAt + seconds * MS_PER_SECOND);
+    setNow(restartedAt);
+  };
+
+  return { remaining, restart };
 };
 
 const ResendLink = ({ email }: { email: string }) => {

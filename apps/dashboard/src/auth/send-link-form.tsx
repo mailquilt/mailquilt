@@ -28,6 +28,11 @@ export const SendLinkForm = ({
         autoComplete="email"
         label="Email"
         name="email"
+        onChange={() => {
+          if (send.isError) {
+            send.reset();
+          }
+        }}
         required
         size="lg"
         type="email"

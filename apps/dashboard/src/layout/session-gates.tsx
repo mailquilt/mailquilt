@@ -1,8 +1,9 @@
-import { Loader } from "@cloudflare/kumo";
+import { Button, Loader } from "@cloudflare/kumo";
 import { Navigate } from "@tanstack/react-router";
 import { createContext, useContext } from "react";
 
 import { authClient } from "../auth/auth-client.ts";
+import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
 
 export interface Account {
   readonly name: string;
@@ -24,16 +25,35 @@ export const useAccount = () => {
 
 /**
  * Renders its pages for a signed-in person and gives them the account; sends
- * anyone else to sign in.
+ * anyone else to sign in. If the session can't be checked, it offers a retry
+ * rather than treating the person as signed out.
  */
 export const SignedInOnly = ({ children }: { children: React.ReactNode }) => {
-  const { data: session, isPending } = authClient.useSession();
+  const { data: session, error, isPending, refetch } = authClient.useSession();
 
   if (isPending) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-kumo-base">
         <Loader />
       </div>
+    );
+  }
+
+  if (!session && error) {
+    return (
+      <AuthLayout>
+        <AuthHeading description="Check your connection, then try again. You haven’t been signed out.">
+          Mailquilt couldn’t check your session
+        </AuthHeading>
+        <Button
+          className="w-full justify-center"
+          onClick={() => refetch()}
+          size="lg"
+          variant="primary"
+        >
+          Try again
+        </Button>
+      </AuthLayout>
     );
   }
 
