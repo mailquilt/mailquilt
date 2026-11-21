@@ -5,7 +5,7 @@ import { NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { ApiLive } from "@repo/api";
 import { PostgresPortsLive } from "@repo/runtime-node";
 import { Config, Effect, Layer } from "effect";
-import { HttpRouter, HttpStaticServer } from "effect/http";
+import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
 
 const DASHBOARD_DIR = fileURLToPath(
   new URL("../../dashboard/dist/client", import.meta.url)
@@ -20,6 +20,7 @@ const HttpServerLive = Layer.unwrap(
 );
 
 const DashboardLive = Layer.mergeAll(
+  HttpRouter.add("*", "/api/*", HttpServerResponse.empty({ status: 404 })),
   HttpStaticServer.layer({
     cacheControl: "no-cache",
     root: DASHBOARD_DIR,

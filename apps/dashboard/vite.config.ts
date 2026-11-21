@@ -16,7 +16,11 @@ const config = defineConfig({
     }),
     viteReact(),
   ],
-  server: { proxy: { "^/health$": DEV_API_URL } },
+  server: {
+    port: 3001,
+    proxy: { "^/api/": DEV_API_URL, "^/health$": DEV_API_URL },
+    strictPort: true,
+  },
 });
 
 export default config;

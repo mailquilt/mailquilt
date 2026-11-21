@@ -2,7 +2,7 @@
 
 Accepted limits, and rules a review doesn't raise again unless something has changed since, such as a bug report or a new feature that depends on them. A pull request that changes one of these says so, gives the reason and updates this page.
 
-The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), and customers bring their own Provider (0002). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
+The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), and API routes under `/api` (0004). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
 
 ## Consent and sending
 
