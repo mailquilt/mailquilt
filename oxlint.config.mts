@@ -1,13 +1,13 @@
 import { defineConfig } from "oxlint";
-import core from "ultracite/oxlint/core";
-import react from "ultracite/oxlint/react";
-import tanstack from "ultracite/oxlint/tanstack";
-import astro from "ultracite/oxlint/astro";
-import vitest from "ultracite/oxlint/vitest";
-import playwright from "ultracite/oxlint/playwright";
-import shadcn from "ultracite/oxlint/shadcn";
-import landmines from "ultracite/oxlint/landmines";
 import antiSlop from "ultracite/oxlint/anti-slop";
+import astro from "ultracite/oxlint/astro";
+import core from "ultracite/oxlint/core";
+import landmines from "ultracite/oxlint/landmines";
+import playwright from "ultracite/oxlint/playwright";
+import react from "ultracite/oxlint/react";
+import shadcn from "ultracite/oxlint/shadcn";
+import tanstack from "ultracite/oxlint/tanstack";
+import vitest from "ultracite/oxlint/vitest";
 
 export default defineConfig({
   env: core.env,

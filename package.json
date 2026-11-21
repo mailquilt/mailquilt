@@ -19,8 +19,8 @@
     "typescript": "7.0.2",
     "ultracite": "8.3.1"
   },
-  "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24"
-  }
+  },
+  "packageManager": "pnpm@11.25.0"
 }
