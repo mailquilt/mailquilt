@@ -62,7 +62,7 @@ describe("check your inbox", () => {
   });
 
   it("lets the person send a new link only after the cooldown", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     let sent = 0;
     api.use(
       http.post("*/api/auth/send-verification-email", () => {
@@ -95,6 +95,43 @@ describe("check your inbox", () => {
       screen.findByText("We sent a new link to ada@northwind.studio.")
     ).resolves.toBeDefined();
     expect(sent).toBe(1);
+  });
+
+  it("unlocks a new link once the minute has passed, even after the tab slept", () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
+
+    renderCheckInbox("ada@northwind.studio");
+    act(() => {
+      vi.setSystemTime(Date.now() + 2 * 60 * 1000);
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(
+      screen
+        .getByRole("button", { name: "Send a new link" })
+        .hasAttribute("disabled")
+    ).toBeFalsy();
+  });
+
+  it("clears the not-sent message once the address is edited", async () => {
+    api.use(
+      http.post("*/api/auth/send-verification-email", () =>
+        HttpResponse.json({ message: "Unavailable" }, { status: 503 })
+      )
+    );
+
+    renderCheckInbox(undefined);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "ada@northwind.studio" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send a new link" }));
+    await expect(screen.findByRole("alert")).resolves.toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "ada@northwind.org" },
+    });
+
+    await expect.poll(() => screen.queryByRole("alert")).toBeNull();
   });
 
   it("asks for the address when it was opened without one, then sends a link", async () => {
