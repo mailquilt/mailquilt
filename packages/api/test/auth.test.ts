@@ -251,4 +251,18 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
         assert.strictEqual(fromAnotherIp.status, 401);
       })
   );
+
+  test.effect(
+    "refuses a sign-in body larger than 64 KiB without reading it",
+    () =>
+      Effect.gen(function* oversizedBody() {
+        const response = yield* signIn(
+          uniqueEmail(),
+          "x".repeat(65 * 1024),
+          uniqueIp()
+        );
+
+        assert.strictEqual(response.status, 413);
+      })
+  );
 });

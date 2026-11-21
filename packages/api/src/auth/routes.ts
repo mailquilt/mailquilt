@@ -1,11 +1,18 @@
-import { Effect, Option } from "effect";
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { ByteSize, Effect, Option } from "effect";
+import {
+  HttpIncomingMessage,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/http";
 
 import { AUTH_BASE_PATH, isAllowedAuthEndpoint } from "./allow-list.ts";
 import { CLIENT_IP_HEADER, makeAuth } from "./better-auth.ts";
 import { AuthConfig } from "./config.ts";
 
 const notFound = HttpServerResponse.empty({ status: 404 });
+
+const MAX_AUTH_BODY_SIZE = ByteSize.kibibytes(64);
 
 const clientIpFromHeaderOrPeer = (
   request: HttpServerRequest.HttpServerRequest,
@@ -41,7 +48,16 @@ const handleAuthRequest = Effect.gen(function* handleAuthRequest() {
     return notFound;
   }
 
-  const body = request.method === "GET" ? null : yield* request.arrayBuffer;
+  const body =
+    request.method === "GET"
+      ? null
+      : yield* request.arrayBuffer.pipe(
+          Effect.provideService(
+            HttpIncomingMessage.MaxBodySize,
+            MAX_AUTH_BODY_SIZE
+          )
+        );
+
   const auth = yield* makeAuth;
 
   const response = yield* Effect.promise(() =>
