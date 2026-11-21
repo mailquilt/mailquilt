@@ -1,27 +1,56 @@
 import { PgClient } from "@effect/sql-pg";
 import { MailquiltApi } from "@repo/contract";
-import { DatabaseHealthLive, DatabaseLive } from "@repo/db";
+import type { SystemMailer } from "@repo/core";
+import type { SystemMailerOutbox } from "@repo/core/testing";
+import { SystemMailerOutboxLive } from "@repo/core/testing";
+import { DatabaseLive, DatabasePortsLive } from "@repo/db";
+import { migrateDatabase } from "@repo/db/migrate";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Context, Effect, Layer, Redacted } from "effect";
+import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
-import { ApiLive } from "../src/index.ts";
+import { ApiLive, authConfigLayer } from "../src/index.ts";
 
 const POSTGRES_IMAGE =
   "postgres:18.7-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff";
+
+/** The app's origin in tests. */
+export const APP_URL = "http://mailquilt.test";
+
+/** The header the test deployment's proxy puts the client IP in, configured as an operator might write it. */
+export const TRUSTED_IP_HEADER = "X-Real-IP";
+
+/** Signs session cookies and verification links in tests. */
+export const TEST_AUTH_SECRET = Redacted.make(
+  "test-secret-that-is-at-least-32-characters-long"
+);
+
+const TestAuthConfig = authConfigLayer({
+  appUrl: APP_URL,
+  clientIpHeader: Option.some(TRUSTED_IP_HEADER),
+  secret: TEST_AUTH_SECRET,
+});
 
 const startPostgres = Effect.acquireRelease(
   Effect.promise(() => new PostgreSqlContainer(POSTGRES_IMAGE).start()),
   (container) => Effect.promise(() => container.stop())
 );
 
-const appWith = (databaseUrl: string) =>
+const appWith = (
+  databaseUrl: string,
+  mailer: Context.Context<SystemMailer | SystemMailerOutbox>
+) =>
   ApiLive.pipe(
     HttpRouter.provideRequest(
-      DatabaseHealthLive.pipe(
-        Layer.provide(DatabaseLive),
-        Layer.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
+      Layer.mergeAll(
+        DatabasePortsLive.pipe(
+          Layer.provideMerge(
+            PgClient.layer({ url: Redacted.make(databaseUrl) })
+          )
+        ),
+        TestAuthConfig,
+        Layer.succeedContext(mailer)
       )
     ),
     Layer.provide(HttpServer.layerServices)
@@ -33,19 +62,31 @@ export class ApiClient extends Context.Service<
   HttpApiClient.ForApi<typeof MailquiltApi>
 >()("test/ApiClient") {}
 
+/** Plain `fetch` to the app in process, for routes outside `contract`. */
+export const AppFetch =
+  Context.Service<typeof globalThis.fetch>("test/AppFetch");
+
 /**
- * The whole API assembled as the entry apps assemble it, with a real Postgres
- * from Testcontainers. Requests go through the same web handler the Worker
- * uses, so routing, encoding and decoding are the real ones.
+ * The whole API assembled as the entry apps assemble it, with a migrated,
+ * real Postgres from Testcontainers and the System Mailer outbox. Requests go
+ * through the same web handler the Worker uses, so routing, encoding and
+ * decoding are the real ones.
  */
-export const TestApp = Layer.effect(
-  ApiClient,
-  Effect.gen(function* apiClient() {
+export const TestApp = Layer.effectContext(
+  Effect.gen(function* testApp() {
     const postgres = yield* startPostgres;
+    const databaseUrl = postgres.getConnectionUri();
+
+    yield* migrateDatabase.pipe(
+      Effect.provide(DatabaseLive),
+      Effect.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
+    );
+
+    const mailer = yield* Layer.build(SystemMailerOutboxLive);
 
     const app = yield* Effect.acquireRelease(
       Effect.sync(() =>
-        HttpRouter.toWebHandler(appWith(postgres.getConnectionUri()), {
+        HttpRouter.toWebHandler(appWith(databaseUrl, mailer), {
           disableLogger: true,
         })
       ),
@@ -55,11 +96,16 @@ export const TestApp = Layer.effect(
     const fetchInProcess: typeof globalThis.fetch = (input, init) =>
       app.handler(new Request(input, init));
 
-    return yield* HttpApiClient.make(MailquiltApi, {
-      baseUrl: "http://mailquilt.test",
+    const client = yield* HttpApiClient.make(MailquiltApi, {
+      baseUrl: APP_URL,
     }).pipe(
       Effect.provide(FetchHttpClient.layer),
       Effect.provideService(FetchHttpClient.Fetch, fetchInProcess)
+    );
+
+    return Context.make(ApiClient, client).pipe(
+      Context.add(AppFetch, fetchInProcess),
+      Context.merge(mailer)
     );
   })
 );

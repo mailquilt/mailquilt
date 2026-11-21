@@ -38,7 +38,7 @@ Mailquilt's threat model and the controls that answer it. Each control ships in 
 - **Responses don't reveal whether an account exists.**
 - **Cookies:** httpOnly, Secure, SameSite=Lax. The CSRF check stays on, and `trustedOrigins` is explicit.
 - **Sessions:** members see their active sessions and can sign each one out.
-- **Client IP header** is set explicitly: `cf-connecting-ip` on Cloudflare, the reverse proxy's header on Docker. The default `x-forwarded-for` can be forged by clients.
+- **Client IP header** is set explicitly: `cf-connecting-ip` on Cloudflare, the reverse proxy's header (`CLIENT_IP_HEADER`) on Docker, and the directly connected peer when Docker has no proxy. The default `x-forwarded-for` can be forged by clients, so Better Auth never reads it.
 - **Re-confirmation:** sensitive actions need a sign-in within the last 10 minutes, and Organization owners get an email:
   - adding or changing a Provider Connection
   - creating an API key

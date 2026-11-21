@@ -13,7 +13,9 @@
   "dependencies": {
     "@repo/contract": "workspace:*",
     "@repo/core": "workspace:*",
-    "effect": "catalog:"
+    "better-auth": "catalog:",
+    "effect": "catalog:",
+    "kysely": "catalog:"
   },
   "devDependencies": {
     "@effect/sql-pg": "catalog:",

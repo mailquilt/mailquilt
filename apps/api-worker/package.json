@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@repo/api": "workspace:*",
+    "@repo/core": "workspace:*",
     "@repo/runtime-cloudflare": "workspace:*",
     "effect": "catalog:"
   },
