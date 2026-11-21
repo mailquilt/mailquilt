@@ -55,6 +55,8 @@ catalog:
   nitro: 3.0.260610-beta
   oxfmt: 0.79.0
   oxlint: 1.94.0
+  path-to-regexp: 6.3.0
+  postcss-selector-parser: 6.1.6
   react: 19.3.1
   react-dom: 19.3.1
   tailwindcss: 4.3.5
@@ -64,6 +66,19 @@ catalog:
   vite: 8.3.8
   vitest: 5.1.0
   wrangler: 4.162.0
+
+# Transitive versions forced past a security advisory. Each stays within the
+# major its parent asks for; remove it once the parent ships the fix.
+overrides:
+  "@vercel/routing-utils>path-to-regexp": "catalog:" # GHSA-9wv6-86v2-598j
+  "@tailwindcss/typography>postcss-selector-parser": "catalog:" # GHSA-rj75-hqrm-r3gf
+
+audit:
+  ignore:
+    # glob and minimatch inside archiver, which @testcontainers/postgresql uses
+    # only in tests. The fix is a major bump archiver doesn't support yet.
+    - GHSA-3g3m-2fjr-6pw4
+    - GHSA-g3hv-75wg-m249
 
 allowBuilds:
   esbuild: true
