@@ -1,0 +1,66 @@
+name: Bug
+description: Something in Mailquilt doesn't work as the docs say.
+labels: [bug, needs-triage]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Contacts, Lists or imports
+        - Templates or the editor
+        - Campaigns and sending
+        - Unsubscribe, preferences or signup forms
+        - Providers, Sending Domains or bounces
+        - Reports and tracking
+        - Sign-in, Organizations or members
+        - API or API keys
+        - Installing or upgrading
+        - Docs
+        - Not sure
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Where Mailquilt runs
+      options:
+        - Hosted
+        - Docker (Coolify or another host)
+        - Cloudflare
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release, or the Docker image tag.
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: Provider
+      description: If it's about sending, which Provider the Organization uses.
+      placeholder: "SES, SMTP (Postmark), Cloudflare Email…"
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a List
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or error
+      description: The error the dashboard or API showed, or the server's log lines around it. Leave out keys, passwords and Contacts' email addresses.
+      render: text

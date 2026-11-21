@@ -11,6 +11,13 @@ Mailquilt ships in four phases. Each phase ends with a demonstrable outcome, wri
 
 Security work ships in the same phase as the feature it protects. It never waits for a later "hardening" phase.
 
+## Review checkpoints
+
+Every pull request gets a review of its own diff against the release bar in [docs/agents/review.md](docs/agents/review.md). Beyond that, there are only two broad reviews per phase:
+
+- **Design checkpoint (P1 only):** once the first Campaign is sent on Docker and on Cloudflare, one reviewer reads the whole codebase and answers "how well is it written?". At that point every pattern exists once: Organization scoping, ports, errors, IDs, tokens, the test harness. Structural fixes become ADRs and land before the rest of P1 builds on those patterns.
+- **Phase end:** one "ready to ship?" review against the release bar. Findings below the bar go to a backlog issue.
+
 ---
 
 ## P1: MVP

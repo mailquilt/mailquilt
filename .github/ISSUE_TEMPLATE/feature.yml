@@ -1,0 +1,25 @@
+name: Idea
+description: Something Mailquilt can't do yet.
+labels: [enhancement, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: The [roadmap](https://github.com/mailquilt/mailquilt/blob/main/ROADMAP.md) lists what's planned. If your idea is there, add to its issue instead.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What you're trying to do
+      description: The task, for you or the people on your Lists, rather than a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: Why Mailquilt can't do it today
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How it could work
+      description: Optional. A sketch, an example from another tool, or an API you'd like.

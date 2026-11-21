@@ -23,6 +23,22 @@ Uses the default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agen
 
 Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+### Before building
+
+Read `docs/architecture.md`, `docs/security.md` and the ADRs for the area you touch. Follow the pattern an ADR or existing code already sets. If a ticket needs a new pattern that other code will copy, such as a new port, error shape or way of scoping, write a short ADR for it before using it a second time.
+
+### Tests
+
+Before writing or changing tests, read `docs/agents/testing.md`.
+
+### Reviews
+
+Before reviewing code, or acting on a review, read `docs/agents/review.md`. It says which kind of review to run, the bar a finding must meet, and when to stop. Decisions already taken are in `docs/agents/decisions.md`. Don't raise them again unless something has changed since.
+
+### Merging
+
+One behaviour per pull request. Merge only after every check has passed, never around a failed or unfinished check, and in each area merge one pull request at a time, each reviewed against the bar first.
+
 # Ultracite Code Standards
 
 This project uses **Ultracite**, a zero-config preset that enforces strict code quality standards through automated formatting and linting.
