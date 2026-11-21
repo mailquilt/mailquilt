@@ -8,16 +8,19 @@ import { HealthStatus } from "./health-status.tsx";
 
 const api = setupServer();
 
-const renderHealthStatus = () =>
+const renderHealthStatus = () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
   render(
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
-      }
-    >
+    <QueryClientProvider client={queryClient}>
       <HealthStatus />
     </QueryClientProvider>
   );
+
+  return queryClient;
+};
 
 describe("health status", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
@@ -28,20 +31,20 @@ describe("health status", () => {
 
   afterAll(() => api.close());
 
-  it("announces the database as connected when the API is healthy", async () => {
+  it("says nothing while the API and its database are healthy", async () => {
     api.use(
       http.get("/health", () => HttpResponse.json({ database: "connected" }))
     );
 
-    renderHealthStatus();
+    const queryClient = renderHealthStatus();
 
-    await expect(
-      screen.findByText("Database connected")
-    ).resolves.toBeDefined();
-    expect(screen.getByRole("status").textContent).toBe("Database connected");
+    await expect
+      .poll(() => queryClient.getQueryState(["health"])?.status)
+      .toBe("success");
+    expect(screen.getByRole("status").textContent).toBe("");
   });
 
-  it("shows the database as unreachable when the API reports it", async () => {
+  it("announces that the database is unreachable when the API reports it", async () => {
     api.use(
       http.get("/health", () =>
         HttpResponse.json({ _tag: "DatabaseUnreachable" }, { status: 503 })
@@ -51,15 +54,17 @@ describe("health status", () => {
     renderHealthStatus();
 
     await expect(
-      screen.findByText("Database unreachable")
+      screen.findByText("Mailquilt can't reach its database")
     ).resolves.toBeDefined();
   });
 
-  it("shows the API as unreachable when the request fails", async () => {
+  it("announces that the API is unreachable when the request fails", async () => {
     api.use(http.get("/health", () => HttpResponse.error()));
 
     renderHealthStatus();
 
-    await expect(screen.findByText("API unreachable")).resolves.toBeDefined();
+    await expect(
+      screen.findByText("The dashboard can't reach the Mailquilt API")
+    ).resolves.toBeDefined();
   });
 });

@@ -9,6 +9,9 @@ export const authClient = createAuthClient({ basePath: "/api/auth" });
 /** Where the verification link lands after Better Auth checks it. */
 export const EMAIL_VERIFIED_PATH = "/email-verified";
 
+/** Better Auth's default minimum, shown in the sign-up hint and its error. */
+export const MIN_PASSWORD_LENGTH = 8;
+
 interface AuthError {
   readonly status: number;
   readonly code?: string | undefined;
@@ -28,7 +31,7 @@ export const authErrorMessage = (error: AuthError) => {
   }
 
   if (error.code === "PASSWORD_TOO_SHORT") {
-    return "Use a password of at least 8 characters.";
+    return `Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
 
   return "Something went wrong. Try again.";

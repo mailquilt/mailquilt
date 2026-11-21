@@ -23,4 +23,12 @@ declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof getRouter>;
   }
+
+  interface HistoryState {
+    /**
+     * The address a verification link was just sent to. Kept in history
+     * state, not the URL, so it never reaches server logs.
+     */
+    verificationEmail?: string;
+  }
 }

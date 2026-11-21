@@ -1,4 +1,4 @@
-import { Badge, Loader, Text } from "@cloudflare/kumo";
+import { Banner } from "@cloudflare/kumo";
 import { DatabaseUnreachable } from "@repo/domain";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
@@ -10,42 +10,45 @@ const healthQuery = queryOptions({
   retry: false,
 });
 
-const HealthResult = () => {
-  const { error, isPending } = useQuery(healthQuery);
-
-  if (isPending) {
-    return <Loader />;
-  }
+const HealthProblem = ({ className }: { className: string | undefined }) => {
+  const { error } = useQuery(healthQuery);
 
   if (error instanceof DatabaseUnreachable) {
     return (
-      <>
-        <Badge variant="error">Database unreachable</Badge>
-        <Text variant="secondary">
-          The API is running but cannot query Postgres.
-        </Text>
-      </>
+      <Banner
+        className={className}
+        description="Signing in, saving changes and sending won't work until it's back. Check that Postgres is running and DATABASE_URL points to it."
+        title="Mailquilt can't reach its database"
+        variant="error"
+      />
     );
   }
 
   if (error) {
     return (
-      <>
-        <Badge variant="error">API unreachable</Badge>
-        <Text variant="secondary">The dashboard cannot reach the API.</Text>
-      </>
+      <Banner
+        className={className}
+        description="Check your connection, then reload the page."
+        title="The dashboard can't reach the Mailquilt API"
+        variant="error"
+      />
     );
   }
 
-  return <Badge variant="success">Database connected</Badge>;
+  return null;
 };
 
 /**
- * Whether the API is up and can reach its Postgres database. The result
- * replaces the loader inside one live region, so screen readers announce it.
+ * Whether the API is up and can reach its Postgres database. Says nothing
+ * while it is; a problem appears in a live region, so screen readers
+ * announce it.
  */
-export const HealthStatus = () => (
-  <output className="flex flex-col items-start gap-2">
-    <HealthResult />
+export const HealthStatus = ({
+  bannerClassName,
+}: {
+  bannerClassName?: string;
+}) => (
+  <output aria-live="polite" className="block">
+    <HealthProblem className={bannerClassName} />
   </output>
 );

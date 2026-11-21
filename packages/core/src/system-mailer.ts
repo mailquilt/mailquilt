@@ -1,3 +1,4 @@
+import { VERIFICATION_EMAIL_SUBJECT } from "@repo/domain";
 import { Context, Effect, Layer } from "effect";
 
 /** One of Mailquilt's own account emails, in plain text. */
@@ -33,7 +34,7 @@ export const sendEmailVerification = (to: string, url: string) =>
   Effect.gen(function* sendVerificationLink() {
     const mailer = yield* SystemMailer;
     yield* mailer.send({
-      subject: "Verify your email address for Mailquilt",
+      subject: VERIFICATION_EMAIL_SUBJECT,
       text: [
         "Open this link to verify your email address and finish signing up for Mailquilt:",
         "",

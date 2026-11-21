@@ -1,3 +1,4 @@
+import { DropdownMenu } from "@cloudflare/kumo";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { DetachedWindowAPI } from "happy-dom";
 import { afterEach, describe, expect, it } from "vitest";
@@ -11,12 +12,28 @@ declare global {
   }
 }
 
+const renderOpenMenu = () =>
+  render(
+    <DropdownMenu defaultOpen>
+      <DropdownMenu.Trigger>
+        <button type="button">Account</button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content>
+        <ThemePicker />
+      </DropdownMenu.Content>
+    </DropdownMenu>
+  );
+
+const isChosen = (name: string) =>
+  screen.getByRole("menuitemradio", { name }).getAttribute("aria-checked") ===
+  "true";
+
 const reloadPage = () => {
   cleanup();
   delete document.documentElement.dataset.mode;
   // oxlint-disable-next-line no-new-func -- runs the shell's inline script as the browser would on load.
   new Function(themeScript)();
-  render(<ThemePicker />);
+  renderOpenMenu();
 };
 
 const setDeviceColorScheme = (scheme: "light" | "dark") => {
@@ -35,26 +52,26 @@ describe("theme picker", () => {
   });
 
   it("keeps the chosen theme after a reload", () => {
-    render(<ThemePicker />);
+    renderOpenMenu();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Dark" }));
     reloadPage();
 
     expect(document.documentElement.dataset.mode).toBe("dark");
-    expect(
-      screen.getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")
-    ).toBe("true");
+    expect(isChosen("Dark")).toBeTruthy();
   });
 
-  it("follows the device setting only while System is chosen", () => {
+  it("follows the device setting only while matching the device is chosen", () => {
     setDeviceColorScheme("dark");
-    render(<ThemePicker />);
+    renderOpenMenu();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Light" }));
     reloadPage();
     expect(document.documentElement.dataset.mode).toBe("light");
 
-    fireEvent.click(screen.getByRole("radio", { name: "System" }));
+    fireEvent.click(
+      screen.getByRole("menuitemradio", { name: "Match my device" })
+    );
     reloadPage();
     expect(document.documentElement.dataset.mode).toBe("dark");
   });

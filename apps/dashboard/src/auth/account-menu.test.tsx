@@ -1,3 +1,5 @@
+import { Sidebar } from "@cloudflare/kumo";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -7,10 +9,14 @@ import { AccountMenu } from "./account-menu.tsx";
 
 const api = setupServer();
 
-const SESSION = {
-  session: { expiresAt: "2026-12-01T00:00:00.000Z", id: "s", userId: "u" },
-  user: { email: "ada@example.com", emailVerified: true, id: "u", name: "Ada" },
-};
+const renderAccountMenu = () =>
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Sidebar.Provider>
+        <AccountMenu account={{ email: "ada@example.com", name: "Ada" }} />
+      </Sidebar.Provider>
+    </QueryClientProvider>
+  );
 
 describe("account menu", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
@@ -22,25 +28,38 @@ describe("account menu", () => {
   afterAll(() => api.close());
 
   it("signs the person out", async () => {
-    let signedIn = true;
+    let signedOut = false;
     api.use(
-      http.get("*/api/auth/get-session", () =>
-        HttpResponse.json(signedIn ? SESSION : null)
-      ),
+      http.get("*/api/auth/get-session", () => HttpResponse.json(null)),
       http.post("*/api/auth/sign-out", () => {
-        signedIn = false;
+        signedOut = true;
 
         return HttpResponse.json({ success: true });
       })
     );
 
-    render(<AccountMenu />);
-    await expect(screen.findByText("ada@example.com")).resolves.toBeDefined();
-    fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+    renderAccountMenu();
+    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
+
+    await expect.poll(() => signedOut).toBe(true);
+  });
+
+  it("says so when signing out fails", async () => {
+    api.use(
+      http.post("*/api/auth/sign-out", () =>
+        HttpResponse.json({ message: "Unavailable" }, { status: 503 })
+      )
+    );
+
+    renderAccountMenu();
+    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 
     await expect(
-      screen.findByRole("link", { name: "Sign in" })
+      screen.findByText(
+        "Couldn’t sign out. Check your connection, then try again."
+      )
     ).resolves.toBeDefined();
-    expect(signedIn).toBeFalsy();
   });
 });

@@ -17,8 +17,9 @@ describe("sign-up form", () => {
 
   afterAll(() => api.close());
 
-  it("asks the person to open the link sent to their email", async () => {
+  it("hands over to the inbox step once the account exists", async () => {
     let callbackURL: unknown;
+    let signedUpAs: unknown;
     api.use(
       http.post("*/api/auth/sign-up/email", async ({ request }) => {
         // SAFETY: the sign-up form sends Better Auth a JSON body.
@@ -32,10 +33,14 @@ describe("sign-up form", () => {
 
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <SignUpForm />
+        <SignUpForm
+          onSignedUp={(email) => {
+            signedUpAs = email;
+          }}
+        />
       </QueryClientProvider>
     );
-    fireEvent.change(screen.getByLabelText("Name"), {
+    fireEvent.change(screen.getByLabelText("Your name"), {
       target: { value: "Ada" },
     });
     fireEvent.change(screen.getByLabelText("Email"), {
@@ -46,11 +51,7 @@ describe("sign-up form", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
-    await expect(
-      screen.findByText(
-        "We sent a link to ada@example.com. Open it to verify your email address, then sign in."
-      )
-    ).resolves.toBeDefined();
+    await expect.poll(() => signedUpAs).toBe("ada@example.com");
     expect(callbackURL).toBe("/email-verified");
   });
 });
