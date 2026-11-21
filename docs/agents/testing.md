@@ -10,6 +10,8 @@ Mail Quilt has three test seams. Use the highest one that can see the rule.
 2. **The Provider port.** One shared contract suite runs against every Provider adapter: recorded HTTP responses and webhook payloads, and Mailpit for SMTP.
 3. **The deployment.** One Playwright smoke test per deployment target signs in, sends a Campaign and checks it arrives in Mailpit. It proves the pieces are wired together. Don't add rules to it.
 
+Dashboard tests render a component in happy-dom with Testing Library. They keep the typed client real and answer its requests with MSW, so they show how the UI handles each result the API can return, not the rules behind it.
+
 Small direct unit tests are only for pure rules with many cases, such as how DNS results are classified, how tokens are signed and checked, CSV formula escaping, and merge-tag rendering and escaping.
 
 ## Never fake the database

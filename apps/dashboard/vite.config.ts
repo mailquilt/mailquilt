@@ -2,18 +2,21 @@ import tailwindcss from "@tailwindcss/vite";
 import { devtools } from "@tanstack/devtools-vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
-import { nitro } from "nitro/vite";
 import { defineConfig } from "vite";
+
+const DEV_API_URL = "http://localhost:3000";
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
   plugins: [
     devtools(),
-    nitro({ rollupConfig: { external: [/^@sentry\//u] } }),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart({
+      spa: { enabled: true, prerender: { outputPath: "/index" } },
+    }),
     viteReact(),
   ],
+  server: { proxy: { "^/health$": DEV_API_URL } },
 });
 
 export default config;

@@ -58,7 +58,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Dashboard
 
-- TanStack Start in **SPA mode**: static files with no server functions. The current Nitro setup goes away.
+- TanStack Start in **SPA mode**: static files with no server functions. Both entry apps serve them next to the API, and any path that isn't a file or an API route gets the app shell.
 - TanStack Query for queries and mutations, through the typed client generated from `contract`.
 - Kumo (Base UI and Tailwind v4) for components; `@mailquilt/editor` (through `@mailquilt/react`) for email design.
 
