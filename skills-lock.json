@@ -78,6 +78,13 @@
       "skillPath": "skills/engineering/implement/SKILL.md",
       "computedHash": "560465496ad0669329993bfdd0604e5c93b5c2446309a76f486040010b063908"
     },
+    "kumo-design": {
+      "source": "cloudflare/kumo",
+      "commit": "36a96e59d38c03f8a7bd65496d7d4253269380ef",
+      "sourceType": "github",
+      "skillPath": "skills/kumo-design/SKILL.md",
+      "computedHash": "a949859a60d0c7bd45975cc6b4ad67316ce0ed5d838776afda0cd9d10b763c17"
+    },
     "lit-best-practices": {
       "source": "artmsilva/lit-best-practices",
       "commit": "f969bda007d639f09cab5f1aab3758c48bd20e77",

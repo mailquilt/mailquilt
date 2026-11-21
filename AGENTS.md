@@ -35,6 +35,14 @@ Before writing or changing tests, read `docs/agents/testing.md`.
 
 Before reviewing code, or acting on a review, read `docs/agents/review.md`. It says which kind of review to run, the bar a finding must meet, and when to stop. Decisions already taken are in `docs/agents/decisions.md`. Don't raise them again unless something has changed since.
 
+### Design and UI
+
+Before designing or changing any screen, read `docs/agents/design.md`. It sets the quality bar, the process, the brand rules, and the checklist every UI change passes. Design with the `frontend-design` skill, and build and review with the `kumo-design` skill. The dashboard's tokens and building blocks are described in `apps/dashboard/README.md`.
+
+### Running commands
+
+In a shell without a terminal (TTY), `turbo run` can finish and then hang, because `turbo.json` uses the interactive UI. Run `./node_modules/.bin/turbo run <task> --ui=stream`, and call tools such as `tsc`, `vitest` and `ultracite` from `node_modules/.bin` rather than through `pnpm exec`.
+
 ### Merging
 
 One behaviour per pull request. Merge only after every check has passed, never around a failed or unfinished check, and in each area merge one pull request at a time, each reviewed against the bar first.
