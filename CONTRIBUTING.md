@@ -35,7 +35,7 @@ Read [docs/agents/testing.md](docs/agents/testing.md) before you write or change
 
 - One behaviour per pull request. A second behaviour is a second pull request.
 - Fill in the pull request template, including how you know the change works.
-- Every CI check must pass before a merge: lint, type-check, tests, `pnpm audit`, CodeQL, the secret scan and the CLA check. CodeQL is skipped until the repository is public, because GitHub offers code scanning on private repositories only on paid plans. Nobody merges around a failed or unfinished check.
+- Every CI check must pass before a merge: lint, type-check, tests, `pnpm audit`, CodeQL, the secret scan and the CLA check. Nobody merges around a failed or unfinished check.
 - A maintainer reviews the change as [docs/agents/review.md](docs/agents/review.md) describes.
 
 ## Contributor License Agreement

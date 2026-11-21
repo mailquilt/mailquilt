@@ -15,9 +15,6 @@ concurrency:
 jobs:
   analyze:
     name: CodeQL
-    # Code scanning needs a public repository on GitHub's free plan. Until the
-    # repository goes public the job is skipped, then it runs on its own.
-    if: ${{ github.event.repository.private == false }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
