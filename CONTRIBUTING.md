@@ -29,7 +29,7 @@ Read [docs/agents/testing.md](docs/agents/testing.md) before you write or change
 
 - Every version is pinned exactly in the catalog in `pnpm-workspace.yaml`. Packages refer to it with `catalog:`.
 - pnpm refuses releases younger than 7 days (`minimumReleaseAge`). An exception goes in `minimumReleaseAgeExclude` with its reason.
-- Renovate opens grouped update pull requests every week. Don't update dependencies in a feature pull request.
+- Dependencies are updated by hand, in their own pull request, never inside a feature pull request.
 
 ## Pull requests
 

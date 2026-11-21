@@ -141,7 +141,7 @@ HSTS, a strict CSP on the dashboard, `frame-ancestors 'none'`, Referrer-Policy, 
 ### Supply chain and release
 
 - Exact version pins in one pnpm catalog, and a `minimumReleaseAge` of 7 days.
-- Renovate opens grouped weekly update PRs, each reviewed by a person.
+- Dependencies are updated deliberately by hand. Dependabot alerts and `pnpm audit` in CI flag vulnerable versions.
 - CI runs `pnpm audit`, CodeQL and secret scanning.
 - Docker images use a minimal base and a non-root user, and are published with an SBOM and a cosign signature.
 - GitHub private vulnerability reporting is on and linked from `SECURITY.md`.

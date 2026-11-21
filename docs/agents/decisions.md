@@ -53,6 +53,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), and customer
 - `@cloudflare/vitest-pool-workers` isn't used while it needs Vitest 4 and `@effect/vitest` needs Vitest 5. The Cloudflare runtime is covered by the smoke test on `wrangler dev`.
 - Every dependency is pinned exactly in one pnpm catalog, with a 7-day `minimumReleaseAge`. `drizzle-orm` and `drizzle-kit` are excluded, because the Effect integration exists only in their newest release candidates.
 - CI installs with `--frozen-lockfile` in every job, so tests never meet a dependency version the repo hasn't taken on purpose.
+- Dependencies are updated by hand, with no Renovate or Dependabot update PRs, so no third-party app gets write access to the repo. Dependabot alerts and `pnpm audit` in CI flag vulnerable versions. At each checkpoint in `ROADMAP.md`, run `pnpm outdated -r` and update what's worth it. This replaces the Renovate setup from #3.
 
 ## Product
 
