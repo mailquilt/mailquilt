@@ -4,6 +4,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-13",
   "compatibility_flags": ["nodejs_compat"],
+  // The dashboard's build output, from `pnpm --filter dashboard build`.
+  // Any path that isn't a file gets index.html, whoever asks, unless it
+  // matches `run_worker_first` (ADR 0004).
+  "assets": {
+    "directory": "../dashboard/dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/health", "/api/*"],
+  },
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
