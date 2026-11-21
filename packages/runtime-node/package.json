@@ -1,0 +1,22 @@
+{
+  "name": "@repo/runtime-node",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/sql-pg": "catalog:",
+    "@repo/core": "workspace:*",
+    "@repo/db": "workspace:*",
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

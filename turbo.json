@@ -16,6 +16,13 @@
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "test": {
+      "dependsOn": ["transit"],
+      "passThroughEnv": ["DOCKER_*", "TESTCONTAINERS_*"]
+    },
+    "transit": {
+      "dependsOn": ["^transit"]
     }
   }
 }
