@@ -59,6 +59,41 @@ describe("sign-up form", () => {
     expect(callbackURL).toBe("/email-verified");
   });
 
+  it("asks for a longer password instead of creating the account", async () => {
+    let requested = false;
+    api.use(
+      http.post("*/api/auth/sign-up/email", () => {
+        requested = true;
+
+        return HttpResponse.json({ token: null, user: {} });
+      })
+    );
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <SignUpForm onSignedUp={() => {}} />
+      </QueryClientProvider>
+    );
+    fireEvent.change(screen.getByLabelText("Your name"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "ada@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "short" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Create account" }));
+
+    await expect(
+      screen.findByText("Use a password of at least 8 characters.")
+    ).resolves.toBeDefined();
+    expect(screen.getByLabelText("Password").getAttribute("aria-invalid")).toBe(
+      "true"
+    );
+    expect(requested).toBeFalsy();
+  });
+
   it("says Mailquilt couldn't be reached when the request never arrives", async () => {
     api.use(http.post("*/api/auth/sign-up/email", () => HttpResponse.error()));
 

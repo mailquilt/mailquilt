@@ -1,5 +1,6 @@
 import type { SystemMailer } from "@repo/core";
 import { RateLimiter, sendEmailVerification } from "@repo/core";
+import { MIN_PASSWORD_LENGTH } from "@repo/domain";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { Duration, Effect, Option, Redacted, Schema } from "effect";
@@ -81,7 +82,11 @@ export const makeAuth = Effect.gen(function* makeAuth() {
       type: "postgres",
     },
     disabledPaths: DISABLED_AUTH_PATHS,
-    emailAndPassword: { enabled: true, requireEmailVerification: true },
+    emailAndPassword: {
+      enabled: true,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
+      requireEmailVerification: true,
+    },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         const signIn = Schema.decodeUnknownOption(SignInBody)(ctx.body);

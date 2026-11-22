@@ -51,6 +51,32 @@ describe("expired verification link", () => {
     expect(sentTo).toBe("ada@example.com");
   });
 
+  it("asks for the address instead of sending a link to nobody", async () => {
+    let requested = false;
+    api.use(
+      http.post("*/api/auth/send-verification-email", () => {
+        requested = true;
+
+        return HttpResponse.json({ status: true });
+      })
+    );
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <LinkExpired error="TOKEN_EXPIRED" onSent={() => {}} />
+      </QueryClientProvider>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Send a new link" }));
+
+    await expect(
+      screen.findByText("Enter your email address.")
+    ).resolves.toBeDefined();
+    expect(screen.getByLabelText("Email").getAttribute("aria-invalid")).toBe(
+      "true"
+    );
+    expect(requested).toBeFalsy();
+  });
+
   it("says the link couldn't be sent when Better Auth refuses", async () => {
     api.use(
       http.post("*/api/auth/send-verification-email", () =>
