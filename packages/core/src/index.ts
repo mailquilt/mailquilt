@@ -56,8 +56,6 @@ export {
   listProviderConnections,
   ProviderConnections,
   sendTestEmail,
-  TEST_EMAIL_LIMIT,
-  TEST_EMAIL_SUBJECT,
   updateProviderConnection,
 } from "./provider-connections.ts";
 

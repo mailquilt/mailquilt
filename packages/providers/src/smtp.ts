@@ -82,7 +82,7 @@ const toSendFailed = (error: Option.Option<typeof NodemailerError.Type>) => {
 const refused = (error: OutboundBlocked | HostNotFound | HostLookupFailed) => {
   if (error._tag === "OutboundBlocked") {
     return new SendFailed({
-      detail: `${error.host} resolves to an address this deployment doesn't connect to, such as a private network.`,
+      detail: `${error.host} resolves to an address this deployment doesn't connect to.`,
       reason: "blocked",
     });
   }

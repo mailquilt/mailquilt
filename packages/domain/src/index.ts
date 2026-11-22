@@ -63,6 +63,7 @@ export { ProviderConnectionNotFound } from "./provider-connection-not-found.ts";
 
 export {
   MailAddress,
+  MAX_CREDENTIAL_LENGTH,
   ProviderConnection,
   ProviderConnectionName,
   Sender,
@@ -90,4 +91,8 @@ export type { SubscriptionStatus } from "./subscription.ts";
 
 export { SignInRequired } from "./sign-in-required.ts";
 
-export { VERIFICATION_EMAIL_SUBJECT } from "./system-email.ts";
+export {
+  TEST_EMAIL_LIMIT,
+  TEST_EMAIL_SUBJECT,
+  VERIFICATION_EMAIL_SUBJECT,
+} from "./system-email.ts";

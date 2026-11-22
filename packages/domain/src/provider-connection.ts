@@ -12,7 +12,8 @@ const MAX_HOST_LENGTH = 253;
 
 const MAX_PORT = 65_535;
 
-const MAX_CREDENTIAL_LENGTH = 1000;
+/** The longest SMTP username or password accepted. */
+export const MAX_CREDENTIAL_LENGTH = 1000;
 
 /** What a Provider Connection is called. Spaces around it are trimmed. */
 export const ProviderConnectionName = Schema.Trim.check(
@@ -51,7 +52,7 @@ export const Sender = Schema.Struct({
  * trimmed.
  */
 export const SmtpHost = Schema.Trim.check(
-  Schema.isNonEmpty({ message: "Enter the server's host name." }),
+  Schema.isNonEmpty({ message: "Enter the server’s host name." }),
   Schema.isMaxLength(MAX_HOST_LENGTH, {
     message: `Use at most ${MAX_HOST_LENGTH} characters.`,
   }),
@@ -108,7 +109,7 @@ export const SmtpCredentials = Schema.Struct({
 
 /**
  * One Organization's configured SMTP server, as the API shows it: without
- * its credentials.
+ * its credentials, only whether it has saved ones (`signsIn`).
  */
 export class ProviderConnection extends Schema.Class<ProviderConnection>(
   "ProviderConnection"
@@ -118,5 +119,6 @@ export class ProviderConnection extends Schema.Class<ProviderConnection>(
   provider: Schema.Literal("smtp"),
   from: Sender,
   smtp: SmtpServer,
+  signsIn: Schema.Boolean,
   createdAt: Schema.DateTimeUtc,
 }) {}

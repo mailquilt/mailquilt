@@ -5,13 +5,14 @@ import {
 } from "@repo/core";
 import type { OrganizationId } from "@repo/domain";
 import {
+  CredentialsRequired,
   newProviderConnectionId,
   ProviderConnection,
   ProviderConnectionNotFound,
   SmtpCredentials,
   SmtpServer,
 } from "@repo/domain";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
 
@@ -57,6 +58,7 @@ interface ConnectionRow {
   readonly fromName: string | null;
   readonly fromEmail: string;
   readonly settings: unknown;
+  readonly signsIn: boolean;
   readonly createdAt: Date;
 }
 
@@ -68,6 +70,7 @@ const connectionColumns = {
   name: providerConnections.name,
   provider: providerConnections.provider,
   settings: providerConnections.settings,
+  signsIn: sql<boolean>`${providerConnections.credentials} is not null`,
 };
 
 const toConnection = (row: ConnectionRow) => ({
@@ -79,6 +82,7 @@ const toConnection = (row: ConnectionRow) => ({
   id: row.id,
   name: row.name,
   provider: row.provider,
+  signsIn: row.signsIn,
   smtp: row.settings,
 });
 
@@ -188,10 +192,20 @@ export const ProviderConnectionsLive = Layer.effect(
         Effect.gen(function* updateConnection() {
           const organization = (yield* CurrentOrganization).id;
 
+          const settings = yield* encodeServer(changes.smtp).pipe(Effect.orDie);
+
           const credentials =
             changes.credentials === "keep"
               ? {}
               : yield* sealedColumns(organization, id, changes.credentials);
+
+          const keptOnlyForTheSameServer =
+            changes.credentials === "keep"
+              ? or(
+                  isNull(providerConnections.credentials),
+                  sql`${providerConnections.settings} = ${JSON.stringify(settings)}::jsonb`
+                )
+              : undefined;
 
           const [updated] = yield* db
             .update(providerConnections)
@@ -200,15 +214,25 @@ export const ProviderConnectionsLive = Layer.effect(
               fromEmail: changes.from.email,
               fromName: changes.from.name ?? null,
               name: changes.name,
-              settings: yield* encodeServer(changes.smtp).pipe(Effect.orDie),
+              settings,
               updatedAt: sql`now()`,
             })
-            .where(inOrganization(organization, id))
+            .where(
+              and(inOrganization(organization, id), keptOnlyForTheSameServer)
+            )
             .returning(connectionColumns)
             .pipe(Effect.orDie);
 
           if (updated === undefined) {
-            return yield* new ProviderConnectionNotFound();
+            const [exists] = yield* db
+              .select({ id: providerConnections.id })
+              .from(providerConnections)
+              .where(inOrganization(organization, id))
+              .pipe(Effect.orDie);
+
+            return yield* exists === undefined
+              ? new ProviderConnectionNotFound()
+              : new CredentialsRequired();
           }
 
           return yield* decodeConnection(toConnection(updated)).pipe(

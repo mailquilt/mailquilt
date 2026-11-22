@@ -1,4 +1,5 @@
 import type {
+  CredentialsRequired,
   ProviderConnection,
   ProviderConnectionId,
   ProviderConnectionNotFound,
@@ -6,8 +7,14 @@ import type {
   SmtpCredentials,
   SmtpServer,
 } from "@repo/domain";
-import { CredentialsRequired, RateLimited, TestEmailSent } from "@repo/domain";
-import { Context, Duration, Effect, Option } from "effect";
+import {
+  RateLimited,
+  TEST_EMAIL_LIMIT,
+  TEST_EMAIL_SUBJECT,
+  TestEmailSent,
+} from "@repo/domain";
+import { Context, Duration, Effect } from "effect";
+import type { Option } from "effect";
 
 import type { CurrentOrganization } from "./current-organization.ts";
 import { CurrentUser } from "./current-user.ts";
@@ -57,12 +64,18 @@ export class ProviderConnections extends Context.Service<
       never,
       CurrentOrganization
     >;
+    /**
+     * Changes a connection. Keeping its saved credentials (`"keep"`) while
+     * the host, port or encryption changes fails with `CredentialsRequired`,
+     * checked in the same statement as the write, so a concurrent change
+     * can't slip between the check and the write.
+     */
     readonly update: (
       id: ProviderConnectionId,
       changes: ProviderConnectionChanges
     ) => Effect.Effect<
       ProviderConnection,
-      ProviderConnectionNotFound,
+      ProviderConnectionNotFound | CredentialsRequired,
       CurrentOrganization
     >;
     readonly remove: (
@@ -78,14 +91,10 @@ export class ProviderConnections extends Context.Service<
   }
 >()("@repo/core/ProviderConnections") {}
 
-/** How many test emails one person may send. */
-export const TEST_EMAIL_LIMIT = { max: 10, window: Duration.minutes(10) };
-
-const sameServer = (a: typeof SmtpServer.Type, b: typeof SmtpServer.Type) =>
-  a.host === b.host && a.port === b.port && a.security === b.security;
-
-/** The subject of a test email, so the person can find it in their inbox. */
-export const TEST_EMAIL_SUBJECT = "Mailquilt test email";
+const TEST_EMAIL_RULE = {
+  max: TEST_EMAIL_LIMIT.max,
+  window: Duration.minutes(TEST_EMAIL_LIMIT.minutes),
+};
 
 /** Connects an SMTP server to the Organization this request acts in. */
 export const createProviderConnection = (connection: NewProviderConnection) =>
@@ -118,17 +127,6 @@ export const updateProviderConnection = (
   Effect.gen(function* updateOrganizationProviderConnection() {
     const connections = yield* ProviderConnections;
 
-    if (changes.credentials === "keep") {
-      const current = yield* connections.withCredentials(id);
-
-      if (
-        Option.isSome(current.credentials) &&
-        !sameServer(current.connection.smtp, changes.smtp)
-      ) {
-        return yield* new CredentialsRequired();
-      }
-    }
-
     return yield* connections.update(id, changes);
   });
 
@@ -153,7 +151,7 @@ export const sendTestEmail = (id: ProviderConnectionId, to: string) =>
 
     const decision = yield* limiter.consume(
       `test-email:user:${user.id}`,
-      TEST_EMAIL_LIMIT
+      TEST_EMAIL_RULE
     );
 
     if (!decision.allowed) {

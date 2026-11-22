@@ -1,7 +1,10 @@
 import { assert, layer } from "@effect/vitest";
-import { TEST_EMAIL_SUBJECT } from "@repo/core";
 import { SmtpOutbox } from "@repo/core/testing";
-import { ProviderConnectionIdSchema, SendFailed } from "@repo/domain";
+import {
+  ProviderConnectionIdSchema,
+  SendFailed,
+  TEST_EMAIL_SUBJECT,
+} from "@repo/domain";
 import { Array as Arr, Effect, Option, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -73,6 +76,7 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
         assert.strictEqual(created.provider, "smtp");
         assert.deepStrictEqual({ ...created.from }, FROM);
         assert.deepStrictEqual({ ...created.smtp }, SMTP);
+        assert.isTrue(created.signsIn);
         assert.deepStrictEqual(
           yield* client.providerConnections.list({ params }),
           [created]
@@ -301,11 +305,14 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
         (yield* lastSend).settings.credentials
       );
 
-      yield* client.providerConnections.update({
+      const withoutSignIn = yield* client.providerConnections.update({
         params: connectionParams,
         payload: { ...WITHOUT_CREDENTIALS, credentials: null },
       });
+
       yield* testEmail;
+
+      assert.isFalse(withoutSignIn.signsIn);
 
       assert.strictEqual(
         Redacted.value(replaced.password),
@@ -354,6 +361,30 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
           yield* client.providerConnections.list({ params }),
           [created]
         );
+      })
+  );
+
+  test.effect(
+    "moves a connection with no saved sign-in to another server",
+    () =>
+      Effect.gen(function* noCredentialsToProtect() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: WITHOUT_CREDENTIALS,
+        });
+
+        const moved = yield* client.providerConnections.update({
+          params: { ...params, providerConnectionId: created.id },
+          payload: {
+            ...WITHOUT_CREDENTIALS,
+            smtp: { ...SMTP, host: "relay.acme.example" },
+          },
+        });
+
+        assert.strictEqual(moved.smtp.host, "relay.acme.example");
+        assert.isFalse(moved.signsIn);
       })
   );
 
