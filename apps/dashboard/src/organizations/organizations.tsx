@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { callApi } from "../api.ts";
-import { PageLoadFailed, PageLoading } from "../layout/page-states.tsx";
+import { PageLoading } from "../layout/page-states.tsx";
 
 const ORGANIZATIONS_QUERY_KEY = ["organizations"] as const;
 
@@ -48,10 +48,15 @@ const keepForThisTab = (organizationId: string) => {
 };
 
 interface OrganizationsState {
+  readonly status: "ready" | "failed";
   readonly organizations: readonly Organization[];
   readonly active: Organization | null;
   readonly choose: (organizationId: string) => void;
+  readonly retry: () => void;
+  readonly retrying: boolean;
 }
+
+const NO_ORGANIZATIONS_KNOWN: readonly Organization[] = [];
 
 const OrganizationsContext = createContext<OrganizationsState | null>(null);
 
@@ -71,6 +76,8 @@ const useOrganizationsState = () => {
  * Loads the signed-in person's Organizations and holds which one this tab
  * works in. Wraps the signed-in pages, and shows them only once the list has
  * loaded, so no page draws "no Organization yet" and then changes its mind.
+ * If it can't be loaded, the app shell stays and its page area says so
+ * (`OrganizationsUnavailable`), with Try again.
  *
  * The choice is remembered per tab in session storage, so two tabs can work
  * in two Organizations (ADR 0007), and as the last choice in local storage,
@@ -111,22 +118,31 @@ export const OrganizationsProvider = ({
     }
   }, [activeId]);
 
+  const { refetch } = query;
+
+  const retry = useCallback(() => {
+    refetch();
+  }, [refetch]);
+
+  const retrying = query.isFetching;
+
   const state = useMemo(
     () =>
-      organizations === undefined ? null : { active, choose, organizations },
-    [active, choose, organizations]
+      ({
+        active,
+        choose,
+        organizations: organizations ?? NO_ORGANIZATIONS_KNOWN,
+        retry,
+        retrying,
+        status: organizations === undefined ? "failed" : "ready",
+      }) satisfies OrganizationsState,
+    [active, choose, organizations, retry, retrying]
   );
 
-  if (state === null) {
-    return query.isError ? (
-      <PageLoadFailed
-        description="Check your connection, then try again."
-        onRetry={() => query.refetch()}
-        title="Mailquilt couldn’t load your organizations"
-      />
-    ) : (
-      <PageLoading />
-    );
+  const neverAnswered = query.isPending && query.errorUpdatedAt === 0;
+
+  if (neverAnswered) {
+    return <PageLoading />;
   }
 
   return <OrganizationsContext value={state}>{children}</OrganizationsContext>;
@@ -141,6 +157,13 @@ export const useOrganizations = () => {
   const { active, choose, organizations } = useOrganizationsState();
 
   return { active, organizations, switchTo: choose };
+};
+
+/** Whether the list loaded, for the app shell; and Try again when it didn't. */
+export const useOrganizationsStatus = () => {
+  const { retry, retrying, status } = useOrganizationsState();
+
+  return { retry, retrying, status };
 };
 
 /** Creates an Organization and switches this tab to it. */

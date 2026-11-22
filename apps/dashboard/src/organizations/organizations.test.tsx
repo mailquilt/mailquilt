@@ -12,9 +12,24 @@ import {
 } from "vitest";
 
 import { SetupSteps } from "../home/setup-steps.tsx";
+import { AppShell } from "../layout/app-shell.tsx";
+import { SignedInOnly } from "../layout/session-gates.tsx";
 import { ACME, renderWithOrganizations } from "./test-organizations.tsx";
 
 const api = setupServer();
+
+const SESSION = {
+  session: { expiresAt: "2026-12-01T00:00:00.000Z", id: "s", userId: "u" },
+  user: { email: "ada@example.com", emailVerified: true, id: "u", name: "Ada" },
+};
+
+const SignedInShell = () => (
+  <SignedInOnly>
+    <AppShell>
+      <SetupSteps />
+    </AppShell>
+  </SignedInOnly>
+);
 
 describe("organizations", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
@@ -51,19 +66,54 @@ describe("organizations", () => {
     ).resolves.toBeDefined();
   });
 
-  it("offers to try again when organizations couldn't be loaded", async () => {
-    let available = false;
+  it("keeps the sidebar and account while organizations can't be loaded, and says so in the page", async () => {
     api.use(
-      http.get("*/api/organizations", () =>
-        available ? HttpResponse.json([ACME]) : HttpResponse.error()
-      )
+      http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
+      http.get("*/api/organizations", () => HttpResponse.error())
     );
 
-    renderWithOrganizations(<SetupSteps />);
+    renderWithOrganizations(<SignedInShell />);
+
+    await expect(
+      screen.findByRole("heading", { name: "Your organizations didn’t load" })
+    ).resolves.toBeDefined();
+    expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Account: Ada" })).toBeDefined();
+    expect(
+      screen.queryByRole("list", { name: /Steps to your first campaign/u })
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /^Organization:/u })
+    ).toBeNull();
+  });
+
+  it("tries again, showing progress, and fills the page once organizations load", async () => {
+    let available = false;
+    let listed = false;
+    api.use(
+      http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
+      http.get("*/api/organizations", async () => {
+        if (!available) {
+          return HttpResponse.error();
+        }
+
+        await vi.waitUntil(() => listed, { timeout: 5000 });
+
+        return HttpResponse.json([ACME]);
+      })
+    );
+
+    renderWithOrganizations(<SignedInShell />);
     const retry = await screen.findByRole("button", { name: "Try again" });
 
     available = true;
     fireEvent.click(retry);
+
+    await expect(
+      screen.findByRole("button", { name: /Trying again…/u })
+    ).resolves.toBeDefined();
+
+    listed = true;
 
     await expect(
       screen.findByRole("list", {

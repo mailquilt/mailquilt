@@ -17,7 +17,11 @@ import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
 import { OrganizationPatch } from "../organizations/organization-patch.tsx";
 import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
-import { useOrganizations } from "../organizations/organizations.tsx";
+import { OrganizationsUnavailable } from "../organizations/organizations-unavailable.tsx";
+import {
+  useOrganizations,
+  useOrganizationsStatus,
+} from "../organizations/organizations.tsx";
 import { useAccount } from "./session-gates.tsx";
 
 const SECTIONS_DIMMED_UNTIL_THEY_EXIST = [
@@ -118,6 +122,7 @@ const MobileBarOpeningSidebarSheet = () => {
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const { pathname } = useLocation();
   const account = useAccount();
+  const { status } = useOrganizationsStatus();
 
   return (
     <Sidebar.Provider className="h-svh">
@@ -177,7 +182,9 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-base">
         <MobileBarOpeningSidebarSheet />
         <HealthStatus bannerClassName="m-6 md:mx-12" />
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col">
+          {status === "failed" ? <OrganizationsUnavailable /> : children}
+        </main>
       </div>
     </Sidebar.Provider>
   );
