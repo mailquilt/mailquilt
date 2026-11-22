@@ -1,6 +1,11 @@
-import { Banner, Button, Input } from "@cloudflare/kumo";
+import { Banner, Button } from "@cloudflare/kumo";
+import { EmailAddress, Password } from "@repo/domain";
+import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
+import { Schema } from "effect";
 
+import { FormField } from "../forms/form-field.tsx";
+import { submitForm } from "../forms/submit-form.ts";
 import {
   authClient,
   authErrorMessage,
@@ -14,19 +19,7 @@ import {
   useSendVerificationLink,
 } from "./send-verification-link.ts";
 
-interface Credentials {
-  readonly email: string;
-  readonly password: string;
-}
-
-const readCredentials = (form: HTMLFormElement) => {
-  const data = new FormData(form);
-
-  return {
-    email: String(data.get("email") ?? ""),
-    password: String(data.get("password") ?? ""),
-  } satisfies Credentials;
-};
+const Credentials = Schema.Struct({ email: EmailAddress, password: Password });
 
 const VerifyFirst = ({ email }: { email: string }) => {
   const send = useSendVerificationLink();
@@ -67,8 +60,14 @@ const VerifyFirst = ({ email }: { email: string }) => {
  */
 export const SignInForm = () => {
   const signIn = useMutation({
-    mutationFn: (credentials: Credentials) =>
+    mutationFn: (credentials: typeof Credentials.Type) =>
       authClient.signIn.email(credentials),
+  });
+
+  const form = useForm({
+    defaultValues: { email: "", password: "" },
+    onSubmit: ({ value }) => signIn.mutate(value),
+    validators: { onSubmit: Schema.toStandardSchemaV1(Credentials) },
   });
 
   const error = signIn.data?.error;
@@ -89,21 +88,26 @@ export const SignInForm = () => {
   return (
     <form
       className="flex flex-col gap-5"
-      onSubmit={(event) => {
-        event.preventDefault();
-        signIn.mutate(readCredentials(event.currentTarget));
-      }}
+      noValidate
+      onSubmit={(event) => submitForm(event, form)}
     >
       {problem}
-      <Input
-        autoComplete="email"
-        label="Email"
-        name="email"
-        required
-        size="lg"
-        type="email"
-      />
-      <PasswordField autoComplete="current-password" />
+      <form.Field name="email">
+        {(field) => (
+          <FormField
+            autoComplete="email"
+            field={field}
+            label="Email"
+            required
+            type="email"
+          />
+        )}
+      </form.Field>
+      <form.Field name="password">
+        {(field) => (
+          <PasswordField autoComplete="current-password" field={field} />
+        )}
+      </form.Field>
       <Button
         className="mt-1 w-full justify-center"
         loading={signIn.isPending}

@@ -1,3 +1,4 @@
+import { MIN_PASSWORD_LENGTH } from "@repo/domain";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -8,9 +9,6 @@ export const authClient = createAuthClient({ basePath: "/api/auth" });
 
 /** Where the verification link lands after Better Auth checks it. */
 export const EMAIL_VERIFIED_PATH = "/email-verified";
-
-/** Better Auth's default minimum, shown in the sign-up hint and its error. */
-export const MIN_PASSWORD_LENGTH = 8;
 
 interface AuthError {
   readonly status: number;

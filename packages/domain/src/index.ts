@@ -1,3 +1,11 @@
+export {
+  EmailAddress,
+  MIN_PASSWORD_LENGTH,
+  NewPassword,
+  Password,
+  PersonName,
+} from "./account.ts";
+
 export { DatabaseUnreachable } from "./database-unreachable.ts";
 
 export { Health } from "./health.ts";

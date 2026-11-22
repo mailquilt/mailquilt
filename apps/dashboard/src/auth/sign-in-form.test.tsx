@@ -74,6 +74,34 @@ describe("sign-in form", () => {
     expect(resentTo).toBe("ada@example.com");
   });
 
+  it("asks for a whole email address instead of signing in", async () => {
+    let requested = false;
+    api.use(
+      http.post("*/api/auth/sign-in/email", () => {
+        requested = true;
+
+        return HttpResponse.json({ token: "t" });
+      })
+    );
+
+    renderSignInForm();
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "ada" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "correct horse battery staple" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    await expect(
+      screen.findByText("Enter an email address like name@example.com.")
+    ).resolves.toBeDefined();
+    expect(screen.getByLabelText("Email").getAttribute("aria-invalid")).toBe(
+      "true"
+    );
+    expect(requested).toBeFalsy();
+  });
+
   it("says the email or password is wrong without saying which", async () => {
     answerSignIn(401, {
       code: "INVALID_EMAIL_OR_PASSWORD",

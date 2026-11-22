@@ -60,6 +60,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 - TanStack Start in **SPA mode**: static files with no server functions. Both entry apps serve them next to the API, and a browser asking for a page that isn't a file or an API route gets the app shell. Dashboard routes never end in a file extension, because Node falls back to the shell only for paths without one. API routes live under `/api`, except `/health` ([ADR 0004](adr/0004-api-routes-live-under-api.md)).
 - TanStack Query for queries and mutations, through the typed client generated from `contract`.
+- TanStack Form for forms, validated with the Effect schemas in `domain` through Standard Schema, so the dashboard and the API check the same rules.
 - Kumo (Base UI and Tailwind v4) for components; `@mailquilt/editor` (through `@mailquilt/react`) for email design.
 
 ## Public pages
