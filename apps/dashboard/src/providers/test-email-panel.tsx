@@ -1,5 +1,5 @@
 import { Button, LinkButton } from "@cloudflare/kumo";
-import { CheckIcon } from "@phosphor-icons/react";
+import { CheckIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
 import {
   MailAddress,
   ProviderConnectionNotFound,
@@ -16,6 +16,7 @@ import type {
 } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
 import { Schema } from "effect";
+import { useState } from "react";
 
 import { QuiltSlot } from "../brand/quilt-block.tsx";
 import { FormField } from "../forms/form-field.tsx";
@@ -148,7 +149,7 @@ const Sent = ({
         Look for “{TEST_EMAIL_SUBJECT}” at {to}. It can take a minute, and may
         land in spam.
       </p>
-      <p className="mt-1 text-sm break-all text-kumo-subtle">
+      <p className="mt-1 text-sm break-words text-kumo-subtle">
         Message ID for your provider’s logs: {sent.messageId}
       </p>
     </div>
@@ -174,7 +175,7 @@ const NotSent = ({
       {failure.detail === undefined ? null : (
         <>
           <p className="mt-2 text-sm text-kumo-subtle">What the server said</p>
-          <p className="rounded-lg bg-kumo-recessed px-3 py-2 font-mono text-sm break-words text-kumo-strong">
+          <p className="rounded-lg bg-kumo-base px-3 py-2 font-mono text-sm break-words text-kumo-strong">
             {failure.detail}
           </p>
         </>
@@ -196,8 +197,9 @@ const NotSent = ({
  * Sends a test email through one connection, to the signed-in person's
  * address unless they change it, and says what happened: the Provider
  * accepted it, or why not in the server's own words, with what to fix.
- * `intro` leads the panel when it opens by itself, such as right after the
- * connection was made, and takes focus so the next step is read out.
+ * `intro` leads the panel right after the connection was made or saved, and
+ * takes focus so the next step is read out. The panel keeps it, though the
+ * page then drops it from the URL, until the person sends a test.
  */
 export const TestEmailPanel = ({
   connection,
@@ -211,11 +213,13 @@ export const TestEmailPanel = ({
   organization: Organization;
 }) => {
   const send = useSendTestEmail(organization.id, connection.id);
+  const [shownIntro, setShownIntro] = useState(intro);
 
   const form = useForm({
     defaultValues: { to: defaultTo },
     onSubmit: ({ value }) => {
       if (!send.isPending) {
+        setShownIntro(undefined);
         send.mutate(Schema.decodeSync(TestEmail)(value).to);
       }
     },
@@ -223,14 +227,14 @@ export const TestEmailPanel = ({
   });
 
   return (
-    <div className="mt-5 flex flex-col gap-5 border-t border-kumo-hairline pt-5">
-      {intro === undefined ? null : (
+    <div className="flex flex-col gap-4">
+      {shownIntro === undefined ? null : (
         <p
           className="border-l-3 border-(--mq-accent) py-1 pl-3 text-base text-kumo-strong outline-none"
           ref={focusOnMount}
           tabIndex={-1}
         >
-          {intro}
+          {shownIntro}
         </p>
       )}
       <form
@@ -256,8 +260,9 @@ export const TestEmailPanel = ({
         <Button
           className="max-sm:h-11 max-sm:w-full max-sm:justify-center"
           aria-busy={send.isPending}
+          icon={PaperPlaneTiltIcon}
           type="submit"
-          variant="primary"
+          variant="secondary"
         >
           {send.isPending ? "Sending…" : "Send test email"}
         </Button>

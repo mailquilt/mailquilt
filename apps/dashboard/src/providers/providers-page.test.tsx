@@ -1,8 +1,10 @@
 import { Organization, ProviderConnectionIdSchema } from "@repo/domain";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import type { ProviderConnectionId } from "@repo/domain";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { useState } from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -49,9 +51,6 @@ const renderPage = (
   );
 
 const sendTestEmail = async () => {
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Send test email" })
-  );
   const to = await screen.findByLabelText("Send a test email to");
 
   expect(to).toHaveProperty("value", "ada@acme.example");
@@ -81,45 +80,28 @@ describe("providers page", () => {
     ).toBe("/providers/new");
   });
 
-  it("opens and hides a connection's test email from one button", async () => {
-    withConnections([POSTMARK]);
+  it("shows who each connection sends as, through which server, and how securely", async () => {
+    withConnections([
+      POSTMARK,
+      {
+        ...POSTMARK,
+        from: { email: "news@acme.example" },
+        id: "pcn_01h455vb4pex5vsknk084sn02r",
+        name: "Office relay",
+        signsIn: false,
+        smtp: { host: "relay.acme.internal", port: 25, security: "none" },
+      },
+    ]);
     renderPage();
 
-    const toggle = await screen.findByRole("button", {
-      name: "Send test email",
-    });
+    const postmark = await screen.findByRole("article", { name: "Postmark" });
+    const relay = screen.getByRole("article", { name: "Office relay" });
 
-    const state = () => ({
-      expanded: toggle.getAttribute("aria-expanded"),
-      field: screen.queryByLabelText("Send a test email to") !== null,
-      label: toggle.textContent,
-    });
-
-    fireEvent.click(toggle);
-    const opened = state();
-    fireEvent.click(toggle);
-
-    expect(opened).toStrictEqual({
-      expanded: "true",
-      field: true,
-      label: "Hide test",
-    });
-    expect(state()).toStrictEqual({
-      expanded: "false",
-      field: false,
-      label: "Send test email",
-    });
-  });
-
-  it("shows each connection's server, encryption and sender", async () => {
-    withConnections([POSTMARK]);
-    renderPage();
-
-    const card = await screen.findByRole("article", { name: /Postmark/u });
-
-    expect(card.textContent).toContain("smtp.postmarkapp.com:587");
-    expect(card.textContent).toContain("STARTTLS");
-    expect(card.textContent).toContain("Acme News <news@acme.example>");
+    expect(within(postmark).getByText("Acme News")).toBeTruthy();
+    expect(within(postmark).getByText("news@acme.example")).toBeTruthy();
+    expect(postmark.textContent).toContain("smtp.postmarkapp.com:587");
+    expect(postmark.textContent).toContain("STARTTLS, signs in");
+    expect(relay.textContent).toContain("Not encrypted, no sign-in");
   });
 
   it("sends a test email to the person's own address and says it was accepted", async () => {
@@ -197,7 +179,7 @@ describe("providers page", () => {
     expect(alert.textContent).toContain("Try again in 4 minutes.");
   });
 
-  it("opens the test email of a connection that was just connected", async () => {
+  it("leads a just-connected connection's test with a note that takes focus", async () => {
     withConnections([POSTMARK]);
     renderPage({
       justConnected: ProviderConnectionIdSchema.make(POSTMARK.id),
@@ -209,6 +191,57 @@ describe("providers page", () => {
 
     expect(document.activeElement).toBe(intro);
     expect(screen.getByLabelText("Send a test email to")).toBeTruthy();
+  });
+
+  it("keeps the just-connected note after the page forgets the news", async () => {
+    withConnections([POSTMARK]);
+
+    const ArrivedFromConnect = () => {
+      const [news, setNews] = useState<ProviderConnectionId | undefined>(
+        ProviderConnectionIdSchema.make(POSTMARK.id)
+      );
+
+      return (
+        <>
+          {news === undefined ? <p>The URL forgot the news.</p> : null}
+          <ProvidersPage
+            justConnected={news}
+            onNewsShown={() => setNews(undefined)}
+            organization={organization}
+            testEmailTo="ada@acme.example"
+          />
+        </>
+      );
+    };
+
+    renderWithOrganizations(<ArrivedFromConnect />);
+
+    await screen.findByText("The URL forgot the news.");
+
+    expect(
+      screen.getByText(
+        "Postmark is connected. Send yourself a test to check it works."
+      )
+    ).toBeTruthy();
+  });
+
+  it("drops the just-connected note once a test is sent", async () => {
+    withConnections([POSTMARK]);
+    api.use(
+      http.post(TEST_EMAILS, () =>
+        HttpResponse.json({ messageId: "<abc@acme.example>" })
+      )
+    );
+    renderPage({
+      justConnected: ProviderConnectionIdSchema.make(POSTMARK.id),
+    });
+
+    await sendTestEmail();
+
+    await expect(
+      screen.findByText("Sent. Postmark accepted the email.")
+    ).resolves.toBeTruthy();
+    expect(screen.queryByText(/Postmark is connected/u)).toBeNull();
   });
 
   it("deletes a connection after asking", async () => {
