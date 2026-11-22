@@ -1,4 +1,10 @@
-import { Banner, Button, Link, Radio } from "@cloudflare/kumo";
+import {
+  Banner,
+  Button,
+  Link,
+  Radio,
+  useKumoToastManager,
+} from "@cloudflare/kumo";
 import { CheckIcon } from "@phosphor-icons/react";
 import { SignUpPolicySchema } from "@repo/domain";
 import type {
@@ -8,7 +14,7 @@ import type {
 } from "@repo/domain";
 import { useLocation } from "@tanstack/react-router";
 import { Predicate, Schema } from "effect";
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 
 import { TableLoadFailed } from "../audience/table-card.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
@@ -67,30 +73,11 @@ const DoneBlock = () => (
   </span>
 );
 
-const Saved = ({ children }: { children: React.ReactNode }) => {
-  const ref = useRef<HTMLOutputElement>(null);
-
-  useEffect(() => {
-    ref.current?.focus();
-  }, []);
-
-  return (
-    <output
-      className="flex items-start gap-2 rounded-sm text-base text-kumo-strong focus-visible:outline-2 focus-visible:outline-kumo-focus"
-      ref={ref}
-      tabIndex={-1}
-    >
-      <DoneBlock />
-      {children}
-    </output>
-  );
-};
-
 const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
   const update = useUpdateSignUp();
+  const toasts = useKumoToastManager();
   const [edited, setEdited] = useState<SignUpPolicy | null>(null);
   const chosen = edited ?? current;
-  const unchanged = chosen === current;
 
   return (
     <PageSection
@@ -103,7 +90,12 @@ const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
           event.preventDefault();
 
           if (!update.isPending) {
-            update.mutate(chosen, { onSuccess: () => setEdited(null) });
+            update.mutate(chosen, {
+              onSuccess: () => {
+                setEdited(null);
+                toasts.add({ title: "Saved who can sign up" });
+              },
+            });
           }
         }}
       >
@@ -136,12 +128,6 @@ const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
           />
         ) : null}
         <div className="flex items-center justify-end gap-4 max-sm:flex-col-reverse max-sm:items-stretch max-sm:*:h-11 max-sm:*:w-full max-sm:*:justify-center">
-          {update.isSuccess && unchanged ? <Saved>Saved</Saved> : null}
-          {unchanged ? null : (
-            <p className="text-base text-kumo-subtle max-sm:text-center">
-              Not saved yet
-            </p>
-          )}
           <Button aria-busy={update.isPending} type="submit" variant="primary">
             {update.isPending ? "Saving…" : "Save changes"}
           </Button>
@@ -192,22 +178,7 @@ const SystemMailerSection = ({
   mailer: SystemMailerSettings | null;
 }) => {
   const update = useUpdateSystemMailer();
-
-  const forgetSaved = () => {
-    if (update.isSuccess) {
-      update.reset();
-    }
-  };
-
-  // WARNING: any edit after a save makes "Saved" untrue, and Kumo's radios and checkbox are buttons, so a click on one is an edit too.
-  const forgetSavedOnClick = (event: React.MouseEvent) => {
-    if (
-      event.target instanceof Element &&
-      event.target.closest("[role=radio], [role=checkbox]")
-    ) {
-      forgetSaved();
-    }
-  };
+  const toasts = useKumoToastManager();
 
   const description =
     "Mailquilt sends its own emails through this server, such as the link that confirms a new account’s address. Campaigns never use it.";
@@ -229,34 +200,29 @@ const SystemMailerSection = ({
           variant="alert"
         />
       ) : null}
-      {update.isSuccess ? (
-        <Saved>
-          Saved. Account emails now go out through{" "}
-          {update.data.systemMailer?.smtp.host}.
-        </Saved>
-      ) : null}
-
-      <div onClickCapture={forgetSavedOnClick} onChange={forgetSaved}>
-        <ConnectionForm
-          busy={update.isPending}
-          busyLabel="Saving…"
-          connection={mailer ?? undefined}
-          failureMessage={mailerFailureMessage(update.error)}
-          key={JSON.stringify(mailer)}
-          named={false}
-          nested
-          onSubmit={({ credentials, settings }) =>
-            update.mutate(
-              credentials === "keep"
-                ? { from: settings.from, smtp: settings.smtp }
-                : { credentials, from: settings.from, smtp: settings.smtp }
-            )
-          }
-          senderDescription="Who account emails come from. Use an address on a domain your server may send for."
-          senderExample={{ email: "accounts@example.com", name: "Acme" }}
-          submitLabel={mailer === null ? "Save server" : "Save changes"}
-        />
-      </div>
+      <ConnectionForm
+        busy={update.isPending}
+        busyLabel="Saving…"
+        connection={mailer ?? undefined}
+        failureMessage={mailerFailureMessage(update.error)}
+        key={JSON.stringify(mailer)}
+        named={false}
+        nested
+        onSubmit={({ credentials, settings }) =>
+          update.mutate(
+            credentials === "keep"
+              ? { from: settings.from, smtp: settings.smtp }
+              : { credentials, from: settings.from, smtp: settings.smtp },
+            {
+              onSuccess: () =>
+                toasts.add({ title: "Saved the account-email server" }),
+            }
+          )
+        }
+        senderDescription="Who account emails come from. Use an address on a domain your server may send for."
+        senderExample={{ email: "accounts@example.com", name: "Acme" }}
+        submitLabel={mailer === null ? "Save server" : "Save changes"}
+      />
     </PageSection>
   );
 };

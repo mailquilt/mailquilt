@@ -1,3 +1,4 @@
+import { Toasty } from "@cloudflare/kumo";
 import type { InstanceSettings } from "@repo/domain";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -48,7 +49,9 @@ const renderPage = () => {
 
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <RouterProvider router={router} />
+      <Toasty>
+        <RouterProvider router={router} />
+      </Toasty>
     </QueryClientProvider>
   );
 };
@@ -106,9 +109,9 @@ describe("Instance settings", () => {
       )
     );
 
-    const confirmation = await screen.findByText("Saved");
-
-    expect(document.activeElement).toBe(confirmation.closest("output"));
+    await expect(
+      screen.findByText("Saved who can sign up")
+    ).resolves.toBeDefined();
     expect(saved).toStrictEqual({ signUp: "open" });
   });
 
@@ -138,25 +141,13 @@ describe("Instance settings", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save server" }));
 
     await expect(
-      screen.findByText(
-        "Saved. Account emails now go out through smtp.example.com."
-      )
+      screen.findByText("Saved the account-email server")
     ).resolves.toBeDefined();
     expect(saved).toStrictEqual({
       credentials: { password: "secret", username: "user" },
       from: { email: "accounts@example.com" },
       smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
     });
-
-    type("Host", "smtp.changed.example");
-
-    await expect
-      .poll(() =>
-        screen.queryByText(
-          "Saved. Account emails now go out through smtp.example.com."
-        )
-      )
-      .toBeNull();
   });
 
   it("shows a server set by environment variables, with nothing to change", async () => {
