@@ -18,3 +18,11 @@ Closes #
 - [ ] It says "Breaking" if the API contract, a stored format or the upgrade path changes, and migrations are expand-then-contract
 - [ ] Nothing in `docs/agents/decisions.md` or `docs/adr/` is reversed, or this says which and why, and updates it
 - [ ] One behaviour changes. A second one is a second pull request
+
+For a change to the dashboard (see `docs/agents/design.md`):
+
+- [ ] The maintainer picked this design from rendered mockups before it was built, or the change is only copy, spacing or tokens
+- [ ] Screenshots at every width in light and dark, for every state, each dialog, sheet and menu open on a phone and on desktop, and a load recording were made and inspected; nothing already drawn moves or changes on load
+- [ ] Focus and keyboard paths were checked in a real browser
+- [ ] A fresh design reviewer worked through the evidence; its findings are fixed or answered here
+- [ ] Each item of the design checklist is answered with what showed it. Images are attached only where a reviewer needs to see a visual change
