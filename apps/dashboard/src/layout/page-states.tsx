@@ -12,6 +12,19 @@ export const PageLoading = () => (
   </div>
 );
 
+/**
+ * A signed-in page's area while what it needs is still loading. The sidebar
+ * stays; the page draws once, in its real state. The loader is centred in the
+ * window, where `PageLoading` drew it a moment before, so it doesn't jump when
+ * the sidebar appears.
+ */
+export const PageAreaLoading = ({ label }: { label: string }) => (
+  <output className="pointer-events-none fixed inset-0 flex items-center justify-center">
+    <Loader />
+    <span className="sr-only">{label}</span>
+  </output>
+);
+
 /** The whole page when something it can't work without failed to load. */
 export const PageLoadFailed = ({
   description,

@@ -1,4 +1,10 @@
+export { Contacts, createContact, listContacts } from "./contacts.ts";
+
+export type { ContactFilter } from "./contacts.ts";
+
 export { checkHealth, DatabaseHealth } from "./health.ts";
+
+export { addToList, createList, getList, Lists, listLists } from "./lists.ts";
 
 export {
   asMemberOf,

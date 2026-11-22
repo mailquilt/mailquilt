@@ -4,6 +4,8 @@ import { HttpIncomingMessage, HttpRouter } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { AuthRoutes } from "./auth/routes.ts";
+import { ContactsHandlers } from "./contacts.ts";
+import { ListsHandlers } from "./lists.ts";
 import { OrganizationsHandlers } from "./organizations.ts";
 import { SystemHandlers } from "./system.ts";
 
@@ -17,7 +19,14 @@ const MAX_API_BODY_SIZE = ByteSize.kibibytes(64);
  */
 export const ApiLive = Layer.mergeAll(
   HttpApiBuilder.layer(MailquiltApi).pipe(
-    Layer.provide(Layer.mergeAll(OrganizationsHandlers, SystemHandlers)),
+    Layer.provide(
+      Layer.mergeAll(
+        ContactsHandlers,
+        ListsHandlers,
+        OrganizationsHandlers,
+        SystemHandlers
+      )
+    ),
     HttpRouter.provideRequest(
       Layer.succeed(HttpIncomingMessage.MaxBodySize, MAX_API_BODY_SIZE)
     )

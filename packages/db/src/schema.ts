@@ -2,12 +2,14 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  foreignKey,
   index,
   integer,
   pgTable,
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const createdAt = () =>
@@ -130,6 +132,95 @@ export const members = pgTable(
     check(
       "members_role_check",
       sql`${table.role} in ('owner', 'admin', 'member')`
+    ),
+  ]
+);
+
+/**
+ * One person in an Organization (`cnt_…`). The address is kept as entered and
+ * unique per Organization regardless of case. `(organization_id, id)` is
+ * unique so a Subscription's foreign keys can require its List and its
+ * Contact to belong to the same Organization.
+ */
+export const contacts = pgTable(
+  "contacts",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("contacts_organization_id_id_key").on(
+      table.organizationId,
+      table.id
+    ),
+    uniqueIndex("contacts_organization_id_email_key").on(
+      table.organizationId,
+      sql`lower(${table.email})`
+    ),
+  ]
+);
+
+/** A List (`lst_…`) that an Organization's Contacts can be subscribed to. */
+export const lists = pgTable(
+  "lists",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("lists_organization_id_id_key").on(table.organizationId, table.id),
+  ]
+);
+
+/**
+ * A Contact's Subscription to one List (`sub_…`), with its status. Its
+ * foreign keys include the Organization, so a List and a Contact from
+ * different Organizations can't be joined.
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    listId: text("list_id").notNull(),
+    contactId: text("contact_id").notNull(),
+    status: text("status").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("subscriptions_list_id_contact_id_key").on(
+      table.listId,
+      table.contactId
+    ),
+    index("subscriptions_list_id_id_idx").on(table.listId, table.id),
+    index("subscriptions_organization_id_contact_id_idx").on(
+      table.organizationId,
+      table.contactId
+    ),
+    foreignKey({
+      columns: [table.organizationId, table.listId],
+      foreignColumns: [lists.organizationId, lists.id],
+      name: "subscriptions_list_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.contactId],
+      foreignColumns: [contacts.organizationId, contacts.id],
+      name: "subscriptions_contact_fkey",
+    }).onDelete("cascade"),
+    check(
+      "subscriptions_status_check",
+      sql`${table.status} in ('pending', 'subscribed', 'unsubscribed')`
     ),
   ]
 );

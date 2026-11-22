@@ -117,3 +117,14 @@ export const clientWithCookie = (cookie: string) =>
 export const signedInClient = signedInPerson.pipe(
   Effect.flatMap(clientWithCookie)
 );
+
+/** A newly signed-in person's typed client, and the path params of an Organization they own. */
+export const ownOrganization = Effect.gen(function* ownOrganization() {
+  const client = yield* signedInClient;
+
+  const organization = yield* client.organizations.create({
+    payload: { name: "Acme" },
+  });
+
+  return { client, params: { organizationId: organization.id } };
+});

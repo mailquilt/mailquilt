@@ -2,17 +2,11 @@ import {
   Organization,
   OrganizationIdSchema,
   OrganizationName,
-  OrganizationNotFound,
-  SignInRequired,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-const SignInRequiredError = SignInRequired.pipe(HttpApiSchema.status(401));
-
-const OrganizationNotFoundError = OrganizationNotFound.pipe(
-  HttpApiSchema.status(404)
-);
+import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
 
 /**
  * The Organizations the signed-in person belongs to. Endpoints for one

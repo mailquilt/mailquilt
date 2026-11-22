@@ -37,6 +37,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 - **Postgres only** ([ADR 0001](adr/0001-postgres-only.md)), through Drizzle 1.0's Effect integration (`drizzle-orm/effect-postgres`).
 - **IDs:** a type prefix plus a UUIDv7 in the TypeID format, for example `org_01h455vb4pex5vsknk084sn02q` for an Organization and `cmp_…` for a Campaign ([ADR 0006](adr/0006-ids-follow-the-typeid-format.md)). They are part of the public API and never change format.
 - **Tenant isolation:** endpoints for one Organization's data name it in the path (`/api/organizations/:organizationId/…`). `asMemberOf` checks membership on every request and provides `CurrentOrganization`, which every repository method for tenant data requires, so no such query runs without one ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). A CI test suite tries to read across Organizations.
+- **Paging:** collections that grow with an Organization's audience, such as Contacts, come a page at a time, newest first, with IDs as the cursors and a total ([ADR 0008](adr/0008-long-collections-are-paged-by-id.md)).
 - **Delivery events:** one table partitioned by month. A scheduled job creates future partitions. Retention drops whole partitions (13 months by default). Drizzle can't declare partitioned tables, so that migration is written by hand.
 - **Campaign totals and Contact engagement summaries** (last opened, counts) are stored separately and outlive raw events.
 - **Bulk writes are set-based**, never one query per Contact.
