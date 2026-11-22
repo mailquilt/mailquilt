@@ -8,15 +8,23 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
 - **Every screen has one job.** Before drawing it, write down who arrives there, in what state, what they need to know, and what they do next.
 - **Content is design.** Every heading, label and sentence is specific and true. Name things the way users think of them, in `GLOSSARY.md` terms.
 - **Never promise what isn't built.** A section that doesn't work yet is shown as coming, or left out. It is never filled with placeholders that look real.
+- **Never draw a guess.** A screen waits for what it needs rather than drawing a state and changing it a moment later. "Not loaded yet" is never shown as "you have none".
 - **Ask "would a senior designer sign this?",** not "is it clean?".
 
 ## Process
 
-1. **UX first.** Write the screen's job, its states and its copy before any styling.
-2. **Mock up a change of direction.** A new visual direction, or a redesign of an existing screen, is shown as rendered mockups for the maintainer to pick from before it is built. Small changes inside an agreed direction don't need one.
-3. **Build** with the dashboard's tokens and building blocks (`apps/dashboard/README.md`, "Design"). Use the `frontend-design` skill for visual direction and the `kumo-design` skill for the rules of the component system.
-4. **Review** against the `kumo-design` rules and the checklist below. Where a rule is deliberately broken, the code or this page says why.
-5. **Look at it.** Take screenshots at 320, 390, 768, 1024 and 1440 px wide, plus one wider screen, in light and dark. The 768–1279 px range is the one most often missed.
+1. **UX first.** Write down the screen's job, who arrives and in what state, every state it has (loading, empty, error, success, disabled), and its copy, before any styling.
+2. **Mock up anything new, then stop.** Every new screen, component, menu, dialog or sheet is shown as rendered mockups before it is built: desktop and phone, light and dark, every state from step 1. Show two or three directions with a recommendation, and wait for the maintainer's pick. This holds on a `ready-for-agent` ticket too. Only copy, spacing and token changes inside an existing component skip this step.
+3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes and its motion. Keep a default only when it is right for this screen, and say which ones you kept. From #6: Kumo pins dialogs near the top of the window; `LayerDialog` puts its desktop card inside the phone drawer; Kumo inputs are 14px, so Safari on iPhone zooms into them.
+4. **Build** with the dashboard's tokens and building blocks (`apps/dashboard/README.md`, "Design"). Use the `frontend-design` skill for visual direction and the `kumo-design` skill for the rules of the component system.
+5. **Review** against the `kumo-design` rules and the checklist below. Where a rule is deliberately broken, the code or this page says why. A correctness review (`code-review`) is not a design review.
+6. **Show the evidence.** UI work is done only when the pull request has:
+   - screenshots at 320, 390, 768, 1024 and 1440 px wide, plus one wider screen, in light and dark, for every state. The 768–1279 px range is the one most often missed;
+   - every dialog, sheet and menu open, on a phone and on desktop;
+   - a frame-by-frame recording of the screen loading with 120 ms of network latency, in which nothing already drawn moves or changes;
+   - each item of the checklist below answered with the screenshot or test that shows it.
+
+   The `dashboard-screens` skill makes the screenshots and the recording. Tests passing is not evidence of design, and "I looked at it" is not evidence at all.
 
 ## Brand
 

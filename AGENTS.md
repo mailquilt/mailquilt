@@ -39,6 +39,11 @@ Before reviewing code, or acting on a review, read `docs/agents/review.md`. It s
 
 Before designing or changing any screen, read `docs/agents/design.md`. It sets the quality bar, the process, the brand rules, and the checklist every UI change passes. Design with the `frontend-design` skill, and build and review with the `kumo-design` skill. The dashboard's tokens and building blocks are described in `apps/dashboard/README.md`.
 
+Two gates apply to every ticket, `ready-for-agent` ones included:
+
+- **Stop at mockups.** Any new screen, component, menu, dialog or sheet is shown as rendered mockups (desktop and phone, light and dark, every state) and waits for the maintainer's pick before any code. Only copy, spacing and token changes inside an existing component skip this.
+- **Done means evidence.** UI is done only with the evidence `docs/agents/design.md` lists: the screenshot matrix, the dialogs and menus open on a phone, a load recording, and the checklist answered item by item. Make them with the `dashboard-screens` skill.
+
 ### Running commands
 
 In a shell without a terminal (TTY), `turbo run` can finish and then hang, because `turbo.json` uses the interactive UI. Run `./node_modules/.bin/turbo run <task> --ui=stream`, and call tools such as `tsc`, `vitest` and `ultracite` from `node_modules/.bin` rather than through `pnpm exec`.
