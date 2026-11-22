@@ -38,6 +38,8 @@ interface ActionDialogProps {
   readonly formId: string;
   /** While the action runs: the button shows progress and nothing closes the dialog. */
   readonly busy: boolean;
+  /** The action can't be undone, such as a delete: its button is drawn in the danger colour. */
+  readonly destructive?: boolean;
   /** On desktop, focused once the dialog has opened, such as its only field. */
   readonly initialFocus?: React.RefObject<HTMLElement | null>;
   /** On phones, focused when the sheet closes, such as the control that opened it. */
@@ -61,6 +63,7 @@ export const ActionDialog = ({
   busy,
   children,
   description,
+  destructive = false,
   finalFocus,
   formId,
   initialFocus,
@@ -95,7 +98,12 @@ export const ActionDialog = ({
           <LayerDialog.Description>{description}</LayerDialog.Description>
           <LayerDialog.Body>{children}</LayerDialog.Body>
           <LayerDialog.Actions dismissLabel="Cancel">
-            <LayerDialog.Action form={formId} loading={busy} type="submit">
+            <LayerDialog.Action
+              form={formId}
+              loading={busy}
+              type="submit"
+              variant={destructive ? "destructive" : "primary"}
+            >
               {actionLabel}
             </LayerDialog.Action>
           </LayerDialog.Actions>
@@ -152,7 +160,7 @@ export const ActionDialog = ({
                   loading={busy}
                   size="lg"
                   type="submit"
-                  variant="primary"
+                  variant={destructive ? "destructive" : "primary"}
                 >
                   {actionLabel}
                 </Button>

@@ -198,8 +198,6 @@ const NotSent = ({
  * accepted it, or why not in the server's own words, with what to fix.
  * `intro` leads the panel when it opens by itself, such as right after the
  * connection was made, and takes focus so the next step is read out.
- * Opened by a click, the panel focuses its address field instead, since the
- * button that opened it is gone.
  */
 export const TestEmailPanel = ({
   connection,
@@ -212,8 +210,6 @@ export const TestEmailPanel = ({
   intro?: string;
   organization: Organization;
 }) => {
-  const fieldRef = intro === undefined ? focusOnMount : undefined;
-
   const send = useSendTestEmail(organization.id, connection.id);
 
   const form = useForm({
@@ -251,7 +247,6 @@ export const TestEmailPanel = ({
                 field={field}
                 inputMode="email"
                 label="Send a test email to"
-                ref={fieldRef}
                 size="base"
                 type="email"
               />

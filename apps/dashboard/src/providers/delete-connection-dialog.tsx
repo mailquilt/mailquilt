@@ -48,6 +48,7 @@ export const DeleteConnectionDialog = ({
       actionLabel="Delete connection"
       busy={remove.isPending}
       description="Mailquilt forgets this server and its sign-in."
+      destructive
       finalFocus={finalFocus}
       formId={formId}
       onOpenChange={onOpenChange}

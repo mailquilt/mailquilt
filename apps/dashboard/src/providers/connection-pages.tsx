@@ -4,6 +4,7 @@ import type { Organization, ProviderConnectionId } from "@repo/domain";
 import { Link, useNavigate } from "@tanstack/react-router";
 
 import { TableLoadFailed } from "../audience/table-card.tsx";
+import { PageFrame } from "../layout/page-frame.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { ConnectionForm } from "./connection-form.tsx";
 import {
@@ -21,7 +22,7 @@ const FormPage = ({
   description: string;
   title: string;
 }) => (
-  <div className="mx-auto w-full max-w-[80rem] px-4 pt-6 pb-12 sm:px-6 md:px-10 md:pt-10">
+  <PageFrame>
     <div className="max-w-[44rem]">
       <Link
         className="mb-4 inline-flex items-center gap-1 rounded-sm text-sm text-kumo-subtle hover:text-kumo-strong focus-visible:outline-2 focus-visible:outline-kumo-focus"
@@ -36,7 +37,7 @@ const FormPage = ({
       <p className="mt-1.5 mb-8 text-base text-(--mq-body)">{description}</p>
       {children}
     </div>
-  </div>
+  </PageFrame>
 );
 
 /** Connects an SMTP server, then opens its test email on Providers. */

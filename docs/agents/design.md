@@ -42,6 +42,7 @@ The official logo kit is in `docs/brand/` (see its README). Copies of the files 
 - **Colours:** ink `#111113`, accent `#D4380F`, quilt grey `#71717A`. The dashboard's light and dark values for each live in `apps/dashboard/src/styles.css`.
 - **Type:** Space Grotesk for display headings, Instrument Sans for everything else.
 - **Primary actions are ink.** The accent is close to error red, so it is kept for brand moments (the logo, the quilt, a cost) and the single next step.
+- **Destructive confirmations are danger red.** The button that confirms something that can't be undone, such as deleting a connection, is danger red (`ActionDialog`'s `destructive`), so the final step is the strongest warning, as the red menu item before it was. It is flat `--mq-danger-button` (`#b91c1c`, 6.5:1 with white), not Kumo's lighter gradient, and not the accent.
 - **Quilting stays in the pictures; the words stay plain.** No sewing puns in the copy.
 
 ## Review checklist

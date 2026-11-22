@@ -101,9 +101,13 @@ const ConnectionCard = ({
     open: introWhenShown !== undefined,
   });
 
+  const panelId = useId();
   const { intro } = panel;
   const testing = panel.open;
-  const setTesting = (open: boolean) => setPanel({ intro, open });
+
+  const setTesting = (open: boolean) =>
+    setPanel({ intro: open ? intro : undefined, open });
+
   const [deleting, setDeleting] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
 
@@ -123,15 +127,15 @@ const ConnectionCard = ({
           SMTP
         </span>
       </div>
-      {testing ? null : (
-        <Button
-          className="col-span-3 row-start-3 mt-4 h-11 w-full justify-center sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:mt-0 sm:h-9 sm:w-auto"
-          onClick={() => setTesting(true)}
-          variant="secondary"
-        >
-          Send test email
-        </Button>
-      )}
+      <Button
+        aria-controls={testing ? panelId : undefined}
+        aria-expanded={testing}
+        className="col-span-3 row-start-3 mt-4 h-11 w-full justify-center sm:col-span-1 sm:col-start-2 sm:row-start-1 sm:mt-0 sm:h-9 sm:w-auto"
+        onClick={() => setTesting(!testing)}
+        variant="secondary"
+      >
+        {testing ? "Hide test" : "Send test email"}
+      </Button>
       <div className="col-start-3 row-start-1">
         <DropdownMenu>
           <DropdownMenu.Trigger
@@ -180,7 +184,7 @@ const ConnectionCard = ({
         <Detail label="Sends as" value={senderOf(connection)} />
       </dl>
       {testing ? (
-        <div className="col-span-3 row-start-3">
+        <div className="col-span-3 row-start-4 sm:row-start-3" id={panelId}>
           <TestEmailPanel
             connection={connection}
             defaultTo={defaultTo}

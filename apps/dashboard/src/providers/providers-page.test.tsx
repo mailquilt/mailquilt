@@ -55,7 +55,6 @@ const sendTestEmail = async () => {
   const to = await screen.findByLabelText("Send a test email to");
 
   expect(to).toHaveProperty("value", "ada@acme.example");
-  expect(document.activeElement).toBe(to);
   fireEvent.submit(to.closest("form") ?? document.body);
 };
 
@@ -80,6 +79,36 @@ describe("providers page", () => {
         .getByRole("link", { name: "Connect SMTP server" })
         .getAttribute("href")
     ).toBe("/providers/new");
+  });
+
+  it("opens and hides a connection's test email from one button", async () => {
+    withConnections([POSTMARK]);
+    renderPage();
+
+    const toggle = await screen.findByRole("button", {
+      name: "Send test email",
+    });
+
+    const state = () => ({
+      expanded: toggle.getAttribute("aria-expanded"),
+      field: screen.queryByLabelText("Send a test email to") !== null,
+      label: toggle.textContent,
+    });
+
+    fireEvent.click(toggle);
+    const opened = state();
+    fireEvent.click(toggle);
+
+    expect(opened).toStrictEqual({
+      expanded: "true",
+      field: true,
+      label: "Hide test",
+    });
+    expect(state()).toStrictEqual({
+      expanded: "false",
+      field: false,
+      label: "Send test email",
+    });
   });
 
   it("shows each connection's server, encryption and sender", async () => {
