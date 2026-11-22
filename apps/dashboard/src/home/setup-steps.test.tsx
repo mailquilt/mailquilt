@@ -11,6 +11,18 @@ import { SetupSteps } from "./setup-steps.tsx";
 
 const api = setupServer();
 
+const CONNECTIONS = "*/api/organizations/:organizationId/provider-connections";
+
+const POSTMARK = {
+  createdAt: "2026-11-22T09:00:00.000Z",
+  from: { email: "news@acme.example" },
+  id: "pcn_01h455vb4pex5vsknk084sn02q",
+  name: "Postmark",
+  provider: "smtp",
+  signsIn: true,
+  smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },
+};
+
 describe("setup steps", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
@@ -36,7 +48,10 @@ describe("setup steps", () => {
   });
 
   it("marks naming an organization done once one exists", async () => {
-    api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([]))
+    );
 
     renderWithOrganizations(<SetupSteps />);
 
@@ -70,5 +85,34 @@ describe("setup steps", () => {
     await expect
       .poll(() => document.activeElement?.textContent)
       .toBe("Acme Newsletter is ready, and you’re its owner.");
+  });
+
+  it("leads to connecting a provider, and marks it done once one exists", async () => {
+    let connections: readonly object[] = [];
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json(connections))
+    );
+
+    renderWithOrganizations(<SetupSteps />);
+
+    const connect = await screen.findByRole("link", {
+      name: "Connect SMTP server",
+    });
+
+    expect(connect.getAttribute("href")).toBe("/providers/new");
+    cleanup();
+
+    connections = [POSTMARK];
+    renderWithOrganizations(<SetupSteps />);
+
+    await expect(
+      screen.findByRole("list", {
+        name: "Steps to your first campaign, 2 of 5 done",
+      })
+    ).resolves.toBeDefined();
+    expect(
+      screen.queryByRole("link", { name: "Connect SMTP server" })
+    ).toBeNull();
   });
 });

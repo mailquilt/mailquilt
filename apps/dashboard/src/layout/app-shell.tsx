@@ -40,14 +40,6 @@ const SEND: DimmedSection = {
   label: "Send",
 };
 
-const DELIVERABILITY: DimmedSection = {
-  items: [
-    { icon: PlugsConnectedIcon, label: "Providers" },
-    { icon: GlobeSimpleIcon, label: "Domains" },
-  ],
-  label: "Deliverability",
-};
-
 const AUDIENCE = [
   { href: "/contacts", icon: UsersIcon, label: "Contacts" },
   { href: "/lists", icon: ListBulletsIcon, label: "Lists" },
@@ -56,14 +48,18 @@ const AUDIENCE = [
 const NAV_ITEM_FOCUS =
   "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kumo-focus";
 
+const SoonBadge = () => (
+  <span className="rounded-sm bg-kumo-tint px-1.5 text-xs font-medium text-kumo-subtle">
+    Soon
+  </span>
+);
+
 const SectionComingSoon = ({ section }: { section: DimmedSection }) => (
   <Sidebar.Group>
     <Sidebar.GroupLabel>
       <span className="flex items-center justify-between gap-2">
         {section.label}
-        <span className="rounded-sm bg-kumo-tint px-1.5 text-xs font-medium text-kumo-subtle">
-          Soon
-        </span>
+        <SoonBadge />
       </span>
     </Sidebar.GroupLabel>
     <Sidebar.Menu>
@@ -197,7 +193,31 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                 ))}
               </Sidebar.Menu>
             </Sidebar.Group>
-            <SectionComingSoon section={DELIVERABILITY} />
+            <Sidebar.Group>
+              <Sidebar.GroupLabel>Deliverability</Sidebar.GroupLabel>
+              <Sidebar.Menu>
+                <Sidebar.MenuButton
+                  active={pathname.startsWith("/providers")}
+                  className={NAV_ITEM_FOCUS}
+                  href="/providers"
+                  icon={PlugsConnectedIcon}
+                  tooltip="Providers"
+                >
+                  Providers
+                </Sidebar.MenuButton>
+                <Sidebar.MenuButton
+                  className="cursor-default opacity-45 hover:bg-transparent"
+                  disabled
+                  icon={GlobeSimpleIcon}
+                  tooltip="Domains is coming soon"
+                >
+                  <span className="flex flex-1 items-center justify-between gap-2">
+                    Domains
+                    <SoonBadge />
+                  </span>
+                </Sidebar.MenuButton>
+              </Sidebar.Menu>
+            </Sidebar.Group>
           </nav>
         </Sidebar.Content>
         <Sidebar.Footer className="h-auto py-2.5 group-data-[state=collapsed]/sidebar:justify-center">

@@ -1,13 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { SetupSteps } from "../../home/setup-steps.tsx";
+import { SetupSteps, useSetupProgress } from "../../home/setup-steps.tsx";
 import { PageColumn } from "../../layout/page-column.tsx";
+import { PageAreaLoading } from "../../layout/page-states.tsx";
 import { useAccount } from "../../layout/session-gates.tsx";
 
 const firstName = (name: string) => name.trim().split(/\s+/u)[0] ?? name;
 
 const Home = () => {
   const account = useAccount();
+  const progress = useSetupProgress();
+
+  if (progress === undefined) {
+    return <PageAreaLoading label="Loading your setup" />;
+  }
 
   return (
     <PageColumn>
