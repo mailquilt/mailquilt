@@ -133,19 +133,10 @@ export const ContactsLive = Layer.effect(
           .from(contacts)
           .where(and(where, gt(contacts.id, filter.before)))
           .orderBy(asc(contacts.id))
-          .limit(PAGE_SIZE + 1)
+          .limit(PAGE_SIZE)
           .pipe(
             Effect.orDie,
-            Effect.map((rows) => {
-              const items = rows.slice(0, PAGE_SIZE).toReversed();
-
-              return {
-                items,
-                next: items.at(-1)?.id ?? null,
-                previous:
-                  rows.length > PAGE_SIZE ? (items[0]?.id ?? null) : null,
-              };
-            })
+            Effect.map((rows) => rows.toReversed())
           );
       }
 
@@ -161,20 +152,8 @@ export const ContactsLive = Layer.effect(
           )
         )
         .orderBy(desc(contacts.id))
-        .limit(PAGE_SIZE + 1)
-        .pipe(
-          Effect.orDie,
-          Effect.map((rows) => {
-            const items = rows.slice(0, PAGE_SIZE);
-
-            return {
-              items,
-              next: rows.length > PAGE_SIZE ? (items.at(-1)?.id ?? null) : null,
-              previous:
-                filter.after === undefined ? null : (items[0]?.id ?? null),
-            };
-          })
-        );
+        .limit(PAGE_SIZE)
+        .pipe(Effect.orDie);
     };
 
     return {
@@ -239,47 +218,66 @@ export const ContactsLive = Layer.effect(
         }),
 
       page: (filter) =>
-        Effect.gen(function* contactPage() {
-          const organization = (yield* CurrentOrganization).id;
+        db
+          .transaction(
+            () =>
+              Effect.gen(function* contactPage() {
+                const organization = (yield* CurrentOrganization).id;
 
-          if (filter.list !== undefined) {
-            yield* requireLists(db, organization, [filter.list]);
-          }
+                if (filter.list !== undefined) {
+                  yield* requireLists(db, organization, [filter.list]);
+                }
 
-          const { items, next, previous } = yield* newestFirstPageAroundCursor(
-            organization,
-            filter
-          );
+                const inWindow = yield* newestFirstPageAroundCursor(
+                  organization,
+                  filter
+                );
 
-          const first = items[0]?.id;
+                const { after, before, ...matching } = filter;
 
-          const [counted] = yield* db
-            .select({
-              start:
-                first === undefined
-                  ? sql<number>`count(*)::int`
-                  : sql<number>`(count(*) filter (where ${contacts.id} > ${first}))::int`,
-              total: sql<number>`count(*)::int`,
-            })
-            .from(contacts)
-            .where(contactsMatching(organization, filter))
-            .pipe(Effect.orDie);
+                const cursorPassedEveryMatch =
+                  inWindow.length === 0 &&
+                  (after !== undefined || before !== undefined);
 
-          const subscriptionsByContact = yield* subscriptionsOf(
-            organization,
-            items.map((item) => item.id)
-          );
+                const items = cursorPassedEveryMatch
+                  ? yield* newestFirstPageAroundCursor(organization, matching)
+                  : inWindow;
 
-          return yield* decodePage({
-            contacts: items.map((item) =>
-              toContact(item, subscriptionsByContact.get(item.id) ?? [])
-            ),
-            next,
-            previous,
-            start: counted?.start ?? 0,
-            total: counted?.total ?? 0,
-          }).pipe(Effect.orDie);
-        }),
+                const first = items[0]?.id ?? "";
+
+                const [counted] = yield* db
+                  .select({
+                    start: sql<number>`(count(*) filter (where ${contacts.id} > ${first}))::int`,
+                    total: sql<number>`count(*)::int`,
+                  })
+                  .from(contacts)
+                  .where(contactsMatching(organization, filter))
+                  .pipe(Effect.orDie);
+
+                const start = counted?.start ?? 0;
+                const total = counted?.total ?? 0;
+
+                const subscriptionsByContact = yield* subscriptionsOf(
+                  organization,
+                  items.map((item) => item.id)
+                );
+
+                return yield* decodePage({
+                  contacts: items.map((item) =>
+                    toContact(item, subscriptionsByContact.get(item.id) ?? [])
+                  ),
+                  next:
+                    start + items.length < total
+                      ? (items.at(-1)?.id ?? null)
+                      : null,
+                  previous: start > 0 ? (items[0]?.id ?? null) : null,
+                  start,
+                  total,
+                }).pipe(Effect.orDie);
+              }),
+            { accessMode: "read only", isolationLevel: "repeatable read" }
+          )
+          .pipe(Effect.catchTag("SqlError", Effect.die)),
     };
   })
 );

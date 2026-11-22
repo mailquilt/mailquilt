@@ -149,7 +149,7 @@ const allContactsColumns = (lists: readonly List[]) => {
               {subscriptions.slice(0, 2).map((subscription, index) => (
                 <span
                   className={
-                    index === 0 ? "contents" : "contents max-lg:hidden"
+                    index === 0 ? "contents" : "contents max-xl:hidden"
                   }
                   key={subscription.listId}
                 >
@@ -307,9 +307,11 @@ const StatusFilter = ({
 );
 
 const Pager = ({
+  loading,
   onPage,
   page,
 }: {
+  loading: boolean;
   onPage: (cursor: Pick<ContactSearch, "after" | "before">) => void;
   page: ContactPage;
 }) => {
@@ -327,7 +329,7 @@ const Pager = ({
       </span>
       <span className="flex gap-2">
         <Button
-          disabled={previous === null}
+          disabled={loading || previous === null}
           icon={CaretLeftIcon}
           onClick={() => {
             if (previous !== null) {
@@ -340,7 +342,7 @@ const Pager = ({
           Previous
         </Button>
         <Button
-          disabled={next === null}
+          disabled={loading || next === null}
           onClick={() => {
             if (next !== null) {
               onPage({ after: next });
@@ -538,6 +540,7 @@ const ContactsTable = ({
       footer={
         page.total === 0 ? undefined : (
           <Pager
+            loading={query.isPlaceholderData}
             onPage={(cursor) =>
               onSearch({ list: search.list, status: search.status, ...cursor })
             }

@@ -1,5 +1,10 @@
 import { assert, layer } from "@effect/vitest";
-import { Contact, ListIdSchema, PAGE_SIZE } from "@repo/domain";
+import {
+  Contact,
+  ContactIdSchema,
+  ListIdSchema,
+  PAGE_SIZE,
+} from "@repo/domain";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -14,6 +19,10 @@ import { TestApp } from "./harness.ts";
 const CONTACT_ID = /^cnt_[0-7][0-9a-hjkmnp-tv-z]{25}$/u;
 
 const NO_SUCH_LIST = ListIdSchema.make("lst_00000000000000000000000000");
+
+const OLDEST_ID = ContactIdSchema.make("cnt_00000000000000000000000000");
+
+const NEWEST_ID = ContactIdSchema.make("cnt_7zzzzzzzzzzzzzzzzzzzzzzzzz");
 
 const newestFirst = <Item extends { readonly id: string }>(
   items: readonly Item[]
@@ -203,6 +212,49 @@ layer(TestApp, { timeout: "2 minutes" })("Contacts", (test) => {
 
       assert.deepStrictEqual(back, first);
     })
+  );
+
+  test.effect("offers a cursor only toward Contacts that exist", () =>
+    Effect.gen(function* cursorsWithNeighbours() {
+      const { client, params } = yield* ownOrganization;
+
+      const ada = yield* client.contacts.create({
+        params,
+        payload: { email: "ada@example.com" },
+      });
+
+      for (const query of [{ after: NEWEST_ID }, { before: OLDEST_ID }]) {
+        const page = yield* client.contacts.list({ params, query });
+
+        assert.deepStrictEqual(page.contacts, [ada]);
+        assert.strictEqual(page.start, 0);
+        assert.isNull(page.previous);
+        assert.isNull(page.next);
+      }
+    })
+  );
+
+  test.effect(
+    "shows the first page when a cursor passes every matching Contact",
+    () =>
+      Effect.gen(function* staleCursor() {
+        const { client, params } = yield* ownOrganization;
+
+        const ada = yield* client.contacts.create({
+          params,
+          payload: { email: "ada@example.com" },
+        });
+
+        for (const query of [{ after: OLDEST_ID }, { before: NEWEST_ID }]) {
+          const page = yield* client.contacts.list({ params, query });
+
+          assert.deepStrictEqual(page.contacts, [ada]);
+          assert.strictEqual(page.start, 0);
+          assert.strictEqual(page.total, 1);
+          assert.isNull(page.previous);
+          assert.isNull(page.next);
+        }
+      })
   );
 
   test.effect("filters Contacts by List, and by their status on it", () =>

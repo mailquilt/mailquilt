@@ -1,8 +1,9 @@
 import { ListIdSchema, Organization } from "@repo/domain";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { Schema } from "effect";
-import { http, HttpResponse } from "msw";
+import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { useState } from "react";
 import {
   afterAll,
   afterEach,
@@ -97,6 +98,18 @@ const renderPage = (search: ContactSearch = {}) => {
   return onSearch;
 };
 
+const PagingContacts = () => {
+  const [search, setSearch] = useState<ContactSearch>({});
+
+  return (
+    <ContactsPage
+      onSearch={setSearch}
+      organization={organization}
+      search={search}
+    />
+  );
+};
+
 describe("contacts page", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
@@ -172,6 +185,35 @@ describe("contacts page", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Previous" }));
 
     expect(onSearch).toHaveBeenCalledWith({ before: ADA.id });
+  });
+
+  it("keeps Previous and Next off until the asked-for page arrives", async () => {
+    api.use(
+      http.get(
+        "*/api/organizations/:organizationId/contacts",
+        async ({ request }) => {
+          if (new URL(request.url).searchParams.has("after")) {
+            await delay("infinite");
+          }
+
+          return HttpResponse.json(
+            page([ADA, ALAN], { next: ALAN.id, total: 3 })
+          );
+        }
+      ),
+      ...audience()
+    );
+
+    renderWithOrganizations(<PagingContacts />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+
+    expect(
+      screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")
+    ).toBeTruthy();
   });
 
   it("starts a new contact on the list the table is filtered by", async () => {
@@ -281,6 +323,44 @@ describe("contacts page", () => {
         "Acme Newsletter already has a contact with this address."
       )
     ).resolves.toBeTruthy();
+  });
+
+  it("doesn't put a duplicate error on an address typed after submitting", async () => {
+    let requested = false;
+    api.use(
+      http.post("*/api/organizations/:organizationId/contacts", async () => {
+        requested = true;
+        await delay(50);
+
+        return HttpResponse.json(
+          { _tag: "ContactAlreadyExists" },
+          { status: 409 }
+        );
+      }),
+      ...audience()
+    );
+
+    renderPage();
+
+    const [addContact] = await screen.findAllByRole("button", {
+      name: "Add contact",
+    });
+
+    fireEvent.click(addContact ?? document.body);
+    const email = await screen.findByLabelText("Email address");
+    fireEvent.change(email, { target: { value: "ada@example.com" } });
+    fireEvent.submit(email.closest("form") ?? document.body);
+
+    await vi.waitFor(() => expect(requested).toBeTruthy());
+    fireEvent.change(email, { target: { value: "grace@example.com" } });
+
+    await expect(
+      screen.findByText(
+        "Acme Newsletter already has a contact with this address.",
+        undefined,
+        { timeout: 500 }
+      )
+    ).rejects.toThrow("Unable to find");
   });
 
   it("adds the selected contacts to a list and says who stayed unsubscribed", async () => {

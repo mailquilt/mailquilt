@@ -56,7 +56,13 @@ export const AddContactDialog = ({
         { email, listIds },
         {
           onError: (error) => {
-            if (Predicate.isTagged(error, "ContactAlreadyExists")) {
+            const stillTheSameAddress =
+              form.getFieldValue("email") === value.email;
+
+            if (
+              Predicate.isTagged(error, "ContactAlreadyExists") &&
+              stillTheSameAddress
+            ) {
               form.setFieldMeta("email", (meta) => ({
                 ...meta,
                 errorMap: {
