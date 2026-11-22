@@ -1,6 +1,10 @@
-import type { SystemMailer } from "@repo/core";
-import { RateLimiter, sendEmailVerification } from "@repo/core";
-import { MIN_PASSWORD_LENGTH } from "@repo/domain";
+import type { Instance, SystemMailer } from "@repo/core";
+import { instanceStatus, RateLimiter, sendEmailVerification } from "@repo/core";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  SIGN_UP_CLOSED,
+} from "@repo/domain";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { Duration, Effect, Option, Redacted, Schema } from "effect";
@@ -57,7 +61,7 @@ export const makeAuth = Effect.gen(function* makeAuth() {
   const rateLimiter = yield* RateLimiter;
 
   const runPromise = Effect.runPromiseWith(
-    yield* Effect.context<RateLimiter | SystemMailer>()
+    yield* Effect.context<Instance | RateLimiter | SystemMailer>()
   );
 
   return betterAuth({
@@ -84,11 +88,27 @@ export const makeAuth = Effect.gen(function* makeAuth() {
     disabledPaths: DISABLED_AUTH_PATHS,
     emailAndPassword: {
       enabled: true,
+      maxPasswordLength: MAX_PASSWORD_LENGTH,
       minPasswordLength: MIN_PASSWORD_LENGTH,
       requireEmailVerification: true,
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/sign-up/email") {
+          const status = await runPromise(instanceStatus);
+
+          if (!status.setUp || status.signUp !== "open") {
+            throw new APIError("FORBIDDEN", {
+              code: SIGN_UP_CLOSED,
+              message: status.setUp
+                ? "Sign-up is invite-only on this Mailquilt."
+                : "This Mailquilt isn’t set up yet. Its first-run setup makes the first account.",
+            });
+          }
+
+          return;
+        }
+
         const signIn = Schema.decodeUnknownOption(SignInBody)(ctx.body);
 
         if (ctx.path !== "/sign-in/email" || Option.isNone(signIn)) {
@@ -140,7 +160,12 @@ export const makeAuth = Effect.gen(function* makeAuth() {
     session: { modelName: "sessions" },
     telemetry: { enabled: false },
     trustedOrigins: [new URL(config.appUrl).origin],
-    user: { modelName: "users" },
+    user: {
+      additionalFields: {
+        instanceAdmin: { defaultValue: false, input: false, type: "boolean" },
+      },
+      modelName: "users",
+    },
     verification: { modelName: "verifications" },
   });
 });

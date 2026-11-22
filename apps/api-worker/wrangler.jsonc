@@ -13,7 +13,9 @@
     "run_worker_first": ["/health", "/api/*"],
   },
   // AUTH_SECRET and ENCRYPTION_KEYS are secrets: `wrangler secret put
-  // AUTH_SECRET`, or `.dev.vars` for `wrangler dev`.
+  // AUTH_SECRET`, or `.dev.vars` for `wrangler dev`. So is
+  // SYSTEM_MAILER_SMTP_PASSWORD, when the System Mailer is set here rather
+  // than on the instance settings page (see `Env` in src/index.ts).
   "vars": {
     "APP_URL": "http://localhost:8787",
   },

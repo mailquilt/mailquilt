@@ -6,6 +6,19 @@ import { Schema } from "effect";
  */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/**
+ * The longest password Better Auth accepts, at sign-up and at every
+ * sign-in, so no account, the instance admin's included, can be made with a
+ * password that can't sign in.
+ */
+export const MAX_PASSWORD_LENGTH = 128;
+
+/**
+ * The error code sign-up answers with when it isn't open: before first-run
+ * setup, or while the install is invite-only. The dashboard reads it.
+ */
+export const SIGN_UP_CLOSED = "SIGN_UP_CLOSED";
+
 /** The pattern browsers check an `<input type="email">` against. */
 export const BROWSER_EMAIL_INPUT_PATTERN =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/u;
@@ -32,5 +45,8 @@ export const Password = Schema.String.check(
 export const NewPassword = Schema.String.check(
   Schema.isMinLength(MIN_PASSWORD_LENGTH, {
     message: `Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
+  }),
+  Schema.isMaxLength(MAX_PASSWORD_LENGTH, {
+    message: `Use a password of at most ${MAX_PASSWORD_LENGTH} characters.`,
   })
 );

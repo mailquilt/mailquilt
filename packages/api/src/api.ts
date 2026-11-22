@@ -5,6 +5,7 @@ import { HttpApiBuilder } from "effect/http-api";
 
 import { AuthRoutes } from "./auth/routes.ts";
 import { ContactsHandlers } from "./contacts.ts";
+import { InstanceHandlers } from "./instance.ts";
 import { ListsHandlers } from "./lists.ts";
 import { OrganizationsHandlers } from "./organizations.ts";
 import { ProviderConnectionsHandlers } from "./provider-connections.ts";
@@ -23,6 +24,7 @@ export const ApiLive = Layer.mergeAll(
     Layer.provide(
       Layer.mergeAll(
         ContactsHandlers,
+        InstanceHandlers,
         ListsHandlers,
         OrganizationsHandlers,
         ProviderConnectionsHandlers,

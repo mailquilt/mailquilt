@@ -8,9 +8,10 @@ import {
   SmtpSecuritySchema,
 } from "@repo/domain";
 import type {
-  ProviderConnection,
+  Sender,
   SmtpCredentials,
   SmtpSecurity,
+  SmtpServer,
 } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
 import type { AnyFieldApi } from "@tanstack/react-form";
@@ -27,7 +28,7 @@ const ConnectionFormValues = Schema.Struct({
   fromEmail: MailAddress,
   fromName: SenderName,
   host: SmtpHost,
-  name: ProviderConnectionName,
+  name: Schema.Trim,
   password: Schema.String,
   port: Schema.String,
   security: SmtpSecuritySchema,
@@ -96,21 +97,39 @@ const credentialIssue = (value: string, missing: string) => {
     : undefined;
 };
 
-const failureMessageFor = (failure: Error | null) => {
+/** An SMTP server already saved, as the API shows it: without its credentials, only whether it has them. */
+export interface SavedServer {
+  readonly name?: string;
+  readonly from: typeof Sender.Type;
+  readonly smtp: typeof SmtpServer.Type;
+  readonly signsIn: boolean;
+}
+
+/**
+ * What to say when saving an SMTP server failed: the message every server
+ * form shares when saved credentials were kept for a changed server, or
+ * `otherwise`.
+ */
+export const serverFailureMessage = (
+  failure: Error | null,
+  otherwise: (failure: Error) => string
+) => {
   if (failure === null) {
     return;
   }
 
-  if (Predicate.isTagged(failure, "CredentialsRequired")) {
-    return SERVER_CHANGED_MESSAGE;
-  }
-
-  if (Predicate.isTagged(failure, "ProviderConnectionNotFound")) {
-    return "This connection no longer exists. Someone may have deleted it.";
-  }
-
-  return "Mailquilt couldn’t save the connection. Check your connection, then try again.";
+  return Predicate.isTagged(failure, "CredentialsRequired")
+    ? SERVER_CHANGED_MESSAGE
+    : otherwise(failure);
 };
+
+/** What to say when saving a Provider Connection failed. */
+export const connectionFailureMessage = (failure: Error | null) =>
+  serverFailureMessage(failure, (other) =>
+    Predicate.isTagged(other, "ProviderConnectionNotFound")
+      ? "This connection no longer exists. Someone may have deleted it."
+      : "Mailquilt couldn’t save the connection. Check your connection, then try again."
+  );
 
 // WARNING: every rule is a field validator; TanStack skips form-level validators while any field has an error, so their errors would arrive a round later.
 const CHECKS = {
@@ -120,7 +139,7 @@ const CHECKS = {
   name: { onSubmit: Schema.toStandardSchemaV1(ProviderConnectionName) },
 };
 
-const signInFor = (connection?: ProviderConnection) => {
+const signInFor = (connection?: SavedServer) => {
   if (connection === undefined) {
     return "new" satisfies SignIn;
   }
@@ -128,7 +147,7 @@ const signInFor = (connection?: ProviderConnection) => {
   return (connection.signsIn ? "keep" : "none") satisfies SignIn;
 };
 
-const defaultsFor = (connection?: ProviderConnection) => {
+const defaultsFor = (connection?: SavedServer) => {
   const values: typeof ConnectionFormValues.Encoded = {
     fromEmail: connection?.from.email ?? "",
     fromName: connection?.from.name ?? "",
@@ -184,26 +203,38 @@ const portIssue = (port: string) => {
 const Section = ({
   children,
   description,
+  nested,
   title,
 }: {
   children: React.ReactNode;
   description?: string;
+  nested: boolean;
   title?: string;
-}) => (
-  <section className="flex flex-col gap-4 border-t border-kumo-hairline py-6 first:border-t-0 first:pt-0">
-    {title === undefined ? null : (
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-kumo-strong">{title}</h2>
-        {description === undefined ? null : (
-          <p className="max-w-[36rem] text-base text-(--mq-body)">
-            {description}
-          </p>
-        )}
-      </div>
-    )}
-    {children}
-  </section>
-);
+}) => {
+  const Heading = nested ? "h3" : "h2";
+
+  return (
+    <section
+      className={`flex flex-col gap-4 border-t border-kumo-hairline py-6 ${nested ? "" : "first:border-t-0 first:pt-0"}`}
+    >
+      {title === undefined ? null : (
+        <div className="flex flex-col gap-1">
+          <Heading
+            className={`font-semibold text-kumo-strong ${nested ? "text-base" : "text-lg"}`}
+          >
+            {title}
+          </Heading>
+          {description === undefined ? null : (
+            <p className="max-w-[36rem] text-base text-(--mq-body)">
+              {description}
+            </p>
+          )}
+        </div>
+      )}
+      {children}
+    </section>
+  );
+};
 
 const SignInChoice = ({
   field,
@@ -248,25 +279,40 @@ const SignInChoice = ({
 };
 
 /**
- * The settings of an SMTP Provider Connection, for connecting one or editing
- * it. Editing one with a saved sign-in offers to keep it, unless the server
+ * The settings of an SMTP server: a Provider Connection's, for connecting
+ * one or editing it, or, without a name or Cancel, the System Mailer's.
+ * Editing one with a saved sign-in offers to keep it, unless the server
  * changes: then the username and password must be entered again, as the API
  * requires. Fields are checked with the same schemas the API uses.
  */
 export const ConnectionForm = ({
   busy,
   busyLabel,
+  cancelHref,
   connection,
-  failure,
+  failureMessage,
+  named = true,
+  nested = false,
   onSubmit,
+  senderDescription,
+  senderExample,
   submitLabel,
 }: {
   busy: boolean;
   /** The submit button's label while saving, such as "Connecting…". */
   busyLabel: string;
-  connection?: ProviderConnection;
-  failure: Error | null;
+  /** Where Cancel goes; without it there is no Cancel. */
+  cancelHref?: string;
+  connection?: SavedServer;
+  failureMessage: string | undefined;
+  /** Whether the server has a name of its own, as a Provider Connection does. */
+  named?: boolean;
+  /** Whether the form sits inside a page section, so its own sections are subsections. */
+  nested?: boolean;
   onSubmit: (result: ConnectionFormResult) => void;
+  senderDescription: string;
+  /** A made-up sender, shown in the empty sender fields. */
+  senderExample: { readonly name: string; readonly email: string };
   submitLabel: string;
 }) => {
   const saved = connection?.signsIn ?? false;
@@ -286,8 +332,6 @@ export const ConnectionForm = ({
       Number(values.port) !== connection.smtp.port ||
       values.security !== connection.smtp.security);
 
-  const failureMessage = failureMessageFor(failure);
-
   const requireNewSignInIfServerChanged = () => {
     if (
       form.getFieldValue("signIn") === "keep" &&
@@ -305,23 +349,26 @@ export const ConnectionForm = ({
       noValidate
       onSubmit={(event) => submitForm(event, form)}
     >
-      <Section>
-        <form.Field name="name" validators={CHECKS.name}>
-          {(field) => (
-            <FormField
-              autoComplete="off"
-              className={FIELD}
-              description="So you can tell connections apart."
-              field={field}
-              label="Name"
-              placeholder="Postmark"
-              size="base"
-            />
-          )}
-        </form.Field>
-      </Section>
+      {named ? (
+        <Section nested={nested}>
+          <form.Field name="name" validators={CHECKS.name}>
+            {(field) => (
+              <FormField
+                autoComplete="off"
+                className={FIELD}
+                description="So you can tell connections apart."
+                field={field}
+                label="Name"
+                placeholder="Postmark"
+                size="base"
+              />
+            )}
+          </form.Field>
+        </Section>
+      ) : null}
       <Section
         description="Your provider lists these under its SMTP settings."
+        nested={nested}
         title="Server"
       >
         <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-start gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
@@ -394,6 +441,7 @@ export const ConnectionForm = ({
       </Section>
       <Section
         description="Stored encrypted. Mailquilt never shows them again, not even to you."
+        nested={nested}
         title="Sign-in"
       >
         <form.Field
@@ -452,10 +500,7 @@ export const ConnectionForm = ({
           }
         </form.Subscribe>
       </Section>
-      <Section
-        description="Who email sent through this connection is from. Your provider must allow this address."
-        title="Sender"
-      >
+      <Section description={senderDescription} nested={nested} title="Sender">
         <form.Field name="fromName" validators={CHECKS.fromName}>
           {(field) => (
             <FormField
@@ -463,7 +508,7 @@ export const ConnectionForm = ({
               className={FIELD}
               field={field}
               label="From name (optional)"
-              placeholder="Acme News"
+              placeholder={senderExample.name}
               size="base"
             />
           )}
@@ -476,7 +521,7 @@ export const ConnectionForm = ({
               field={field}
               inputMode="email"
               label="From email"
-              placeholder="news@example.com"
+              placeholder={senderExample.email}
               size="base"
               type="email"
             />
@@ -492,9 +537,11 @@ export const ConnectionForm = ({
         />
       )}
       <div className="flex justify-end gap-2 border-t border-kumo-hairline pt-6 max-sm:flex-col-reverse max-sm:*:h-11 max-sm:*:w-full max-sm:*:justify-center">
-        <LinkButton href="/providers" variant="ghost">
-          Cancel
-        </LinkButton>
+        {cancelHref === undefined ? null : (
+          <LinkButton href={cancelHref} variant="ghost">
+            Cancel
+          </LinkButton>
+        )}
         <Button aria-busy={busy} type="submit" variant="primary">
           {busy ? busyLabel : submitLabel}
         </Button>

@@ -8,6 +8,8 @@ import { PageLoadFailed, PageLoading } from "./page-states.tsx";
 export interface Account {
   readonly name: string;
   readonly email: string;
+  /** Can see and change Instance settings. */
+  readonly instanceAdmin: boolean;
 }
 
 const AccountContext = createContext<Account | null>(null);

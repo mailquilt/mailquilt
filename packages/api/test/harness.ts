@@ -1,7 +1,11 @@
 import { PgClient } from "@effect/sql-pg";
 import { MailquiltApi } from "@repo/contract";
-import { credentialCipherLayer } from "@repo/core";
-import type { SmtpProvider, SystemMailer } from "@repo/core";
+import {
+  credentialCipherLayer,
+  SystemMailerConfig,
+  SystemMailerLive,
+} from "@repo/core";
+import type { SmtpProvider, SystemMailer, SystemMailerSmtp } from "@repo/core";
 import type { SmtpOutbox, SystemMailerOutbox } from "@repo/core/testing";
 import {
   RecordingSmtpProviderLive,
@@ -9,6 +13,7 @@ import {
 } from "@repo/core/testing";
 import { DatabaseLive, DatabasePortsLive } from "@repo/db";
 import { migrateDatabase } from "@repo/db/migrate";
+import type { SignUpPolicy } from "@repo/domain";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Context, Effect, Layer, Option, Redacted } from "effect";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
@@ -46,27 +51,129 @@ const startPostgres = Effect.acquireRelease(
   (container) => Effect.promise(() => container.stop())
 );
 
+interface TestAppOptions {
+  /**
+   * Whether first-run setup has made the instance admin, and who may then
+   * sign up. `"fresh"` is an install nobody has set up yet. By default the
+   * install is set up and sign-up is open, so tests can make accounts.
+   */
+  readonly install?: "fresh" | SignUpPolicy;
+  /**
+   * `"outbox"` keeps account emails in the System Mailer outbox. `"smtp"`
+   * sends them with the real System Mailer, in its place, through the
+   * recording SMTP Provider, from `systemMailerConfig` or else the instance
+   * settings.
+   */
+  readonly systemMailer?: "outbox" | "smtp";
+  /** The System Mailer set by environment variables, if any. */
+  readonly systemMailerConfig?: Option.Option<SystemMailerSmtp>;
+}
+
+/** The instance admin first-run setup makes in tests. */
+export const INSTANCE_ADMIN = {
+  email: "admin@example.com",
+  name: "Grace",
+  password: "an instance admin's password",
+} as const;
+
 const appWith = (
   databaseUrl: string,
   fakes: Context.Context<
     SystemMailer | SystemMailerOutbox | SmtpProvider | SmtpOutbox
-  >
-) =>
-  ApiLive.pipe(
+  >,
+  options: TestAppOptions
+) => {
+  const ports = Layer.mergeAll(
+    DatabasePortsLive.pipe(
+      Layer.provideMerge(PgClient.layer({ url: Redacted.make(databaseUrl) })),
+      Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS))
+    ),
+    Layer.succeed(
+      SystemMailerConfig,
+      options.systemMailerConfig ?? Option.none()
+    ),
+    Layer.succeedContext(fakes)
+  );
+
+  return ApiLive.pipe(
     HttpRouter.provideRequest(
       Layer.mergeAll(
-        DatabasePortsLive.pipe(
-          Layer.provideMerge(
-            PgClient.layer({ url: Redacted.make(databaseUrl) })
-          ),
-          Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS))
-        ),
-        TestAuthConfig,
-        Layer.succeedContext(fakes)
+        options.systemMailer === "smtp"
+          ? SystemMailerLive.pipe(Layer.provideMerge(ports))
+          : ports,
+        TestAuthConfig
       )
     ),
     Layer.provide(HttpServer.layerServices)
   );
+};
+
+/** The signed-in instance admin's session cookie; empty on a fresh install, which has no instance admin. */
+export const InstanceAdminCookie = Context.Service<string>(
+  "test/InstanceAdminCookie"
+);
+
+const setUpInstance = (
+  fetch: typeof globalThis.fetch,
+  client: HttpApiClient.ForApi<typeof MailquiltApi>,
+  signUp: SignUpPolicy
+) =>
+  Effect.gen(function* setUpTestInstance() {
+    yield* client.instance.setUp({
+      payload: {
+        ...INSTANCE_ADMIN,
+        password: Redacted.make(INSTANCE_ADMIN.password),
+      },
+    });
+
+    const signedIn = yield* Effect.promise(() =>
+      fetch(`${APP_URL}/api/auth/sign-in/email`, {
+        body: JSON.stringify({
+          email: INSTANCE_ADMIN.email,
+          password: INSTANCE_ADMIN.password,
+        }),
+        headers: {
+          "content-type": "application/json",
+          origin: APP_URL,
+          [TRUSTED_IP_HEADER]: "192.0.2.1",
+        },
+        method: "POST",
+      })
+    );
+
+    if (!signedIn.ok) {
+      return yield* Effect.die(
+        new Error("The test install's instance admin couldn't sign in")
+      );
+    }
+
+    const cookie = signedIn.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; ");
+
+    if (signUp === "open") {
+      const opened = yield* Effect.promise(() =>
+        fetch(`${APP_URL}/api/instance/settings/sign-up`, {
+          body: JSON.stringify({ signUp }),
+          headers: {
+            "content-type": "application/json",
+            cookie,
+            origin: APP_URL,
+          },
+          method: "PUT",
+        })
+      );
+
+      if (!opened.ok) {
+        return yield* Effect.die(
+          new Error("Couldn't open sign-up in the test install")
+        );
+      }
+    }
+
+    return cookie;
+  });
 
 /** The typed client generated from `contract`, wired to the app in process. */
 export class ApiClient extends Context.Service<
@@ -80,54 +187,69 @@ export const AppFetch =
 
 /**
  * The whole API assembled as the entry apps assemble it, with a migrated,
- * real Postgres from Testcontainers, the System Mailer outbox and the
- * recording SMTP Provider. Its
- * `SqlClient` reaches that Postgres directly, to set up states no endpoint
- * can make yet; tests still check results through the API. Requests go
- * through the same web handler the Worker uses, so routing, encoding and
- * decoding are the real ones.
+ * real Postgres from Testcontainers, the System Mailer outbox (or the real
+ * System Mailer) and the recording SMTP Provider. Unless `install` is
+ * `"fresh"`, first-run setup has made `INSTANCE_ADMIN`, whose session cookie
+ * is `InstanceAdminCookie`. Its `SqlClient` reaches that Postgres directly,
+ * to set up states no endpoint can make yet; tests still check results
+ * through the API. Requests go through the same web handler the Worker
+ * uses, so routing, encoding and decoding are the real ones.
  */
-export const TestApp = Layer.effectContext(
-  Effect.gen(function* testApp() {
-    const postgres = yield* startPostgres;
-    const databaseUrl = postgres.getConnectionUri();
+export const makeTestApp = (options: TestAppOptions = {}) =>
+  Layer.effectContext(
+    Effect.gen(function* testApp() {
+      const postgres = yield* startPostgres;
+      const databaseUrl = postgres.getConnectionUri();
 
-    yield* migrateDatabase.pipe(
-      Effect.provide(DatabaseLive),
-      Effect.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
-    );
+      yield* migrateDatabase.pipe(
+        Effect.provide(DatabaseLive),
+        Effect.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
+      );
 
-    const fakes = yield* Layer.build(
-      Layer.mergeAll(SystemMailerOutboxLive, RecordingSmtpProviderLive)
-    );
+      const fakes = yield* Layer.build(
+        Layer.mergeAll(SystemMailerOutboxLive, RecordingSmtpProviderLive)
+      );
 
-    const database = yield* Layer.build(
-      PgClient.layer({ url: Redacted.make(databaseUrl) })
-    );
+      const database = yield* Layer.build(
+        PgClient.layer({ url: Redacted.make(databaseUrl) })
+      );
 
-    const app = yield* Effect.acquireRelease(
-      Effect.sync(() =>
-        HttpRouter.toWebHandler(appWith(databaseUrl, fakes), {
-          disableLogger: true,
-        })
-      ),
-      (web) => Effect.promise(web.dispose)
-    );
+      const app = yield* Effect.acquireRelease(
+        Effect.sync(() =>
+          HttpRouter.toWebHandler(appWith(databaseUrl, fakes, options), {
+            disableLogger: true,
+          })
+        ),
+        (web) => Effect.promise(web.dispose)
+      );
 
-    const fetchInProcess: typeof globalThis.fetch = (input, init) =>
-      app.handler(new Request(input, init));
+      const fetchInProcess: typeof globalThis.fetch = (input, init) =>
+        app.handler(new Request(input, init));
 
-    const client = yield* HttpApiClient.make(MailquiltApi, {
-      baseUrl: APP_URL,
-    }).pipe(
-      Effect.provide(FetchHttpClient.layer),
-      Effect.provideService(FetchHttpClient.Fetch, fetchInProcess)
-    );
+      const client = yield* HttpApiClient.make(MailquiltApi, {
+        baseUrl: APP_URL,
+      }).pipe(
+        Effect.provide(FetchHttpClient.layer),
+        Effect.provideService(FetchHttpClient.Fetch, fetchInProcess)
+      );
 
-    return Context.make(ApiClient, client).pipe(
-      Context.add(AppFetch, fetchInProcess),
-      Context.merge(fakes),
-      Context.merge(database)
-    );
-  })
-);
+      const context = Context.make(ApiClient, client).pipe(
+        Context.add(AppFetch, fetchInProcess),
+        Context.merge(fakes),
+        Context.merge(database)
+      );
+
+      const install = options.install ?? "open";
+
+      return Context.add(
+        context,
+        InstanceAdminCookie,
+        install === "fresh"
+          ? ""
+          : yield* setUpInstance(fetchInProcess, client, install)
+      );
+    })
+  );
+
+/** A set-up install with open sign-up, account emails kept in the System Mailer outbox. */
+export const TestApp = makeTestApp();

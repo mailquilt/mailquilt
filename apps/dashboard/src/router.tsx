@@ -30,5 +30,7 @@ declare module "@tanstack/react-router" {
      * state, not the URL, so it never reaches server logs.
      */
     verificationEmail?: string;
+    /** Set on the way from first-run setup, to Instance settings (which then welcomes the new instance admin) or, when its sign-in failed, to sign-in. */
+    justSetUp?: boolean;
   }
 }

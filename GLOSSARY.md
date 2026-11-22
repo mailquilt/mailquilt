@@ -10,6 +10,8 @@ Mailquilt is an open-source email platform for newsletters, automations and tran
 
 **Member**: A user's place in one Organization, with a role: owner, admin or member. Whoever creates an Organization is its owner. _Avoid_: Seat, user (for the membership), teammate
 
+**Instance admin**: The person who runs a Mailquilt install and manages its settings, such as the System Mailer and who may sign up; first-run setup makes them. Being one gives no access to any Organization's data. _Avoid_: Site admin, root
+
 ### Audience
 
 **Contact**: One person, identified by one email address, within an Organization. _Avoid_: Subscriber, recipient, member, lead

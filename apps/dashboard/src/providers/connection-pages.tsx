@@ -6,12 +6,20 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { TableLoadFailed } from "../audience/table-card.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
-import { ConnectionForm } from "./connection-form.tsx";
+import {
+  ConnectionForm,
+  connectionFailureMessage,
+} from "./connection-form.tsx";
 import {
   useCreateConnection,
   useProviderConnections,
   useUpdateConnection,
 } from "./providers-api.ts";
+
+const SENDER_DESCRIPTION =
+  "Who email sent through this connection is from. Your provider must allow this address.";
+
+const SENDER_EXAMPLE = { email: "news@example.com", name: "Acme News" };
 
 const FormPage = ({
   children,
@@ -57,7 +65,10 @@ export const ConnectPage = ({
       <ConnectionForm
         busy={create.isPending}
         busyLabel="Connecting…"
-        failure={create.error}
+        cancelHref="/providers"
+        failureMessage={connectionFailureMessage(create.error)}
+        senderDescription={SENDER_DESCRIPTION}
+        senderExample={SENDER_EXAMPLE}
         onSubmit={({ credentials, settings }) =>
           create.mutate(
             credentials === "keep" || credentials === null
@@ -132,7 +143,10 @@ export const EditPage = ({
         key={providerConnectionId}
         busyLabel="Saving…"
         connection={connection}
-        failure={update.error}
+        cancelHref="/providers"
+        failureMessage={connectionFailureMessage(update.error)}
+        senderDescription={SENDER_DESCRIPTION}
+        senderExample={SENDER_EXAMPLE}
         onSubmit={({ credentials, settings }) =>
           update.mutate(
             credentials === "keep" ? settings : { ...settings, credentials },

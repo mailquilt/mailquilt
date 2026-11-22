@@ -15,11 +15,16 @@ import { AccountMenu } from "./account-menu.tsx";
 
 const api = setupServer();
 
-const renderAccountMenu = ({ sidebarOpen = true } = {}) =>
+const renderAccountMenu = ({
+  instanceAdmin = false,
+  sidebarOpen = true,
+} = {}) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
       <Sidebar.Provider defaultOpen={sidebarOpen}>
-        <AccountMenu account={{ email: "ada@example.com", name: "Ada" }} />
+        <AccountMenu
+          account={{ email: "ada@example.com", instanceAdmin, name: "Ada" }}
+        />
       </Sidebar.Provider>
     </QueryClientProvider>
   );
@@ -32,6 +37,26 @@ describe("account menu", () => {
   });
 
   afterAll(() => api.close());
+
+  it("offers Instance settings to the instance admin only", async () => {
+    renderAccountMenu();
+    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+
+    expect(
+      within(await screen.findByRole("menu")).queryByText("Instance settings")
+    ).toBeNull();
+
+    cleanup();
+    renderAccountMenu({ instanceAdmin: true });
+    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+
+    expect(
+      within(await screen.findByRole("menu"))
+        .getByText("Instance settings")
+        .closest("a")
+        ?.getAttribute("href")
+    ).toBe("/instance");
+  });
 
   it("signs the person out", async () => {
     let signedOut = false;

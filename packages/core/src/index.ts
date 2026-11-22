@@ -76,7 +76,33 @@ export { CurrentUser } from "./current-user.ts";
 export {
   sendEmailVerification,
   SystemMailer,
-  SystemMailerNotConfigured,
+  SystemMailerAfterResponding,
+  SystemMailerLive,
 } from "./system-mailer.ts";
+
+export {
+  SystemMailerConfig,
+  SystemMailerConfigFromEnv,
+} from "./system-mailer-config.ts";
+
+export type { SystemMailerSmtp } from "./system-mailer-config.ts";
+
+export {
+  asInstanceAdmin,
+  getInstanceSettings,
+  Instance,
+  instanceStatus,
+  setUpInstance,
+  updateSignUp,
+  updateSystemMailer,
+} from "./instance.ts";
+
+export { InstanceAdmin } from "./instance-admin.ts";
+
+export type {
+  NewInstanceAdmin,
+  SavedSystemMailer,
+  SystemMailerChanges,
+} from "./instance.ts";
 
 export type { SystemEmail } from "./system-mailer.ts";

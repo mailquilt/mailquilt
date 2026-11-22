@@ -1,11 +1,20 @@
-import { MIN_PASSWORD_LENGTH } from "@repo/domain";
+import { MIN_PASSWORD_LENGTH, SIGN_UP_CLOSED } from "@repo/domain";
+import { inferAdditionalFields } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 /**
  * Better Auth's client for the endpoints our router allows, on the origin
- * that served the dashboard.
+ * that served the dashboard. The session's user says whether they are the
+ * instance admin.
  */
-export const authClient = createAuthClient({ basePath: "/api/auth" });
+export const authClient = createAuthClient({
+  basePath: "/api/auth",
+  plugins: [
+    inferAdditionalFields({
+      user: { instanceAdmin: { input: false, type: "boolean" } },
+    }),
+  ],
+});
 
 /** Where the verification link lands after Better Auth checks it. */
 export const EMAIL_VERIFIED_PATH = "/email-verified";
@@ -30,6 +39,10 @@ export const authErrorMessage = (error: AuthError) => {
 
   if (error.code === "INVALID_EMAIL_OR_PASSWORD") {
     return "The email or password is incorrect.";
+  }
+
+  if (error.code === SIGN_UP_CLOSED) {
+    return "Sign-up has just closed on this Mailquilt. Ask the person who runs it to give you access.";
   }
 
   if (error.code === "PASSWORD_TOO_SHORT") {
