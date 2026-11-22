@@ -103,6 +103,18 @@ export const newSubscriptionId = newId("sub").pipe(
   Effect.map((id) => SubscriptionIdSchema.make(id))
 );
 
+/** A Provider Connection's ID, `pcn_…`. */
+export const ProviderConnectionIdSchema = Schema.String.check(
+  hasPrefix("pcn")
+).pipe(Schema.brand("ProviderConnectionId"));
+
+export type ProviderConnectionId = typeof ProviderConnectionIdSchema.Type;
+
+/** A new Provider Connection ID. IDs made later sort after earlier ones. */
+export const newProviderConnectionId = newId("pcn").pipe(
+  Effect.map((id) => ProviderConnectionIdSchema.make(id))
+);
+
 /** A signed-in person. Better Auth makes these IDs, so they have no prefix. */
 export const UserIdSchema = Schema.String.pipe(Schema.brand("UserId"));
 

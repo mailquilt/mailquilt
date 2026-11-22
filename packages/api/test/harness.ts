@@ -1,8 +1,12 @@
 import { PgClient } from "@effect/sql-pg";
 import { MailquiltApi } from "@repo/contract";
-import type { SystemMailer } from "@repo/core";
-import type { SystemMailerOutbox } from "@repo/core/testing";
-import { SystemMailerOutboxLive } from "@repo/core/testing";
+import { credentialCipherLayer } from "@repo/core";
+import type { SmtpProvider, SystemMailer } from "@repo/core";
+import type { SmtpOutbox, SystemMailerOutbox } from "@repo/core/testing";
+import {
+  RecordingSmtpProviderLive,
+  SystemMailerOutboxLive,
+} from "@repo/core/testing";
 import { DatabaseLive, DatabasePortsLive } from "@repo/db";
 import { migrateDatabase } from "@repo/db/migrate";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
@@ -32,6 +36,11 @@ const TestAuthConfig = authConfigLayer({
   secret: TEST_AUTH_SECRET,
 });
 
+/** Seals Provider Connection credentials in tests: key 1, 32 bytes of 7s. */
+export const TEST_ENCRYPTION_KEYS = Redacted.make(
+  "1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
+);
+
 const startPostgres = Effect.acquireRelease(
   Effect.promise(() => new PostgreSqlContainer(POSTGRES_IMAGE).start()),
   (container) => Effect.promise(() => container.stop())
@@ -39,7 +48,9 @@ const startPostgres = Effect.acquireRelease(
 
 const appWith = (
   databaseUrl: string,
-  mailer: Context.Context<SystemMailer | SystemMailerOutbox>
+  fakes: Context.Context<
+    SystemMailer | SystemMailerOutbox | SmtpProvider | SmtpOutbox
+  >
 ) =>
   ApiLive.pipe(
     HttpRouter.provideRequest(
@@ -47,10 +58,11 @@ const appWith = (
         DatabasePortsLive.pipe(
           Layer.provideMerge(
             PgClient.layer({ url: Redacted.make(databaseUrl) })
-          )
+          ),
+          Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS))
         ),
         TestAuthConfig,
-        Layer.succeedContext(mailer)
+        Layer.succeedContext(fakes)
       )
     ),
     Layer.provide(HttpServer.layerServices)
@@ -68,7 +80,8 @@ export const AppFetch =
 
 /**
  * The whole API assembled as the entry apps assemble it, with a migrated,
- * real Postgres from Testcontainers and the System Mailer outbox. Its
+ * real Postgres from Testcontainers, the System Mailer outbox and the
+ * recording SMTP Provider. Its
  * `SqlClient` reaches that Postgres directly, to set up states no endpoint
  * can make yet; tests still check results through the API. Requests go
  * through the same web handler the Worker uses, so routing, encoding and
@@ -84,7 +97,9 @@ export const TestApp = Layer.effectContext(
       Effect.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
     );
 
-    const mailer = yield* Layer.build(SystemMailerOutboxLive);
+    const fakes = yield* Layer.build(
+      Layer.mergeAll(SystemMailerOutboxLive, RecordingSmtpProviderLive)
+    );
 
     const database = yield* Layer.build(
       PgClient.layer({ url: Redacted.make(databaseUrl) })
@@ -92,7 +107,7 @@ export const TestApp = Layer.effectContext(
 
     const app = yield* Effect.acquireRelease(
       Effect.sync(() =>
-        HttpRouter.toWebHandler(appWith(databaseUrl, mailer), {
+        HttpRouter.toWebHandler(appWith(databaseUrl, fakes), {
           disableLogger: true,
         })
       ),
@@ -111,7 +126,7 @@ export const TestApp = Layer.effectContext(
 
     return Context.make(ApiClient, client).pipe(
       Context.add(AppFetch, fetchInProcess),
-      Context.merge(mailer),
+      Context.merge(fakes),
       Context.merge(database)
     );
   })

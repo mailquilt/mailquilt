@@ -30,7 +30,9 @@ export {
   newMemberId,
   newOrganizationId,
   newSubscriptionId,
+  newProviderConnectionId,
   OrganizationIdSchema,
+  ProviderConnectionIdSchema,
   SubscriptionIdSchema,
   UserIdSchema,
 } from "./ids.ts";
@@ -40,6 +42,7 @@ export type {
   ListId,
   MemberId,
   OrganizationId,
+  ProviderConnectionId,
   SubscriptionId,
   UserId,
 } from "./ids.ts";
@@ -53,6 +56,29 @@ export { OrganizationNotFound } from "./organization-not-found.ts";
 export { Organization, OrganizationName, RoleSchema } from "./organization.ts";
 
 export type { Role } from "./organization.ts";
+
+export { ProviderConnectionNotFound } from "./provider-connection-not-found.ts";
+
+export {
+  MailAddress,
+  ProviderConnection,
+  ProviderConnectionName,
+  Sender,
+  SenderName,
+  SmtpCredentials,
+  SmtpHost,
+  SmtpPort,
+  SmtpSecuritySchema,
+  SmtpServer,
+} from "./provider-connection.ts";
+
+export type { SmtpSecurity } from "./provider-connection.ts";
+
+export { SendFailed, SendFailureReasonSchema } from "./send-failed.ts";
+
+export type { SendFailureReason } from "./send-failed.ts";
+
+export { TestEmailSent } from "./test-email-sent.ts";
 
 export { Subscription, SubscriptionStatusSchema } from "./subscription.ts";
 

@@ -16,7 +16,7 @@ pnpm --filter dashboard build          # the server serves dashboard/dist/client
 (cd apps/server && set -a && . ./.env && set +a && node src/main.ts)
 ```
 
-`apps/server/.env` is local only. It needs `DATABASE_URL` (the `mailquilt-postgres` container), `APP_URL=http://localhost:3000`, `AUTH_SECRET` and `PORT`. Migrate a fresh database with `pnpm --filter @repo/db migrate`. Rebuild the dashboard after every change you want to see.
+`apps/server/.env` is local only. It needs `DATABASE_URL` (the `mailquilt-postgres` container), `APP_URL=http://localhost:3000`, `AUTH_SECRET`, `ENCRYPTION_KEYS` (`1:` followed by `openssl rand -base64 32`) and `PORT`. Migrate a fresh database with `pnpm --filter @repo/db migrate`. Rebuild the dashboard after every change you want to see.
 
 ## 2. Sign in
 

@@ -105,10 +105,10 @@ All of these go through one outbound guard:
 - SNS certificate fetches
 - SMTP hosts
 
-The guard blocks private, link-local, loopback and cloud metadata addresses. It checks again after DNS resolution and limits redirects, timeouts and response size.
+The guard blocks private, link-local, loopback and cloud metadata addresses. It checks every address after DNS resolution, and the connection goes to the address it checked, so a second DNS answer can't redirect it ([ADR 0010](adr/0010-outbound-connections-go-to-the-address-the-guard-checked.md)). It limits redirects, timeouts and response size.
 
 - **Hosted:** always on.
-- **Self-hosted:** private networks are allowed by default (internal SMTP relays are normal), and one setting turns the block on.
+- **Self-hosted:** private networks and loopback are allowed by default (internal SMTP relays are normal), and `BLOCK_PRIVATE_NETWORKS=true` turns the block on. Cloud metadata, link-local and reserved addresses are refused either way.
 
 Outgoing webhooks are HMAC-signed with a timestamp.
 
@@ -121,7 +121,7 @@ Outgoing webhooks are HMAC-signed with a timestamp.
 
 ### Secrets and personal data
 
-- Provider credentials are encrypted with AES-GCM and a versioned key for rotation. They are write-only in the API and held as Effect `Redacted` values so they never reach logs.
+- Provider credentials are encrypted with AES-256-GCM under a versioned key from `ENCRYPTION_KEYS`, bound to their row so a copied value doesn't open elsewhere ([ADR 0009](adr/0009-secrets-are-sealed-under-versioned-keys-bound-to-their-row.md)). They are write-only in the API and held as Effect `Redacted` values so they never reach logs.
 - Logs never contain email addresses or message content.
 - Delivery events reference Contacts by ID. Deleting a Contact anonymizes their history.
 
