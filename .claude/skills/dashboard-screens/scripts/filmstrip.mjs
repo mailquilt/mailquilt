@@ -1,7 +1,14 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { BASE_URL, openPage, readArgs, renderSheet, sleep } from "./chrome.mjs";
+import {
+  BASE_URL,
+  navigate,
+  openPage,
+  readArgs,
+  renderSheet,
+  sleep,
+} from "./chrome.mjs";
 
 const USAGE =
   "Usage: node filmstrip.mjs --out <dir> [--path /] [--name load] [--width 1280] [--theme light] [--latency 120] [--duration 3500]";
@@ -17,43 +24,52 @@ const out = path.resolve(args.out);
 const name = args.name ?? "load";
 const width = Number(args.width ?? 1280);
 const frames = [];
-const start = Date.now();
+let start = Date.now();
 
 mkdirSync(out, { recursive: true });
 
 const page = await openPage({ theme: args.theme ?? "light", width });
 
-await page.send("Network.emulateNetworkConditions", {
-  downloadThroughput: -1,
-  latency: Number(args.latency ?? 120),
-  offline: false,
-  uploadThroughput: -1,
-});
+try {
+  await page.send("Network.emulateNetworkConditions", {
+    downloadThroughput: -1,
+    latency: Number(args.latency ?? 120),
+    offline: false,
+    uploadThroughput: -1,
+  });
 
-page.onMessage((message) => {
-  if (message.method === "Page.screencastFrame") {
-    frames.push({ at: Date.now() - start, data: message.params.data });
-    page.send("Page.screencastFrameAck", {
-      sessionId: message.params.sessionId,
-    });
-  }
-});
+  page.onMessage((message) => {
+    if (message.method === "Page.screencastFrame") {
+      frames.push({ at: Date.now() - start, data: message.params.data });
+      page.send("Page.screencastFrameAck", {
+        sessionId: message.params.sessionId,
+      });
+    }
+  });
 
-await page.send("Page.startScreencast", {
-  everyNthFrame: 1,
-  format: "png",
-  maxWidth: width,
-});
+  await page.send("Page.startScreencast", {
+    everyNthFrame: 1,
+    format: "png",
+    maxWidth: width,
+  });
 
-const url = `${BASE_URL}${args.path ?? "/"}`;
+  start = Date.now();
 
-await page.send("Page.navigate", { url });
+  await navigate(page, `${BASE_URL}${args.path ?? "/"}`);
 
-await sleep(Number(args.duration ?? 3500));
+  await sleep(Number(args.duration ?? 3500));
 
-await page.send("Page.stopScreencast");
+  await page.send("Page.stopScreencast");
+} catch (error) {
+  console.error(error.message);
+  process.exitCode = 1;
+} finally {
+  await page.close();
+}
 
-page.close();
+if (process.exitCode === 1) {
+  process.exit(1);
+}
 
 const files = frames.map(({ at, data }, index) => {
   const file = `${name}-${String(index).padStart(3, "0")}-${at}ms.png`;

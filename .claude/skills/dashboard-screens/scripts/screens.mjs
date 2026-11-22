@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   BASE_URL,
   clickTarget,
+  navigate,
   openPage,
   pressKey,
   readArgs,
@@ -39,15 +40,15 @@ const shots = [];
 
 mkdirSync(out, { recursive: true });
 
-for (const theme of themes) {
-  for (const width of widths) {
-    const page = await openPage({ theme, width });
+const shoot = async (theme, width) => {
+  const page = await openPage({ theme, width });
 
+  try {
     if (blocked.length > 0) {
       await page.send("Network.setBlockedURLs", { urls: blocked });
     }
 
-    await page.send("Page.navigate", { url: `${BASE_URL}${args.path ?? "/"}` });
+    await navigate(page, `${BASE_URL}${args.path ?? "/"}`);
     await sleep(wait);
 
     for (const step of steps) {
@@ -58,7 +59,9 @@ for (const theme of themes) {
         const result = await clickTarget(page, value);
 
         if (result !== "clicked") {
-          console.warn(`${width}px ${theme}: ${result} ${value}`);
+          throw new Error(
+            `${width}px ${theme}: ${result} ${value}; no screenshot taken`
+          );
         }
       } else if (kind === "type") {
         await typeText(page, value);
@@ -78,9 +81,21 @@ for (const theme of themes) {
 
     writeFileSync(path.join(out, file), Buffer.from(shot.result.data, "base64"));
     shots.push({ file, theme, width });
-    page.close();
     console.log(`${file}  focus: ${focus}`);
+  } finally {
+    await page.close();
   }
+};
+
+try {
+  for (const theme of themes) {
+    for (const width of widths) {
+      await shoot(theme, width);
+    }
+  }
+} catch (error) {
+  console.error(error.message);
+  process.exit(1);
 }
 
 const cells = shots

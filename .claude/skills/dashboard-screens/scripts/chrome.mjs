@@ -1,7 +1,7 @@
 // oxlint-disable no-await-in-loop -- Chrome starts once per screenshot, and steps on a page run in order.
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -35,40 +35,66 @@ export const readArgs = (argv) => {
   return args;
 };
 
+// WARNING: Chrome picks its own debugging port, read back from its profile, so the scripts only talk to the Chrome they started.
 const startChrome = async () => {
-  const port = 9300 + Math.floor(Math.random() * 600);
+  const profile = mkdtempSync(path.join(tmpdir(), "mailquilt-screens-"));
 
   const chrome = spawn(
     CHROME,
     [
       "--headless=new",
-      `--remote-debugging-port=${port}`,
-      `--user-data-dir=${mkdtempSync(path.join(tmpdir(), "mailquilt-screens-"))}`,
+      "--remote-debugging-port=0",
+      `--user-data-dir=${profile}`,
       "--hide-scrollbars",
       "about:blank",
     ],
     { stdio: "ignore" }
   );
 
+  let launchError;
+
+  chrome.once("error", (error) => {
+    launchError = error;
+  });
+  chrome.once("exit", (code) => {
+    launchError ??= new Error(`Chrome exited with code ${code}`);
+  });
+
   for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (launchError !== undefined) {
+      break;
+    }
+
     try {
+      const [port] = readFileSync(
+        path.join(profile, "DevToolsActivePort"),
+        "utf-8"
+      ).split("\n");
+
       const response = await fetch(`http://127.0.0.1:${port}/json/list`);
       const targets = await response.json();
 
-      return { chrome, page: targets.find((target) => target.type === "page") };
+      return {
+        chrome,
+        page: targets.find((target) => target.type === "page"),
+        profile,
+      };
     } catch {
       await sleep(100);
     }
   }
 
   chrome.kill();
+  rmSync(profile, { force: true, recursive: true });
 
-  throw new Error(`Chrome didn't start. Set CHROME_PATH (tried ${CHROME}).`);
+  throw new Error(
+    `Chrome didn't start (${launchError?.message ?? "no answer in 10 seconds"}). Set CHROME_PATH (tried ${CHROME}).`
+  );
 };
 
 /** Opens a page at `width` in `theme`, signed in when `MAILQUILT_SESSION` is set. */
 export const openPage = async ({ width, theme }) => {
-  const { chrome, page } = await startChrome();
+  const { chrome, page, profile } = await startChrome();
   const socket = new WebSocket(page.webSocketDebuggerUrl);
 
   await once(socket, "open");
@@ -134,9 +160,17 @@ export const openPage = async ({ width, theme }) => {
   });
 
   return {
-    close: () => {
+    close: async () => {
       socket.close();
-      chrome.kill();
+
+      if (chrome.exitCode === null && chrome.signalCode === null) {
+        const exited = once(chrome, "exit");
+
+        chrome.kill();
+        await exited;
+      }
+
+      rmSync(profile, { force: true, recursive: true });
     },
     evaluate,
     onMessage: (listener) => listeners.add(listener),
@@ -209,25 +243,37 @@ export const pressKey = async (page, key) => {
   await page.send("Input.dispatchKeyEvent", { key, type: "keyUp", ...details });
 };
 
+/** Opens `url`, and fails instead of capturing Chrome's error page when it can't load. */
+export const navigate = async (page, url) => {
+  const reply = await page.send("Page.navigate", { url });
+  const errorText = reply.result?.errorText;
+
+  if (errorText) {
+    throw new Error(`Couldn't load ${url}: ${errorText}. Is the app running?`);
+  }
+};
+
 /** Renders an HTML contact sheet, all of it, to PNG bytes. */
 export const renderSheet = async (htmlPath, width) => {
   const page = await openPage({ theme: "light", width });
 
-  await page.send("Page.navigate", { url: `file://${htmlPath}` });
-  await sleep(800);
+  try {
+    await navigate(page, `file://${htmlPath}`);
+    await sleep(800);
 
-  const height = await page.evaluate("document.documentElement.scrollHeight");
+    const height = await page.evaluate("document.documentElement.scrollHeight");
 
-  await page.send("Emulation.setDeviceMetricsOverride", {
-    deviceScaleFactor: 1,
-    height,
-    mobile: false,
-    width,
-  });
+    await page.send("Emulation.setDeviceMetricsOverride", {
+      deviceScaleFactor: 1,
+      height,
+      mobile: false,
+      width,
+    });
 
-  const shot = await page.send("Page.captureScreenshot", { format: "png" });
+    const shot = await page.send("Page.captureScreenshot", { format: "png" });
 
-  page.close();
-
-  return Buffer.from(shot.result.data, "base64");
+    return Buffer.from(shot.result.data, "base64");
+  } finally {
+    await page.close();
+  }
 };
