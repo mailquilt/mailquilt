@@ -1,6 +1,12 @@
 import { Sidebar } from "@cloudflare/kumo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -9,10 +15,10 @@ import { AccountMenu } from "./account-menu.tsx";
 
 const api = setupServer();
 
-const renderAccountMenu = () =>
+const renderAccountMenu = ({ sidebarOpen = true } = {}) =>
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <Sidebar.Provider>
+      <Sidebar.Provider defaultOpen={sidebarOpen}>
         <AccountMenu account={{ email: "ada@example.com", name: "Ada" }} />
       </Sidebar.Provider>
     </QueryClientProvider>
@@ -43,6 +49,23 @@ describe("account menu", () => {
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 
     await expect.poll(() => signedOut).toBe(true);
+  });
+
+  it("names who is signed in only when the collapsed sidebar hides it", async () => {
+    renderAccountMenu();
+    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+
+    expect(
+      within(await screen.findByRole("menu")).queryByText("ada@example.com")
+    ).toBeNull();
+
+    cleanup();
+    renderAccountMenu({ sidebarOpen: false });
+    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+
+    expect(
+      within(await screen.findByRole("menu")).getByText("ada@example.com")
+    ).toBeDefined();
   });
 
   it("says so when signing out fails", async () => {
