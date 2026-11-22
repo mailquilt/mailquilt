@@ -4,10 +4,16 @@ import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { CreateOrganizationForm } from "./create-organization-form.tsx";
-import { useOrganizations } from "./organizations.tsx";
+import { useCreateOrganization, useOrganizations } from "./organizations.tsx";
 import { ACME, renderWithOrganizations } from "./test-organizations.tsx";
 
 const api = setupServer();
+
+const FormOnHome = () => {
+  const create = useCreateOrganization();
+
+  return <CreateOrganizationForm create={create} layout="step" />;
+};
 
 const ActiveName = () => {
   const { active } = useOrganizations();
@@ -15,8 +21,8 @@ const ActiveName = () => {
   return <p data-testid="active">{active?.name ?? "none"}</p>;
 };
 
-const submitName = (name: string) => {
-  fireEvent.change(screen.getByLabelText("Organization name"), {
+const submitName = async (name: string) => {
+  fireEvent.change(await screen.findByLabelText("Organization name"), {
     target: { value: name },
   });
   fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
@@ -48,19 +54,20 @@ describe("create organization form", () => {
 
     renderWithOrganizations(
       <>
-        <CreateOrganizationForm />
+        <FormOnHome />
         <ActiveName />
       </>
     );
     await expect
       .poll(() => screen.getByTestId("active").textContent)
       .toBe("none");
-    submitName("  Acme Newsletter ");
+    await submitName("  Acme Newsletter ");
 
     await expect
       .poll(() => screen.getByTestId("active").textContent)
       .toBe("Acme Newsletter");
     expect(created).toStrictEqual({ name: "Acme Newsletter" });
+    expect(screen.queryByText("Created Acme Newsletter")).toBeNull();
   });
 
   it("asks for a name instead of sending only spaces", async () => {
@@ -74,8 +81,8 @@ describe("create organization form", () => {
       })
     );
 
-    renderWithOrganizations(<CreateOrganizationForm />);
-    submitName("   ");
+    renderWithOrganizations(<FormOnHome />);
+    await submitName("   ");
 
     await expect(
       screen.findByText("Enter a name for your organization.")
@@ -89,8 +96,8 @@ describe("create organization form", () => {
       http.post("*/api/organizations", () => HttpResponse.error())
     );
 
-    renderWithOrganizations(<CreateOrganizationForm />);
-    submitName("Acme Newsletter");
+    renderWithOrganizations(<FormOnHome />);
+    await submitName("Acme Newsletter");
 
     await expect(
       screen.findByText(

@@ -1,5 +1,11 @@
-import { Sidebar } from "@cloudflare/kumo";
+import { Sidebar, Toasty } from "@cloudflare/kumo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
 import { render } from "@testing-library/react";
 
 import { OrganizationsProvider } from "./organizations.tsx";
@@ -16,17 +22,31 @@ export const BOLT = {
   role: "owner",
 } as const;
 
-/** Renders `ui` as signed-in pages see it: with the query client and the tab's Organization. */
+/**
+ * Renders `ui` as signed-in pages see it: inside the router, with the query
+ * client, toasts and the tab's Organization.
+ */
 export const renderWithOrganizations = (ui: React.ReactNode) => {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routeTree: createRootRoute({
+      component: () => (
+        <Toasty>
+          <OrganizationsProvider>
+            <Sidebar.Provider>{ui}</Sidebar.Provider>
+          </OrganizationsProvider>
+        </Toasty>
+      ),
+    }),
+  });
+
   render(
     <QueryClientProvider
       client={
         new QueryClient({ defaultOptions: { queries: { retry: false } } })
       }
     >
-      <OrganizationsProvider>
-        <Sidebar.Provider>{ui}</Sidebar.Provider>
-      </OrganizationsProvider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   );
 };

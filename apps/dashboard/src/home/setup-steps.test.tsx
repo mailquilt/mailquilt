@@ -47,14 +47,4 @@ describe("setup steps", () => {
     ).resolves.toBeDefined();
     expect(screen.queryByLabelText("Organization name")).toBeNull();
   });
-
-  it("offers to try again when organizations couldn't be loaded", async () => {
-    api.use(http.get("*/api/organizations", () => HttpResponse.error()));
-
-    renderWithOrganizations(<SetupSteps />);
-
-    await expect(
-      screen.findByRole("button", { name: "Try again" })
-    ).resolves.toBeDefined();
-  });
 });

@@ -15,6 +15,7 @@ describe("organization switcher", () => {
     api.resetHandlers();
     sessionStorage.clear();
     localStorage.clear();
+    window.happyDOM?.setViewport({ height: 768, width: 1024 });
   });
 
   afterAll(() => api.close());
@@ -27,22 +28,22 @@ describe("organization switcher", () => {
     renderWithOrganizations(<OrganizationSwitcher />);
     fireEvent.click(
       await screen.findByRole("button", {
-        name: "Organization: Acme Newsletter",
+        name: "Organization: Acme Newsletter, Owner",
       })
     );
     fireEvent.click(
-      await screen.findByRole("menuitemradio", { name: "Bolt Weekly" })
+      await screen.findByRole("menuitemradio", { name: /Bolt Weekly/u })
     );
 
     await expect(
-      screen.findByRole("button", { name: "Organization: Bolt Weekly" })
+      screen.findByRole("button", { name: "Organization: Bolt Weekly, Owner" })
     ).resolves.toBeDefined();
 
     cleanup();
     renderWithOrganizations(<OrganizationSwitcher />);
 
     await expect(
-      screen.findByRole("button", { name: "Organization: Bolt Weekly" })
+      screen.findByRole("button", { name: "Organization: Bolt Weekly, Owner" })
     ).resolves.toBeDefined();
   });
 
@@ -53,7 +54,7 @@ describe("organization switcher", () => {
 
     renderWithOrganizations(<OrganizationSwitcher />);
     await screen.findByRole("button", {
-      name: "Organization: Acme Newsletter",
+      name: "Organization: Acme Newsletter, Owner",
     });
 
     localStorage.setItem("mailquilt.organization", BOLT.id);
@@ -61,7 +62,53 @@ describe("organization switcher", () => {
     renderWithOrganizations(<OrganizationSwitcher />);
 
     await expect(
-      screen.findByRole("button", { name: "Organization: Acme Newsletter" })
+      screen.findByRole("button", {
+        name: "Organization: Acme Newsletter, Owner",
+      })
     ).resolves.toBeDefined();
   });
+
+  it.each([
+    { layout: "desktop dialog", width: 1024 },
+    { layout: "phone sheet", width: 390 },
+  ])(
+    "creates an organization from the menu's $layout, switches to it and says so",
+    async ({ width }) => {
+      window.happyDOM?.setViewport({ height: 844, width });
+      let organizations: readonly (typeof ACME | typeof BOLT)[] = [ACME];
+      api.use(
+        http.get("*/api/organizations", () => HttpResponse.json(organizations)),
+        http.post("*/api/organizations", () => {
+          organizations = [ACME, BOLT];
+
+          return HttpResponse.json(BOLT, { status: 201 });
+        })
+      );
+
+      renderWithOrganizations(<OrganizationSwitcher />);
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Organization: Acme Newsletter, Owner",
+        })
+      );
+      fireEvent.click(
+        await screen.findByRole("menuitem", { name: "New organization" })
+      );
+      fireEvent.change(await screen.findByLabelText("Organization name"), {
+        target: { value: "Bolt Weekly" },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "Create organization" })
+      );
+
+      await expect(
+        screen.findByRole("button", {
+          name: "Organization: Bolt Weekly, Owner",
+        })
+      ).resolves.toBeDefined();
+      await expect(
+        screen.findByText("Created Bolt Weekly")
+      ).resolves.toBeDefined();
+    }
+  );
 });

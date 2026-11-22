@@ -1,9 +1,12 @@
-import { Banner, Button, Loader } from "@cloudflare/kumo";
-
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
-import { useOrganizations } from "../organizations/organizations.tsx";
+import { OrganizationPatch } from "../organizations/organization-patch.tsx";
+import {
+  useCreateOrganization,
+  useOrganizations,
+} from "../organizations/organizations.tsx";
+import { YOUR_ROLE } from "../organizations/roles.tsx";
 
 interface SetupStep {
   readonly title: string;
@@ -14,7 +17,7 @@ interface SetupStep {
 const SETUP_STEPS: readonly SetupStep[] = [
   {
     about:
-      "It holds your contacts, campaigns and sending settings. Most people make one per brand or newsletter.",
+      "It holds one brand’s contacts, campaigns and sending settings. Send for several brands? You can add the others later.",
     title: "Name your organization",
   },
   {
@@ -52,39 +55,26 @@ const stateOf = (index: number, doneCount: number) => {
 };
 
 const NameOrganization = () => {
-  const { active, query } = useOrganizations();
+  const { active } = useOrganizations();
+  const create = useCreateOrganization();
 
   if (active) {
     return (
-      <p className="max-w-[36rem] text-base text-kumo-subtle">
-        You’re working in{" "}
-        <span className="font-medium text-kumo-default">{active.name}</span>.
+      <p className="flex max-w-[36rem] items-start gap-2 text-base text-(--mq-body)">
+        <span className="flex h-lh items-center">
+          <OrganizationPatch className="size-4" organizationId={active.id} />
+        </span>
+        <span>
+          <span className="font-medium text-kumo-strong">{active.name}</span> is
+          ready, and you’re {YOUR_ROLE[active.role]}.
+        </span>
       </p>
     );
   }
 
-  if (query.isPending) {
-    return <Loader className="mt-3" />;
-  }
-
-  if (query.isError) {
-    return (
-      <div className="mt-3 flex flex-col items-start gap-3">
-        <Banner
-          role="alert"
-          title="Mailquilt couldn’t load your organizations. Check your connection, then try again."
-          variant="error"
-        />
-        <Button onClick={() => query.refetch()} variant="secondary">
-          Try again
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-3 max-w-[28rem]">
-      <CreateOrganizationForm />
+    <div className="mt-3 max-w-[30rem]">
+      <CreateOrganizationForm create={create} layout="step" />
     </div>
   );
 };

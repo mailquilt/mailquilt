@@ -29,9 +29,17 @@
   /* The logo's block geometry: 44-unit blocks with 6-unit corners. */
   --radius-quilt: 13.6%;
   --radius-quilt-slot: 11%;
+  /* The gap between blocks: 8 units across the logo's 96. */
+  --spacing-quilt-seam: 8.3%;
 
   /* The cost label: its stitched seam's 2px corner plus the seam's 7px inset. */
   --radius-quilt-label: 0.5625rem;
+
+  /* Sheets slide up and settle like Kumo's own drawer. */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* A sheet's last row stays clear of the iPhone home indicator. */
+  --spacing-sheet-bottom: max(1.5rem, env(safe-area-inset-bottom));
 
   /* Every signed-out page lines its logo, form and footer up on this width. */
   --container-auth-form: 23.75rem;
@@ -58,6 +66,9 @@
   --mq-quilt-sky: #0f0f11;
   --mq-quilt-goose: #2a2a2f;
   --mq-quilt-goose-alt: #232327;
+  --mq-patch-ink: #111113;
+  --mq-patch-grey: #71717a;
+  --mq-patch-pale: #d4d4d8;
 
   --text-color-kumo-default: #27272a;
   --text-color-kumo-strong: #111113;
@@ -94,6 +105,9 @@
   --mq-quilt-sky: #0b0b0d;
   --mq-quilt-goose: #26262b;
   --mq-quilt-goose-alt: #1f1f23;
+  --mq-patch-ink: #e4e4e7;
+  --mq-patch-grey: #8b949e;
+  --mq-patch-pale: #3f3f46;
 
   --text-color-kumo-default: #e4e4e7;
   --text-color-kumo-strong: #f0f6fc;

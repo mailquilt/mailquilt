@@ -1,21 +1,32 @@
-import { Dialog, DropdownMenu, useSidebar } from "@cloudflare/kumo";
-import { CaretUpDownIcon, PlusIcon, XIcon } from "@phosphor-icons/react";
-import { useState } from "react";
+import {
+  DropdownMenu,
+  useKumoToastManager,
+  useSidebar,
+} from "@cloudflare/kumo";
+import { CaretUpDownIcon } from "@phosphor-icons/react";
+import { useId, useState } from "react";
 
+import { ActionDialog } from "../layout/action-dialog.tsx";
 import { CreateOrganizationForm } from "./create-organization-form.tsx";
-import { useOrganizations } from "./organizations.tsx";
+import { NewPatchSlot, OrganizationPatch } from "./organization-patch.tsx";
+import { useCreateOrganization, useOrganizations } from "./organizations.tsx";
+import { RoleBadge, ROLE_LABELS } from "./roles.tsx";
 
-const initialOf = (name: string) => name.trim().charAt(0).toUpperCase();
+const MENU_ROW = "gap-2.5 py-1";
 
 /**
- * The Organization this tab works in, at the top of the sidebar. Its menu
- * switches to another one or creates a new one. Hidden until the person has
- * an Organization: the home page asks them to name their first.
+ * The Organization this tab works in, at the top of the sidebar, with the
+ * person's role in it. Its menu switches to another one or creates a new one.
+ * Hidden until the person has an Organization: the home page asks them to
+ * name their first.
  */
 export const OrganizationSwitcher = () => {
   const { active, organizations, switchTo } = useOrganizations();
   const { isMobile, state } = useSidebar();
+  const toasts = useKumoToastManager();
   const [creating, setCreating] = useState(false);
+  const create = useCreateOrganization();
+  const formId = useId();
   const besideCollapsedSidebar = !isMobile && state === "collapsed";
 
   if (!active) {
@@ -26,18 +37,17 @@ export const OrganizationSwitcher = () => {
     <>
       <DropdownMenu>
         <DropdownMenu.Trigger
-          aria-label={`Organization: ${active.name}`}
-          className="flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg p-1 text-left group-data-[state=collapsed]/sidebar:w-auto hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
+          aria-label={`Organization: ${active.name}, ${ROLE_LABELS[active.role]}`}
+          className="flex min-h-8.5 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0 hover:bg-kumo-tint focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
         >
-          <span
-            aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-quilt bg-kumo-tint font-display text-sm font-semibold text-kumo-strong ring ring-kumo-line"
-          >
-            {initialOf(active.name)}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
+          <OrganizationPatch className="size-4" organizationId={active.id} />
+          <span className="min-w-0 flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
             {active.name}
           </span>
+          <RoleBadge
+            className="group-data-[state=collapsed]/sidebar:hidden"
+            role={active.role}
+          />
           <CaretUpDownIcon
             aria-hidden="true"
             className="size-4 shrink-0 text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden"
@@ -47,56 +57,77 @@ export const OrganizationSwitcher = () => {
           align="start"
           className={
             besideCollapsedSidebar
-              ? "w-60 rounded-xl"
+              ? "w-64 rounded-xl"
               : "w-(--anchor-width) rounded-xl"
           }
           side={besideCollapsedSidebar ? "right" : "bottom"}
         >
           <DropdownMenu.Group>
-            <DropdownMenu.Label className="font-medium text-kumo-subtle">
-              Organizations
+            <DropdownMenu.Label className="pt-1 pb-1 font-medium text-kumo-subtle">
+              Switch organization
             </DropdownMenu.Label>
             <DropdownMenu.RadioGroup value={active.id}>
               {organizations.map((organization) => (
                 <DropdownMenu.RadioItem
+                  className={MENU_ROW}
                   key={organization.id}
                   onClick={() => switchTo(organization.id)}
                   value={organization.id}
                 >
-                  <span className="min-w-0 truncate">{organization.name}</span>
+                  <OrganizationPatch
+                    className="size-6"
+                    organizationId={organization.id}
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="leading-4.5 font-medium break-words text-kumo-strong">
+                      {organization.name}
+                    </span>
+                    <span className="text-xs leading-4 text-kumo-subtle">
+                      {ROLE_LABELS[organization.role]}
+                    </span>
+                  </span>
                   <DropdownMenu.RadioItemIndicator />
                 </DropdownMenu.RadioItem>
               ))}
             </DropdownMenu.RadioGroup>
           </DropdownMenu.Group>
           <DropdownMenu.Separator />
-          <DropdownMenu.Item icon={PlusIcon} onClick={() => setCreating(true)}>
-            New organization
+          <DropdownMenu.Item
+            className={MENU_ROW}
+            onClick={() => {
+              create.reset();
+              setCreating(true);
+            }}
+          >
+            <NewPatchSlot className="size-6" />
+            <span className="leading-4.5 font-medium text-kumo-strong">
+              New organization
+            </span>
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu>
-      <Dialog.Root onOpenChange={setCreating} open={creating}>
-        <Dialog className="flex flex-col gap-6 px-6 py-5 sm:px-8 sm:py-7">
-          <div className="flex items-start gap-4">
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Dialog.Title className="font-display text-xl font-semibold text-kumo-strong">
-                New organization
-              </Dialog.Title>
-              <Dialog.Description className="text-base text-(--mq-body)">
-                It has its own contacts, campaigns and sending settings. Switch
-                between organizations at the top of the sidebar.
-              </Dialog.Description>
-            </div>
-            <Dialog.Close
-              aria-label="Close"
-              className="-mt-1 -mr-2 flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-kumo-default hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus"
-            >
-              <XIcon aria-hidden="true" className="size-5" />
-            </Dialog.Close>
-          </div>
-          <CreateOrganizationForm onCreated={() => setCreating(false)} />
-        </Dialog>
-      </Dialog.Root>
+      <ActionDialog
+        actionLabel="Create organization"
+        busy={create.isPending}
+        description="Make one for each brand or newsletter you send for. Its contacts, campaigns and sending settings stay separate from your others."
+        formId={formId}
+        onOpenChange={setCreating}
+        open={creating}
+        title="New organization"
+      >
+        <CreateOrganizationForm
+          create={create}
+          id={formId}
+          layout="dialog"
+          onCreated={(created) => {
+            setCreating(false);
+            toasts.add({
+              description: "You’re working in it now.",
+              title: `Created ${created.name}`,
+            });
+          }}
+        />
+      </ActionDialog>
     </>
   );
 };

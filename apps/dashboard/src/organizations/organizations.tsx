@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { callApi } from "../api.ts";
+import { PageLoadFailed, PageLoading } from "../layout/page-states.tsx";
 
 const ORGANIZATIONS_QUERY_KEY = ["organizations"] as const;
 
@@ -46,31 +47,35 @@ const keepForThisTab = (organizationId: string) => {
   }
 };
 
-interface Choice {
-  readonly chosenId: string | null;
+interface OrganizationsState {
+  readonly organizations: readonly Organization[];
+  readonly active: Organization | null;
   readonly choose: (organizationId: string) => void;
 }
 
-const ChoiceContext = createContext<Choice | null>(null);
+const OrganizationsContext = createContext<OrganizationsState | null>(null);
 
-const useChoice = () => {
-  const choice = useContext(ChoiceContext);
+const useOrganizationsState = () => {
+  const state = useContext(OrganizationsContext);
 
-  if (!choice) {
+  if (!state) {
     throw new Error(
       "Organizations are only known inside OrganizationsProvider"
     );
   }
 
-  return choice;
+  return state;
 };
 
 /**
- * Holds which Organization this tab works in. Wraps the signed-in pages. The
- * choice is remembered per tab in session storage, so two tabs can work in
- * two Organizations (ADR 0007), and as the last choice in local storage, for
- * new tabs. A tab keeps whichever Organization it shows, chosen or not, so
- * another tab's later choice never moves it on reload. Where storage is
+ * Loads the signed-in person's Organizations and holds which one this tab
+ * works in. Wraps the signed-in pages, and shows them only once the list has
+ * loaded, so no page draws "no Organization yet" and then changes its mind.
+ *
+ * The choice is remembered per tab in session storage, so two tabs can work
+ * in two Organizations (ADR 0007), and as the last choice in local storage,
+ * for new tabs. A tab keeps whichever Organization it shows, chosen or not,
+ * so another tab's later choice never moves it on reload. Where storage is
  * blocked, the choice lasts until the page reloads.
  */
 export const OrganizationsProvider = ({
@@ -80,35 +85,22 @@ export const OrganizationsProvider = ({
 }) => {
   const [chosenId, setChosenId] = useState(readRemembered);
 
-  const choose = useCallback((organizationId: string) => {
-    remember(organizationId);
-    setChosenId(organizationId);
-  }, []);
-
-  const choice = useMemo(() => ({ choose, chosenId }), [choose, chosenId]);
-
-  return <ChoiceContext value={choice}>{children}</ChoiceContext>;
-};
-
-/**
- * The signed-in person's Organizations and the one this tab works in: the
- * last one chosen, or their first if that one is gone. `null` until they
- * have one.
- */
-export const useOrganizations = () => {
-  const { chosenId, choose } = useChoice();
-
   const query = useQuery({
     queryFn: ({ signal }) =>
       callApi((client) => client.organizations.list(), signal),
     queryKey: ORGANIZATIONS_QUERY_KEY,
   });
 
-  const organizations = query.data ?? [];
+  const choose = useCallback((organizationId: string) => {
+    remember(organizationId);
+    setChosenId(organizationId);
+  }, []);
+
+  const organizations = query.data;
 
   const active =
-    organizations.find((organization) => organization.id === chosenId) ??
-    organizations[0] ??
+    organizations?.find((organization) => organization.id === chosenId) ??
+    organizations?.[0] ??
     null;
 
   const activeId = active?.id;
@@ -119,13 +111,42 @@ export const useOrganizations = () => {
     }
   }, [activeId]);
 
-  return { active, organizations, query, switchTo: choose };
+  const state = useMemo(
+    () =>
+      organizations === undefined ? null : { active, choose, organizations },
+    [active, choose, organizations]
+  );
+
+  if (state === null) {
+    return query.isError ? (
+      <PageLoadFailed
+        description="Check your connection, then try again."
+        onRetry={() => query.refetch()}
+        title="Mailquilt couldn’t load your organizations"
+      />
+    ) : (
+      <PageLoading />
+    );
+  }
+
+  return <OrganizationsContext value={state}>{children}</OrganizationsContext>;
+};
+
+/**
+ * The signed-in person's Organizations and the one this tab works in: the
+ * last one chosen, or their first if that one is gone. `null` until they
+ * have one.
+ */
+export const useOrganizations = () => {
+  const { active, choose, organizations } = useOrganizationsState();
+
+  return { active, organizations, switchTo: choose };
 };
 
 /** Creates an Organization and switches this tab to it. */
 export const useCreateOrganization = () => {
   const queryClient = useQueryClient();
-  const { choose } = useChoice();
+  const { choose } = useOrganizationsState();
 
   return useMutation({
     mutationFn: (name: string) =>

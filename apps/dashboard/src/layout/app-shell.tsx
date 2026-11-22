@@ -15,7 +15,9 @@ import { useLocation } from "@tanstack/react-router";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
+import { OrganizationPatch } from "../organizations/organization-patch.tsx";
 import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
+import { useOrganizations } from "../organizations/organizations.tsx";
 import { useAccount } from "./session-gates.tsx";
 
 const SECTIONS_DIMMED_UNTIL_THEY_EXIST = [
@@ -79,6 +81,7 @@ const SidebarHeaderControls = () => {
 
 const MobileBarOpeningSidebarSheet = () => {
   const { isMobile, openMobile, toggleSidebar } = useSidebar();
+  const { active } = useOrganizations();
 
   if (!isMobile) {
     return null;
@@ -95,7 +98,13 @@ const MobileBarOpeningSidebarSheet = () => {
       >
         <ListIcon aria-hidden="true" className="size-5" />
       </button>
-      <MailquiltLogo className="h-5 w-auto" />
+      <MailquiltLogo className="h-5 w-auto shrink-0" />
+      {active ? (
+        <p className="ml-auto flex min-w-0 items-center gap-2 text-base font-medium text-kumo-strong">
+          <OrganizationPatch className="size-5" organizationId={active.id} />
+          <span className="truncate">{active.name}</span>
+        </p>
+      ) : null}
     </div>
   );
 };
@@ -117,7 +126,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeaderControls />
         </Sidebar.Header>
         <Sidebar.Content>
-          <div className="px-2 pt-1 pb-2 group-data-[state=collapsed]/sidebar:flex group-data-[state=collapsed]/sidebar:justify-center">
+          <div className="mb-2 border-b border-kumo-hairline pb-2 empty:hidden">
             <OrganizationSwitcher />
           </div>
           <nav aria-label="Main">

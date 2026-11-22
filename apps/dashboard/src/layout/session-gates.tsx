@@ -1,10 +1,9 @@
-import { Button, Loader } from "@cloudflare/kumo";
 import { useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
 import { createContext, useContext, useEffect } from "react";
 
 import { authClient } from "../auth/auth-client.ts";
-import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
+import { PageLoadFailed, PageLoading } from "./page-states.tsx";
 
 export interface Account {
   readonly name: string;
@@ -43,28 +42,16 @@ export const SignedInOnly = ({ children }: { children: React.ReactNode }) => {
   }, [queryClient, signedOut]);
 
   if (isPending) {
-    return (
-      <div className="flex min-h-svh items-center justify-center bg-kumo-base">
-        <Loader />
-      </div>
-    );
+    return <PageLoading />;
   }
 
   if (!session && error) {
     return (
-      <AuthLayout>
-        <AuthHeading description="Check your connection, then try again. You haven’t been signed out.">
-          Mailquilt couldn’t check your session
-        </AuthHeading>
-        <Button
-          className="w-full justify-center"
-          onClick={() => refetch()}
-          size="lg"
-          variant="primary"
-        >
-          Try again
-        </Button>
-      </AuthLayout>
+      <PageLoadFailed
+        description="Check your connection, then try again. You haven’t been signed out."
+        onRetry={() => refetch()}
+        title="Mailquilt couldn’t check your session"
+      />
     );
   }
 
