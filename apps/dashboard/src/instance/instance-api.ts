@@ -76,17 +76,20 @@ export const useSetUpInstance = () =>
   });
 
 /**
- * Records in the cached status that setup has run. Signed-out pages send
+ * Records in the cached status that setup has run, after cancelling any
+ * status request still on its way, whose older answer would undo it. Signed-out pages send
  * people to setup until it says so, so it changes only once the person has
  * left the setup page, or setup sends them to sign in.
  */
 export const useMarkSetUp = () => {
   const queryClient = useQueryClient();
 
-  return () =>
+  return async () => {
+    await queryClient.cancelQueries({ queryKey: STATUS_KEY });
     queryClient.setQueryData<InstanceStatus>(STATUS_KEY, (cached) =>
       cached === undefined ? cached : { ...cached, setUp: true }
     );
+  };
 };
 
 /** The install's settings. Only the instance admin gets them. */

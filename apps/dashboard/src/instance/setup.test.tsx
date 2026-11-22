@@ -25,7 +25,7 @@ import { SignInPage } from "../auth/sign-in-page.tsx";
 import { SignUpPage } from "../auth/sign-up-page.tsx";
 import { RouterLink } from "../layout/router-link.tsx";
 import { SignedInOnly } from "../layout/session-gates.tsx";
-import { SetupGate } from "./setup-gate.tsx";
+import { SignedOutPages } from "../layout/signed-out-pages.tsx";
 import { SetupPage } from "./setup-page.tsx";
 
 const api = setupServer();
@@ -61,9 +61,9 @@ const renderAt = (path: string) => {
 
   const signedOut = createRoute({
     component: () => (
-      <SetupGate>
+      <SignedOutPages>
         <Outlet />
-      </SetupGate>
+      </SignedOutPages>
     ),
     getParentRoute: () => root,
     id: "signed-out",
@@ -123,6 +123,7 @@ const renderAt = (path: string) => {
 
 const answerStatus = (status: { setUp: boolean; signUp: string }) =>
   api.use(
+    http.get("*/health", () => HttpResponse.json({ database: "connected" })),
     http.get("*/api/instance", () => HttpResponse.json(status)),
     http.get("*/api/auth/get-session", () => HttpResponse.json(null))
   );
@@ -148,6 +149,36 @@ describe("first-run setup", () => {
   });
 
   afterAll(() => api.close());
+
+  it("draws a signed-out page only once the install's status is known", async () => {
+    let answer: ((value: undefined) => void) | undefined;
+
+    // oxlint-disable-next-line promise/avoid-new -- the test holds this response open and answers it itself.
+    const answered = new Promise<undefined>((resolve) => {
+      answer = resolve;
+    });
+
+    answerStatus({ setUp: true, signUp: "invite-only" });
+    api.use(
+      http.get("*/api/instance", async () => {
+        await answered;
+
+        return HttpResponse.json({ setUp: true, signUp: "invite-only" });
+      })
+    );
+    renderAt("/sign-in");
+
+    await screen.findByRole("status");
+
+    expect(screen.queryByText("Mailquilt is open source.")).toBeNull();
+
+    answer?.(undefined);
+
+    await expect(
+      screen.findByRole("heading", { name: "Sign in" })
+    ).resolves.toBeDefined();
+    expect(screen.getByText("Mailquilt is open source.")).toBeDefined();
+  });
 
   it("sends every signed-out page of a fresh install to setup", async () => {
     answerStatus({ setUp: false, signUp: "invite-only" });

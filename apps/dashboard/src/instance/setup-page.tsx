@@ -30,7 +30,7 @@ export const SetupPage = () => {
   const taken = Predicate.isTagged(setUp.error, "SetupClosed");
 
   const goToSignIn = async ({ justSetUp }: { justSetUp: boolean }) => {
-    markSetUp();
+    await markSetUp();
     await navigate({ replace: true, state: { justSetUp }, to: "/sign-in" });
   };
 
@@ -68,7 +68,7 @@ export const SetupPage = () => {
                     return goToSignIn({ justSetUp: true });
                   }
 
-                  markSetUp();
+                  await markSetUp();
                   await navigate({
                     state: { justSetUp: true },
                     to: "/instance",

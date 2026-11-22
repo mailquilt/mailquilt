@@ -115,6 +115,49 @@ describe("Instance settings", () => {
     expect(saved).toStrictEqual({ signUp: "open" });
   });
 
+  it("keeps a choice made while a save is still running, and saves once at a time", async () => {
+    let saves = 0;
+    let answer: ((value: undefined) => void) | undefined;
+
+    // oxlint-disable-next-line promise/avoid-new -- the test holds this response open and answers it itself.
+    const answered = new Promise<undefined>((resolve) => {
+      answer = resolve;
+    });
+
+    answerSettings({ signUp: "invite-only", systemMailer: SAVED });
+    api.use(
+      http.put(`${SETTINGS}/sign-up`, async () => {
+        saves += 1;
+        await answered;
+
+        return HttpResponse.json({ signUp: "open", systemMailer: SAVED });
+      })
+    );
+    renderPage();
+
+    const section = within(
+      await screen.findByRole("region", { name: "Who can sign up" })
+    );
+
+    fireEvent.click(section.getByRole("radio", { name: /^Anyone/u }));
+    fireEvent.click(section.getByRole("button", { name: "Save changes" }));
+    await expect.poll(() => saves).toBe(1);
+
+    fireEvent.click(section.getByRole("radio", { name: /^Invite only/u }));
+    fireEvent.click(section.getByRole("button", { name: "Saving…" }));
+    answer?.(undefined);
+
+    await expect(
+      screen.findByText("Saved who can sign up")
+    ).resolves.toBeDefined();
+    expect(saves).toBe(1);
+    expect(
+      section
+        .getByRole("radio", { name: /^Invite only/u })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+  });
+
   it("adds the server account emails go out through, with its sign-in", async () => {
     let saved: unknown;
     answerSettings({ signUp: "invite-only", systemMailer: null });

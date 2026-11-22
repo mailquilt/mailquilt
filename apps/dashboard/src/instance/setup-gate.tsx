@@ -1,9 +1,8 @@
-import { Button } from "@cloudflare/kumo";
 import type { InstanceStatus } from "@repo/domain";
 import { Navigate, useLocation } from "@tanstack/react-router";
 import { createContext, useContext } from "react";
 
-import { AuthHeading } from "../layout/auth-layout.tsx";
+import { PageLoadFailed, PageLoading } from "../layout/page-states.tsx";
 import { useInstanceStatus } from "./instance-api.ts";
 
 const SETUP_PATH = "/setup";
@@ -22,35 +21,25 @@ export const useInstanceStatusOfGate = () => {
 };
 
 /**
- * Every signed-out page waits for the install's status. Until first-run
- * setup has run, every one of them sends the person to setup. While the
- * status loads, the page's frame shows with nothing in it, rather than a form
- * that may be the wrong one.
+ * Waits for the install's status, with the whole page's loader, so a
+ * signed-out page draws once. Until first-run setup has run, every
+ * signed-out page sends the person to setup.
  */
 export const SetupGate = ({ children }: { children: React.ReactNode }) => {
-  const { data: status, isFetching, isPending, refetch } = useInstanceStatus();
+  const { data: status, isPending, refetch } = useInstanceStatus();
   const { pathname } = useLocation();
 
   if (isPending) {
-    return null;
+    return <PageLoading />;
   }
 
   if (!status) {
     return (
-      <>
-        <AuthHeading description="Check your connection, then try again.">
-          Mailquilt couldn’t be reached
-        </AuthHeading>
-        <Button
-          className="w-full justify-center"
-          aria-busy={isFetching}
-          onClick={() => refetch()}
-          size="lg"
-          variant="primary"
-        >
-          {isFetching ? "Trying again…" : "Try again"}
-        </Button>
-      </>
+      <PageLoadFailed
+        description="Check your connection, then try again."
+        onRetry={() => refetch()}
+        title="Mailquilt couldn’t be reached"
+      />
     );
   }
 

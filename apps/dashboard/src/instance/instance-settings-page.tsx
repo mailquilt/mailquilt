@@ -91,8 +91,8 @@ const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
 
           if (!update.isPending) {
             update.mutate(chosen, {
-              onSuccess: () => {
-                setEdited(null);
+              onSuccess: (_, saved) => {
+                setEdited((now) => (now === saved ? null : now));
                 toasts.add({ title: "Saved who can sign up" });
               },
             });
@@ -103,7 +103,10 @@ const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
           appearance="card"
           controlPosition="start"
           onValueChange={(value) => {
-            update.reset();
+            if (update.isError) {
+              update.reset();
+            }
+
             setEdited(Schema.decodeUnknownSync(SignUpPolicySchema)(value));
           }}
           value={chosen}

@@ -1,14 +1,11 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
-import { SetupGate } from "../instance/setup-gate.tsx";
-import { AuthLayout } from "../layout/auth-layout.tsx";
+import { SignedOutPages } from "../layout/signed-out-pages.tsx";
 
 const AuthPages = () => (
-  <AuthLayout>
-    <SetupGate>
-      <Outlet />
-    </SetupGate>
-  </AuthLayout>
+  <SignedOutPages>
+    <Outlet />
+  </SignedOutPages>
 );
 
 export const Route = createFileRoute("/_auth")({ component: AuthPages });
