@@ -326,11 +326,14 @@ describe("contacts page", () => {
   });
 
   it("doesn't put a duplicate error on an address typed after submitting", async () => {
-    let requested = false;
+    let edited = false;
     api.use(
       http.post("*/api/organizations/:organizationId/contacts", async () => {
-        requested = true;
-        await delay(50);
+        await vi.waitFor(() => {
+          if (!edited) {
+            throw new Error("The test hasn't edited the address yet");
+          }
+        });
 
         return HttpResponse.json(
           { _tag: "ContactAlreadyExists" },
@@ -348,19 +351,27 @@ describe("contacts page", () => {
 
     fireEvent.click(addContact ?? document.body);
     const email = await screen.findByLabelText("Email address");
+
+    const submit = within(await screen.findByRole("dialog")).getByRole(
+      "button",
+      { name: "Add contact" }
+    );
+
     fireEvent.change(email, { target: { value: "ada@example.com" } });
     fireEvent.submit(email.closest("form") ?? document.body);
 
-    await vi.waitFor(() => expect(requested).toBeTruthy());
+    await vi.waitFor(() =>
+      expect(submit.hasAttribute("disabled")).toBeTruthy()
+    );
     fireEvent.change(email, { target: { value: "grace@example.com" } });
+    edited = true;
 
-    await expect(
-      screen.findByText(
-        "Acme Newsletter already has a contact with this address.",
-        undefined,
-        { timeout: 500 }
+    await vi.waitFor(() => expect(submit.hasAttribute("disabled")).toBeFalsy());
+    expect(
+      screen.queryByText(
+        "Acme Newsletter already has a contact with this address."
       )
-    ).rejects.toThrow("Unable to find");
+    ).toBeNull();
   });
 
   it("adds the selected contacts to a list and says who stayed unsubscribed", async () => {
