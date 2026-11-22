@@ -1,4 +1,4 @@
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -46,5 +46,29 @@ describe("setup steps", () => {
       })
     ).resolves.toBeDefined();
     expect(screen.queryByLabelText("Organization name")).toBeNull();
+  });
+
+  it("moves focus to the news that the organization is ready, so it is read out", async () => {
+    let organizations: readonly (typeof ACME)[] = [];
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json(organizations)),
+      http.post("*/api/organizations", () => {
+        organizations = [ACME];
+
+        return HttpResponse.json(ACME, { status: 201 });
+      })
+    );
+
+    renderWithOrganizations(<SetupSteps />);
+    fireEvent.change(await screen.findByLabelText("Organization name"), {
+      target: { value: "Acme Newsletter" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create organization" })
+    );
+
+    await expect
+      .poll(() => document.activeElement?.textContent)
+      .toBe("Acme Newsletter is ready, and you’re its owner.");
   });
 });

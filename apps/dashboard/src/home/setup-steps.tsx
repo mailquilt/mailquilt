@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
@@ -54,13 +56,22 @@ const stateOf = (index: number, doneCount: number) => {
   return index === doneCount ? "next" : "later";
 };
 
+const focusWhenShown = (element: HTMLElement | null) => {
+  element?.focus();
+};
+
 const NameOrganization = () => {
   const { active } = useOrganizations();
   const create = useCreateOrganization();
+  const [justCreated, setJustCreated] = useState(false);
 
   if (active) {
     return (
-      <p className="flex max-w-[36rem] items-start gap-2 text-base text-(--mq-body)">
+      <p
+        className="flex max-w-[36rem] items-start gap-2 text-base text-(--mq-body) outline-none"
+        ref={justCreated ? focusWhenShown : undefined}
+        tabIndex={-1}
+      >
         <span className="flex h-lh items-center">
           <OrganizationPatch className="size-4" organizationId={active.id} />
         </span>
@@ -74,7 +85,11 @@ const NameOrganization = () => {
 
   return (
     <div className="mt-3 max-w-[30rem]">
-      <CreateOrganizationForm create={create} layout="step" />
+      <CreateOrganizationForm
+        create={create}
+        layout="step"
+        onCreated={() => setJustCreated(true)}
+      />
     </div>
   );
 };

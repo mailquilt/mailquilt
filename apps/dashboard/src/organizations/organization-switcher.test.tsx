@@ -38,6 +38,7 @@ describe("organization switcher", () => {
     await expect(
       screen.findByRole("button", { name: "Organization: Bolt Weekly, Owner" })
     ).resolves.toBeDefined();
+    await expect.poll(() => screen.queryByRole("menu")).toBeNull();
 
     cleanup();
     renderWithOrganizations(<OrganizationSwitcher />);
@@ -111,4 +112,56 @@ describe("organization switcher", () => {
       ).resolves.toBeDefined();
     }
   );
+
+  it("puts the cursor in the name field when the desktop dialog opens", async () => {
+    api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
+
+    renderWithOrganizations(<OrganizationSwitcher />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Organization: Acme Newsletter, Owner",
+      })
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "New organization" })
+    );
+    const field = await screen.findByLabelText("Organization name");
+
+    await expect.poll(() => document.activeElement).toBe(field);
+  });
+
+  it("returns focus to the switcher after creating from the phone sheet", async () => {
+    window.happyDOM?.setViewport({ height: 844, width: 390 });
+    let organizations: readonly (typeof ACME | typeof BOLT)[] = [ACME];
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json(organizations)),
+      http.post("*/api/organizations", () => {
+        organizations = [ACME, BOLT];
+
+        return HttpResponse.json(BOLT, { status: 201 });
+      })
+    );
+
+    renderWithOrganizations(<OrganizationSwitcher />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Organization: Acme Newsletter, Owner",
+      })
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "New organization" })
+    );
+    fireEvent.change(await screen.findByLabelText("Organization name"), {
+      target: { value: "Bolt Weekly" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create organization" })
+    );
+
+    const switcher = await screen.findByRole("button", {
+      name: "Organization: Bolt Weekly, Owner",
+    });
+
+    await expect.poll(() => document.activeElement).toBe(switcher);
+  });
 });

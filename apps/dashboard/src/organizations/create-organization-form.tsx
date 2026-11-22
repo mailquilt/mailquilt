@@ -16,11 +16,13 @@ const NAME_HINT = "Usually the brand or newsletter’s name.";
  */
 export const CreateOrganizationForm = ({
   create,
+  fieldRef,
   id,
   layout,
   onCreated,
 }: {
   create: ReturnType<typeof useCreateOrganization>;
+  fieldRef?: React.Ref<HTMLInputElement>;
   id?: string;
   layout: "step" | "dialog";
   onCreated?: (created: Organization) => void;
@@ -72,11 +74,13 @@ export const CreateOrganizationForm = ({
           aria-describedby={hint === null ? undefined : hintId}
           aria-invalid={nameError !== null}
           autoComplete="organization"
-          className="w-full max-sm:h-11 max-sm:text-lg"
+          className="w-full max-sm:h-11 max-sm:text-lg pointer-coarse:h-11 pointer-coarse:text-lg"
           id={inputId}
           maxLength={MAX_NAME_LENGTH}
           name="name"
+          onChange={() => setNameError(null)}
           placeholder="Acme Weekly"
+          ref={fieldRef}
           size={layout === "step" ? "lg" : "base"}
           variant={nameError === null ? "default" : "error"}
         />

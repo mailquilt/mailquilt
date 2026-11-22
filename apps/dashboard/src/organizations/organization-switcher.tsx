@@ -4,7 +4,7 @@ import {
   useSidebar,
 } from "@cloudflare/kumo";
 import { CaretUpDownIcon } from "@phosphor-icons/react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { ActionDialog } from "../layout/action-dialog.tsx";
 import { CreateOrganizationForm } from "./create-organization-form.tsx";
@@ -27,6 +27,8 @@ export const OrganizationSwitcher = () => {
   const [creating, setCreating] = useState(false);
   const create = useCreateOrganization();
   const formId = useId();
+  const switcherButton = useRef<HTMLButtonElement>(null);
+  const nameField = useRef<HTMLInputElement>(null);
   const besideCollapsedSidebar = !isMobile && state === "collapsed";
 
   if (!active) {
@@ -37,6 +39,7 @@ export const OrganizationSwitcher = () => {
     <>
       <DropdownMenu>
         <DropdownMenu.Trigger
+          ref={switcherButton}
           aria-label={`Organization: ${active.name}, ${ROLE_LABELS[active.role]}`}
           className="flex min-h-8.5 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0 hover:bg-kumo-tint focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
         >
@@ -69,6 +72,7 @@ export const OrganizationSwitcher = () => {
             <DropdownMenu.RadioGroup value={active.id}>
               {organizations.map((organization) => (
                 <DropdownMenu.RadioItem
+                  closeOnClick
                   className={MENU_ROW}
                   key={organization.id}
                   onClick={() => switchTo(organization.id)}
@@ -110,13 +114,16 @@ export const OrganizationSwitcher = () => {
         actionLabel="Create organization"
         busy={create.isPending}
         description="Make one for each brand or newsletter you send for. Its contacts, campaigns and sending settings stay separate from your others."
+        finalFocus={switcherButton}
         formId={formId}
+        initialFocus={nameField}
         onOpenChange={setCreating}
         open={creating}
         title="New organization"
       >
         <CreateOrganizationForm
           create={create}
+          fieldRef={nameField}
           id={formId}
           layout="dialog"
           onCreated={(created) => {

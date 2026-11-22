@@ -88,6 +88,14 @@ describe("create organization form", () => {
       screen.findByText("Enter a name for your organization.")
     ).resolves.toBeDefined();
     expect(requested).toBeFalsy();
+
+    fireEvent.change(screen.getByLabelText("Organization name"), {
+      target: { value: "A" },
+    });
+
+    expect(
+      screen.queryByText("Enter a name for your organization.")
+    ).toBeNull();
   });
 
   it("says so when the organization couldn't be created", async () => {
