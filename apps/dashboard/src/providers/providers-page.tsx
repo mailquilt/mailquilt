@@ -48,28 +48,30 @@ const introFor = (
 };
 
 const NoConnection = () => (
-  <section className="flex gap-5 rounded-xl border border-kumo-fill bg-kumo-base p-8 max-sm:flex-col max-sm:gap-4 max-sm:p-5">
-    <QuiltSlot className="size-10 shrink-0" />
-    <div className="flex max-w-[44rem] flex-col">
-      <h2 className="text-lg font-semibold text-kumo-strong">
-        No provider connected yet
-      </h2>
-      <p className="mt-1 text-base text-(--mq-body)">
-        Connect the SMTP server you send with. Your provider lists its host,
-        port and sign-in, often under “SMTP settings”.
-      </p>
-      <LinkButton
-        className="mt-5 w-fit max-sm:w-full max-sm:justify-center"
-        href="/providers/new"
-        icon={PlusIcon}
-        variant="primary"
-      >
-        Connect SMTP server
-      </LinkButton>
-      <p className="mt-5 border-t border-kumo-hairline pt-4 text-sm text-kumo-subtle">
-        Amazon SES and Cloudflare Email arrive in a later Mailquilt update.
-      </p>
+  <section className="rounded-xl border border-kumo-fill bg-kumo-base px-6 py-5 max-sm:p-4">
+    <div className="flex gap-4 max-sm:flex-col">
+      <QuiltSlot className="size-10 shrink-0" />
+      <div className="flex max-w-[44rem] flex-col">
+        <h2 className="text-lg font-semibold text-kumo-strong">
+          No provider connected yet
+        </h2>
+        <p className="mt-1 text-base text-(--mq-body)">
+          Connect the SMTP server you send with. Your provider lists its host,
+          port and sign-in, often under “SMTP settings”.
+        </p>
+        <LinkButton
+          className="mt-4 w-fit max-sm:w-full max-sm:justify-center"
+          href="/providers/new"
+          icon={PlusIcon}
+          variant="primary"
+        >
+          Connect SMTP server
+        </LinkButton>
+      </div>
     </div>
+    <p className="mt-5 border-t border-kumo-hairline pt-4 text-sm text-kumo-subtle">
+      Amazon SES and Cloudflare Email arrive in a later Mailquilt update.
+    </p>
   </section>
 );
 

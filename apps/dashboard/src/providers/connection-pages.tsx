@@ -23,7 +23,7 @@ const FormPage = ({
   title: string;
 }) => (
   <PageFrame>
-    <div className="max-w-[44rem]">
+    <div className="mx-auto max-w-[44rem]">
       <Link
         className="mb-4 inline-flex items-center gap-1 rounded-sm text-sm text-kumo-subtle hover:text-kumo-strong focus-visible:outline-2 focus-visible:outline-kumo-focus"
         to="/providers"
