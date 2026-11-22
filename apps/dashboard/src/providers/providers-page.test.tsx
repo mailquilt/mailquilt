@@ -1,7 +1,13 @@
 import { Organization, ProviderConnectionIdSchema } from "@repo/domain";
 import type { ProviderConnectionId } from "@repo/domain";
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { Schema } from "effect";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from "@testing-library/react";
+import { Deferred, Effect, Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { useState } from "react";
@@ -51,7 +57,10 @@ const renderPage = (
   );
 
 const sendTestEmail = async () => {
-  const to = await screen.findByLabelText("Send a test email to");
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Send test for Postmark" })
+  );
+  const to = await screen.findByLabelText("Send to");
 
   expect(to).toHaveProperty("value", "ada@acme.example");
   fireEvent.submit(to.closest("form") ?? document.body);
@@ -120,11 +129,12 @@ describe("providers page", () => {
 
     await sendTestEmail();
 
-    await expect(
-      screen.findByText("Sent. Postmark accepted the email.")
-    ).resolves.toBeTruthy();
+    const sent = await screen.findByRole("status");
+
+    expect(sent.textContent).toContain("Sent. Postmark accepted it.");
     expect(sentTo).toBe("ada@acme.example");
-    expect(screen.getByText(/<abc@acme\.example>/u)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Message ID" }));
+    await expect(screen.findByText("<abc@acme.example>")).resolves.toBeTruthy();
   });
 
   it("says why the provider refused, in the server's words, and offers to edit", async () => {
@@ -151,10 +161,48 @@ describe("providers page", () => {
     expect(alert.textContent).toContain(
       "The server refused the username or password"
     );
+    expect(document.activeElement).toBe(alert);
     expect(alert.textContent).toContain("535 5.7.8");
     expect(
       screen.getByRole("link", { name: "Edit connection" }).getAttribute("href")
     ).toBe(`/providers/${POSTMARK.id}/edit`);
+  });
+
+  it("keeps the last result on screen while sending again", async () => {
+    const secondArrived = Deferred.makeUnsafe<boolean>();
+    const answerSecond = Deferred.makeUnsafe<boolean>();
+    let requests = 0;
+    withConnections([POSTMARK]);
+    api.use(
+      http.post(TEST_EMAILS, async () => {
+        requests += 1;
+
+        if (requests === 2) {
+          Deferred.doneUnsafe(secondArrived, Effect.succeed(true));
+          await Effect.runPromise(Deferred.await(answerSecond));
+        }
+
+        return HttpResponse.json({ messageId: "<abc@acme.example>" });
+      })
+    );
+    renderPage();
+
+    await sendTestEmail();
+    await screen.findByRole("status");
+    fireEvent.submit(
+      screen.getByLabelText("Send to").closest("form") ?? document.body
+    );
+    await act(() =>
+      Effect.runPromise(
+        Deferred.await(secondArrived).pipe(
+          Effect.andThen(Effect.sleep("1 millis"))
+        )
+      )
+    );
+
+    expect(screen.getByText("Sent. Postmark accepted it.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    Deferred.doneUnsafe(answerSecond, Effect.succeed(true));
   });
 
   it("says when the person has sent too many test emails", async () => {
@@ -179,18 +227,45 @@ describe("providers page", () => {
     expect(alert.textContent).toContain("Try again in 4 minutes.");
   });
 
-  it("leads a just-connected connection's test with a note that takes focus", async () => {
+  it("opens a just-connected connection's test by itself, as the next step", async () => {
     withConnections([POSTMARK]);
     renderPage({
       justConnected: ProviderConnectionIdSchema.make(POSTMARK.id),
     });
 
-    const intro = await screen.findByText(
+    const dialog = await screen.findByRole("dialog");
+
+    expect(dialog.textContent).toContain(
       "Postmark is connected. Send yourself a test to check it works."
     );
+    expect(screen.getByLabelText("Send to")).toHaveProperty(
+      "value",
+      "ada@acme.example"
+    );
+  });
 
-    expect(document.activeElement).toBe(intro);
-    expect(screen.getByLabelText("Send a test email to")).toBeTruthy();
+  it("says only what Mailquilt found when no server answered", async () => {
+    withConnections([POSTMARK]);
+    api.use(
+      http.post(TEST_EMAILS, () =>
+        HttpResponse.json(
+          {
+            _tag: "SendFailed",
+            detail: "smtp.postmarkapp.com has no address.",
+            reason: "host-not-found",
+          },
+          { status: 502 }
+        )
+      )
+    );
+    renderPage();
+
+    await sendTestEmail();
+
+    const alert = await screen.findByRole("alert");
+
+    expect(alert.textContent).toContain("smtp.postmarkapp.com doesn’t exist");
+    expect(alert.textContent).not.toContain("What the server said");
   });
 
   it("keeps the just-connected note after the page forgets the news", async () => {
@@ -223,25 +298,6 @@ describe("providers page", () => {
         "Postmark is connected. Send yourself a test to check it works."
       )
     ).toBeTruthy();
-  });
-
-  it("drops the just-connected note once a test is sent", async () => {
-    withConnections([POSTMARK]);
-    api.use(
-      http.post(TEST_EMAILS, () =>
-        HttpResponse.json({ messageId: "<abc@acme.example>" })
-      )
-    );
-    renderPage({
-      justConnected: ProviderConnectionIdSchema.make(POSTMARK.id),
-    });
-
-    await sendTestEmail();
-
-    await expect(
-      screen.findByText("Sent. Postmark accepted the email.")
-    ).resolves.toBeTruthy();
-    expect(screen.queryByText(/Postmark is connected/u)).toBeNull();
   });
 
   it("deletes a connection after asking", async () => {

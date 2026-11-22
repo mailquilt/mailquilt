@@ -1,5 +1,5 @@
-import { Button, LinkButton } from "@cloudflare/kumo";
-import { CheckIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
+import { ClipboardText, Collapsible, LinkButton } from "@cloudflare/kumo";
+import { CheckIcon } from "@phosphor-icons/react";
 import {
   MailAddress,
   ProviderConnectionNotFound,
@@ -16,33 +16,37 @@ import type {
 } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
 import { Schema } from "effect";
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { QuiltSlot } from "../brand/quilt-block.tsx";
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
+import { ActionDialog } from "../layout/action-dialog.tsx";
 import { useSendTestEmail } from "./providers-api.ts";
 
 const TestEmail = Schema.Struct({ to: MailAddress });
 
 const SECONDS_PER_MINUTE = 60;
 
-const focusOnMount = (element: HTMLElement | null) => element?.focus();
-
-const scrollIntoViewOnMount = (element: HTMLElement | null) =>
+const revealOnMount = (element: HTMLElement | null) => {
+  element?.focus({ preventScroll: true });
   element?.scrollIntoView({
     behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? "auto"
       : "smooth",
     block: "nearest",
   });
+};
 
 interface Failure {
   readonly title: string;
   readonly fix?: string;
   readonly detail?: string;
+  readonly detailLabel?: string;
   readonly canEdit: boolean;
 }
+
+const SERVER_SAID = "What the server said";
 
 const sendFailure = (
   connection: ProviderConnection,
@@ -54,6 +58,7 @@ const sendFailure = (
   const byReason: Record<SendFailureReason, Omit<Failure, "detail">> = {
     auth: {
       canEdit: true,
+      detailLabel: SERVER_SAID,
       fix: "Copy them again from your provider’s SMTP settings, then edit this connection.",
       title: "The server refused the username or password",
     },
@@ -62,7 +67,11 @@ const sendFailure = (
       fix: "Mailquilt doesn’t connect to internal addresses, such as a cloud server’s own metadata service. Use your provider’s public host name.",
       title: `${connection.smtp.host} resolves to an address Mailquilt won’t connect to`,
     },
-    failed: { canEdit: true, title: "The server didn’t accept the email" },
+    failed: {
+      canEdit: true,
+      detailLabel: SERVER_SAID,
+      title: "The server didn’t accept the email",
+    },
     "host-not-found": {
       canEdit: true,
       fix: "Check the host name for typos.",
@@ -70,11 +79,13 @@ const sendFailure = (
     },
     rejected: {
       canEdit: true,
+      detailLabel: SERVER_SAID,
       fix: "Often the sender address isn’t one your provider lets you send from. Check it’s verified there.",
       title: "The server refused the email",
     },
     tls: {
       canEdit: true,
+      detailLabel: "What went wrong",
       fix: "Check the encryption matches the port: STARTTLS is usually on 587, TLS on 465.",
       title: "The connection couldn’t be encrypted",
     },
@@ -84,6 +95,7 @@ const sendFailure = (
     },
     unreachable: {
       canEdit: true,
+      detailLabel: "What went wrong",
       fix: "Check the host and port, and that the server accepts connections from this Mailquilt server.",
       title: `Mailquilt couldn’t reach ${server}`,
     },
@@ -134,26 +146,35 @@ const Sent = ({
   sent: TestEmailSent;
   to: string;
 }) => (
-  <output className="flex gap-4" ref={scrollIntoViewOnMount}>
+  <div className="flex gap-2.5 outline-none" ref={revealOnMount} tabIndex={-1}>
     <span
       aria-hidden="true"
-      className="flex size-10 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
+      className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
     >
-      <CheckIcon className="size-5" weight="bold" />
+      <CheckIcon className="size-3" weight="bold" />
     </span>
-    <div className="flex min-w-0 flex-col gap-1">
-      <h3 className="text-base font-semibold text-kumo-strong">
-        Sent. {connection.name} accepted the email.
-      </h3>
-      <p className="text-base text-(--mq-body)">
+    <div className="min-w-0 flex-1">
+      <output className="block text-base text-(--mq-body)">
+        <strong className="font-semibold text-kumo-strong">
+          Sent. {connection.name} accepted it.
+        </strong>{" "}
         Look for “{TEST_EMAIL_SUBJECT}” at {to}. It can take a minute, and may
         land in spam.
-      </p>
-      <p className="mt-1 text-sm break-words text-kumo-subtle">
-        Message ID for your provider’s logs: {sent.messageId}
-      </p>
+      </output>
+      <Collapsible className="mt-1">
+        <Collapsible.DefaultTrigger>Message ID</Collapsible.DefaultTrigger>
+        <Collapsible.DefaultPanel>
+          <div className="w-0 min-w-full">
+            <ClipboardText
+              className="w-full"
+              labels={{ copyAction: "Copy message ID" }}
+              text={sent.messageId}
+            />
+          </div>
+        </Collapsible.DefaultPanel>
+      </Collapsible>
     </div>
-  </output>
+  </div>
 );
 
 const NotSent = ({
@@ -163,8 +184,13 @@ const NotSent = ({
   connection: ProviderConnection;
   failure: Failure;
 }) => (
-  <div className="flex gap-4" ref={scrollIntoViewOnMount} role="alert">
-    <QuiltSlot className="size-10 shrink-0" />
+  <div
+    className="flex gap-2.5 outline-none"
+    ref={revealOnMount}
+    role="alert"
+    tabIndex={-1}
+  >
+    <QuiltSlot className="mt-0.5 size-5 shrink-0" />
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <h3 className="text-base font-semibold text-kumo-strong">
         {failure.title}
@@ -172,10 +198,11 @@ const NotSent = ({
       {failure.fix === undefined ? null : (
         <p className="text-base text-(--mq-body)">{failure.fix}</p>
       )}
-      {failure.detail === undefined ? null : (
+      {failure.detail === undefined ||
+      failure.detailLabel === undefined ? null : (
         <>
-          <p className="mt-2 text-sm text-kumo-subtle">What the server said</p>
-          <p className="rounded-lg bg-kumo-base px-3 py-2 font-mono text-sm break-words text-kumo-strong">
+          <p className="mt-2 text-sm text-kumo-subtle">{failure.detailLabel}</p>
+          <p className="rounded-lg bg-kumo-recessed px-3 py-2 font-mono text-sm wrap-anywhere text-kumo-strong">
             {failure.detail}
           </p>
         </>
@@ -193,56 +220,94 @@ const NotSent = ({
   </div>
 );
 
+type Outcome =
+  | {
+      readonly attempt: number;
+      readonly kind: "sent";
+      readonly sent: TestEmailSent;
+      readonly to: string;
+    }
+  | {
+      readonly attempt: number;
+      readonly kind: "failed";
+      readonly error: Error;
+    };
+
+const senderOf = ({ from }: ProviderConnection) =>
+  from.name === undefined ? from.email : `${from.name} <${from.email}>`;
+
 /**
  * Sends a test email through one connection, to the signed-in person's
  * address unless they change it, and says what happened: the Provider
  * accepted it, or why not in the server's own words, with what to fix.
- * `intro` leads the panel right after the connection was made or saved, and
- * takes focus so the next step is read out. The panel keeps it, though the
- * page then drops it from the URL, until the person sends a test.
+ * `intro` replaces the description when it opens by itself, right after the
+ * connection was made or saved. While it sends again, the last result stays,
+ * dimmed, so nothing jumps. Mount it afresh for each opening (a new `key`),
+ * so it starts without the last result.
  */
-export const TestEmailPanel = ({
+export const TestEmailDialog = ({
   connection,
   defaultTo,
+  finalFocus,
   intro,
+  onOpenChange,
+  open,
   organization,
 }: {
   connection: ProviderConnection;
   defaultTo: string;
+  finalFocus?: React.RefObject<HTMLElement | null>;
   intro?: string;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
   organization: Organization;
 }) => {
   const send = useSendTestEmail(organization.id, connection.id);
-  const [shownIntro, setShownIntro] = useState(intro);
+  const formId = useId();
+  const sendTo = useRef<HTMLInputElement>(null);
+  const [outcome, setOutcome] = useState<Outcome>();
+  const done = outcome !== undefined;
 
   const form = useForm({
     defaultValues: { to: defaultTo },
     onSubmit: ({ value }) => {
-      if (!send.isPending) {
-        setShownIntro(undefined);
-        send.mutate(Schema.decodeSync(TestEmail)(value).to);
+      if (send.isPending) {
+        return;
       }
+
+      const { to } = Schema.decodeSync(TestEmail)(value);
+      const attempt = (outcome?.attempt ?? 0) + 1;
+
+      send.mutate(to, {
+        onError: (error) => setOutcome({ attempt, error, kind: "failed" }),
+        onSuccess: (sent) => setOutcome({ attempt, kind: "sent", sent, to }),
+      });
     },
     validators: { onSubmit: Schema.toStandardSchemaV1(TestEmail) },
   });
 
   return (
-    <div className="flex flex-col gap-4">
-      {shownIntro === undefined ? null : (
-        <p
-          className="border-l-3 border-(--mq-accent) py-1 pl-3 text-base text-kumo-strong outline-none"
-          ref={focusOnMount}
-          tabIndex={-1}
+    <ActionDialog
+      actionLabel={done ? "Send again" : "Send"}
+      busy={send.isPending}
+      description={
+        intro ??
+        `Through ${connection.name} (${connection.smtp.host}:${connection.smtp.port}), from ${senderOf(connection)}.`
+      }
+      dismissLabel={done ? "Close" : "Cancel"}
+      finalFocus={finalFocus}
+      formId={formId}
+      initialFocus={sendTo}
+      onOpenChange={onOpenChange}
+      open={open}
+      title="Send a test email"
+    >
+      <div className="flex flex-col gap-4">
+        <form
+          id={formId}
+          noValidate
+          onSubmit={(event) => submitForm(event, form)}
         >
-          {shownIntro}
-        </p>
-      )}
-      <form
-        className="flex items-end gap-2 max-sm:flex-col max-sm:items-stretch"
-        noValidate
-        onSubmit={(event) => submitForm(event, form)}
-      >
-        <div className="min-w-0 flex-1">
           <form.Field name="to">
             {(field) => (
               <FormField
@@ -250,32 +315,34 @@ export const TestEmailPanel = ({
                 className="w-full max-sm:h-11 pointer-coarse:h-11"
                 field={field}
                 inputMode="email"
-                label="Send a test email to"
+                label="Send to"
+                ref={sendTo}
                 size="base"
                 type="email"
               />
             )}
           </form.Field>
-        </div>
-        <Button
-          className="max-sm:h-11 max-sm:w-full max-sm:justify-center"
-          aria-busy={send.isPending}
-          icon={PaperPlaneTiltIcon}
-          type="submit"
-          variant="secondary"
+        </form>
+        <div
+          className={`min-w-0 transition-opacity motion-reduce:transition-none ${send.isPending ? "opacity-50" : ""}`}
         >
-          {send.isPending ? "Sending…" : "Send test email"}
-        </Button>
-      </form>
-      {send.isSuccess ? (
-        <Sent connection={connection} sent={send.data} to={send.variables} />
-      ) : null}
-      {send.isError ? (
-        <NotSent
-          connection={connection}
-          failure={failureOf(connection, send.error)}
-        />
-      ) : null}
-    </div>
+          {outcome?.kind === "sent" ? (
+            <Sent
+              connection={connection}
+              key={outcome.attempt}
+              sent={outcome.sent}
+              to={outcome.to}
+            />
+          ) : null}
+          {outcome?.kind === "failed" ? (
+            <NotSent
+              connection={connection}
+              failure={failureOf(connection, outcome.error)}
+              key={outcome.attempt}
+            />
+          ) : null}
+        </div>
+      </div>
+    </ActionDialog>
   );
 };

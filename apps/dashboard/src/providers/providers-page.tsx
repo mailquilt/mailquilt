@@ -1,9 +1,10 @@
-import { DropdownMenu, LinkButton } from "@cloudflare/kumo";
+import { Button, DropdownMenu, LinkButton } from "@cloudflare/kumo";
 import {
   DotsThreeIcon,
   EnvelopeSimpleIcon,
   LockSimpleIcon,
   LockSimpleOpenIcon,
+  PaperPlaneTiltIcon,
   PencilSimpleIcon,
   PlusIcon,
   TrashIcon,
@@ -23,7 +24,7 @@ import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { DeleteConnectionDialog } from "./delete-connection-dialog.tsx";
 import { useProviderConnections } from "./providers-api.ts";
-import { TestEmailPanel } from "./test-email-panel.tsx";
+import { TestEmailDialog } from "./test-email-dialog.tsx";
 
 const ENCRYPTION_NAME: Record<SmtpSecurity, string> = {
   none: "Not encrypted",
@@ -96,6 +97,13 @@ const ConnectionCard = ({
   const headingId = useId();
   const [deleting, setDeleting] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const testButton = useRef<HTMLButtonElement>(null);
+
+  const [test, setTest] = useState({
+    intro,
+    open: intro !== undefined,
+    opening: 0,
+  });
 
   const SecurityIcon =
     connection.smtp.security === "none" ? LockSimpleOpenIcon : LockSimpleIcon;
@@ -105,61 +113,75 @@ const ConnectionCard = ({
       aria-labelledby={headingId}
       className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-kumo-fill bg-kumo-base"
     >
-      <div className="px-6 py-5 max-sm:p-4">
-        <div className="flex items-center gap-3">
-          <span
-            aria-hidden="true"
-            className="flex size-10 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
+      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 px-6 py-5 max-sm:p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
+        <span
+          aria-hidden="true"
+          className="flex size-10 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
+        >
+          <EnvelopeSimpleIcon className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2
+            className="text-base font-semibold break-words text-kumo-strong"
+            id={headingId}
           >
-            <EnvelopeSimpleIcon className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2
-              className="text-base font-semibold break-words text-kumo-strong"
-              id={headingId}
-            >
-              {connection.name}
-            </h2>
-            <p className="text-sm text-kumo-subtle">
-              SMTP server, connected {formatDay(connection.createdAt)}
-            </p>
-          </div>
-          <DropdownMenu>
-            <DropdownMenu.Trigger
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-kumo-strong hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
-              ref={menuButton}
-              render={
-                <button
-                  aria-label={`More for ${connection.name}`}
-                  type="button"
-                />
+            {connection.name}
+          </h2>
+          <p className="text-sm text-kumo-subtle">
+            SMTP server, connected {formatDay(connection.createdAt)}
+          </p>
+        </div>
+        <Button
+          className="col-span-full row-start-3 mt-4 w-full justify-center sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:mt-0 sm:w-auto"
+          icon={PaperPlaneTiltIcon}
+          onClick={() =>
+            setTest(({ opening }) => ({
+              intro: undefined,
+              open: true,
+              opening: opening + 1,
+            }))
+          }
+          ref={testButton}
+          variant="secondary"
+        >
+          Send test
+          <span className="sr-only"> for {connection.name}</span>
+        </Button>
+        <DropdownMenu>
+          <DropdownMenu.Trigger
+            className="col-start-3 row-start-1 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-kumo-strong hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint sm:col-start-4"
+            ref={menuButton}
+            render={
+              <button
+                aria-label={`More for ${connection.name}`}
+                type="button"
+              />
+            }
+          >
+            <DotsThreeIcon aria-hidden="true" className="size-5" />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end" className="min-w-44 rounded-xl">
+            <DropdownMenu.Item
+              icon={PencilSimpleIcon}
+              onClick={() =>
+                navigate({
+                  params: { providerConnectionId: connection.id },
+                  to: "/providers/$providerConnectionId/edit",
+                })
               }
             >
-              <DotsThreeIcon aria-hidden="true" className="size-5" />
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Content align="end" className="min-w-44 rounded-xl">
-              <DropdownMenu.Item
-                icon={PencilSimpleIcon}
-                onClick={() =>
-                  navigate({
-                    params: { providerConnectionId: connection.id },
-                    to: "/providers/$providerConnectionId/edit",
-                  })
-                }
-              >
-                Edit
-              </DropdownMenu.Item>
-              <DropdownMenu.Item
-                icon={TrashIcon}
-                onClick={() => setDeleting(true)}
-                variant="danger"
-              >
-                Delete
-              </DropdownMenu.Item>
-            </DropdownMenu.Content>
-          </DropdownMenu>
-        </div>
-        <dl className="mt-5 grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2.5 max-sm:grid-cols-[4.75rem_minmax(0,1fr)] max-sm:gap-x-3">
+              Edit
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              icon={TrashIcon}
+              onClick={() => setDeleting(true)}
+              variant="danger"
+            >
+              Delete
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu>
+        <dl className="col-span-full row-start-2 mt-5 grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2.5 max-sm:grid-cols-[4.75rem_minmax(0,1fr)] max-sm:gap-x-3">
           <Detail label="Sends as">
             {connection.from.name === undefined ? (
               connection.from.email
@@ -184,14 +206,16 @@ const ConnectionCard = ({
           </Detail>
         </dl>
       </div>
-      <div className="flex-1 border-t border-kumo-fill bg-kumo-recessed px-6 py-4 max-sm:p-4">
-        <TestEmailPanel
-          connection={connection}
-          defaultTo={defaultTo}
-          intro={intro}
-          organization={organization}
-        />
-      </div>
+      <TestEmailDialog
+        connection={connection}
+        defaultTo={defaultTo}
+        finalFocus={testButton}
+        intro={test.intro}
+        key={test.opening}
+        onOpenChange={(open) => setTest((last) => ({ ...last, open }))}
+        open={test.open}
+        organization={organization}
+      />
       <DeleteConnectionDialog
         connection={connection}
         finalFocus={menuButton}
@@ -206,9 +230,9 @@ const ConnectionCard = ({
 
 /**
  * The Organization's Provider Connections, two across on wide screens, each
- * with who it sends as, its server and security, a test email ready below,
- * and its Edit and Delete. A connection that was just connected or saved
- * leads its test with a note that takes focus, as the next step.
+ * with who it sends as, its server and security, Send test, and its Edit and
+ * Delete. A connection that was just connected or saved opens its test by
+ * itself, as the next step.
  */
 export const ProvidersPage = ({
   justConnected,
