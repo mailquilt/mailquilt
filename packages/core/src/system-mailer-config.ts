@@ -118,7 +118,7 @@ export const SystemMailerConfigFromEnv = Layer.effect(
 
     return Option.some({
       credentials: Option.flatten(credentials),
-      from: Option.match(fromName, {
+      from: Option.match(fromName.pipe(Option.filter((name) => name !== "")), {
         onNone: () => ({ email: fromEmail.value }),
         onSome: (name) => ({ email: fromEmail.value, name }),
       }),

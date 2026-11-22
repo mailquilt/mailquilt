@@ -13,9 +13,11 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppContactsRouteImport } from './routes/_app/contacts'
+import { Route as AppInstanceRouteImport } from './routes/_app/instance'
 import { Route as AppListsRouteImport } from './routes/_app/lists'
 import { Route as AuthCheckYourInboxRouteImport } from './routes/_auth/check-your-inbox'
 import { Route as AuthEmailVerifiedRouteImport } from './routes/_auth/email-verified'
+import { Route as AuthSetupRouteImport } from './routes/_auth/setup'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as AppProvidersIndexRouteImport } from './routes/_app/providers/index'
@@ -40,6 +42,11 @@ const AppContactsRoute = AppContactsRouteImport.update({
   path: '/contacts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInstanceRoute = AppInstanceRouteImport.update({
+  id: '/instance',
+  path: '/instance',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppListsRoute = AppListsRouteImport.update({
   id: '/lists',
   path: '/lists',
@@ -53,6 +60,11 @@ const AuthCheckYourInboxRoute = AuthCheckYourInboxRouteImport.update({
 const AuthEmailVerifiedRoute = AuthEmailVerifiedRouteImport.update({
   id: '/email-verified',
   path: '/email-verified',
+  getParentRoute: () => AuthRoute,
+} as any)
+const AuthSetupRoute = AuthSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
   getParentRoute: () => AuthRoute,
 } as any)
 const AuthSignInRoute = AuthSignInRouteImport.update({
@@ -85,9 +97,11 @@ const AppProvidersProviderConnectionIdEditRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/contacts': typeof AppContactsRoute
+  '/instance': typeof AppInstanceRoute
   '/lists': typeof AppListsRoute
   '/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/email-verified': typeof AuthEmailVerifiedRoute
+  '/setup': typeof AuthSetupRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/providers/new': typeof AppProvidersNewRoute
@@ -97,9 +111,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
   '/contacts': typeof AppContactsRoute
+  '/instance': typeof AppInstanceRoute
   '/lists': typeof AppListsRoute
   '/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/email-verified': typeof AuthEmailVerifiedRoute
+  '/setup': typeof AuthSetupRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/providers/new': typeof AppProvidersNewRoute
@@ -111,9 +127,11 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
   '/_app/contacts': typeof AppContactsRoute
+  '/_app/instance': typeof AppInstanceRoute
   '/_app/lists': typeof AppListsRoute
   '/_auth/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/_auth/email-verified': typeof AuthEmailVerifiedRoute
+  '/_auth/setup': typeof AuthSetupRoute
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
@@ -126,9 +144,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/contacts'
+    | '/instance'
     | '/lists'
     | '/check-your-inbox'
     | '/email-verified'
+    | '/setup'
     | '/sign-in'
     | '/sign-up'
     | '/providers/new'
@@ -138,9 +158,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/contacts'
+    | '/instance'
     | '/lists'
     | '/check-your-inbox'
     | '/email-verified'
+    | '/setup'
     | '/sign-in'
     | '/sign-up'
     | '/providers/new'
@@ -151,9 +173,11 @@ export interface FileRouteTypes {
     | '/_app'
     | '/_auth'
     | '/_app/contacts'
+    | '/_app/instance'
     | '/_app/lists'
     | '/_auth/check-your-inbox'
     | '/_auth/email-verified'
+    | '/_auth/setup'
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_app/'
@@ -197,6 +221,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppContactsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/instance': {
+      id: '/_app/instance'
+      path: '/instance'
+      fullPath: '/instance'
+      preLoaderRoute: typeof AppInstanceRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/lists': {
       id: '/_app/lists'
       path: '/lists'
@@ -216,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/email-verified'
       fullPath: '/email-verified'
       preLoaderRoute: typeof AuthEmailVerifiedRouteImport
+      parentRoute: typeof AuthRoute
+    }
+    '/_auth/setup': {
+      id: '/_auth/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof AuthSetupRouteImport
       parentRoute: typeof AuthRoute
     }
     '/_auth/sign-in': {
@@ -258,6 +296,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppContactsRoute: typeof AppContactsRoute
+  AppInstanceRoute: typeof AppInstanceRoute
   AppListsRoute: typeof AppListsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppProvidersNewRoute: typeof AppProvidersNewRoute
@@ -267,6 +306,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppContactsRoute: AppContactsRoute,
+  AppInstanceRoute: AppInstanceRoute,
   AppListsRoute: AppListsRoute,
   AppIndexRoute: AppIndexRoute,
   AppProvidersNewRoute: AppProvidersNewRoute,
@@ -280,6 +320,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 interface AuthRouteChildren {
   AuthCheckYourInboxRoute: typeof AuthCheckYourInboxRoute
   AuthEmailVerifiedRoute: typeof AuthEmailVerifiedRoute
+  AuthSetupRoute: typeof AuthSetupRoute
   AuthSignInRoute: typeof AuthSignInRoute
   AuthSignUpRoute: typeof AuthSignUpRoute
 }
@@ -287,6 +328,7 @@ interface AuthRouteChildren {
 const AuthRouteChildren: AuthRouteChildren = {
   AuthCheckYourInboxRoute: AuthCheckYourInboxRoute,
   AuthEmailVerifiedRoute: AuthEmailVerifiedRoute,
+  AuthSetupRoute: AuthSetupRoute,
   AuthSignInRoute: AuthSignInRoute,
   AuthSignUpRoute: AuthSignUpRoute,
 }

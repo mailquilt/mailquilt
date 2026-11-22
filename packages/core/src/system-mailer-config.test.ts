@@ -68,6 +68,20 @@ describe("System Mailer from environment variables", () => {
     })
   );
 
+  it.effect("sends from the address alone when the from name is blank", () =>
+    Effect.gen(function* blankName() {
+      const config = yield* readFrom({
+        ...COMPLETE,
+        SYSTEM_MAILER_FROM_NAME: "   ",
+      });
+
+      assert.deepStrictEqual(
+        config.pipe(Option.map((mailer) => mailer.from)),
+        Option.some({ email: "accounts@example.com" })
+      );
+    })
+  );
+
   it.effect("stops the app when a variable it needs is missing", () =>
     Effect.gen(function* missing() {
       const exit = yield* readFrom(withoutKey("SYSTEM_MAILER_SMTP_PORT")).pipe(

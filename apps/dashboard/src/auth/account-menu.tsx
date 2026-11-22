@@ -1,5 +1,9 @@
 import { DropdownMenu, useSidebar } from "@cloudflare/kumo";
-import { CaretUpDownIcon, SignOutIcon } from "@phosphor-icons/react";
+import {
+  CaretUpDownIcon,
+  GearSixIcon,
+  SignOutIcon,
+} from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 
 import type { Account } from "../layout/session-gates.tsx";
@@ -38,8 +42,9 @@ const AccountName = ({
 );
 
 /**
- * Who is signed in, at the foot of the sidebar. Opens a menu with their
- * appearance setting and, set apart in red, sign-out. The menu is as wide as
+ * Who is signed in, at the foot of the sidebar. Opens a menu with, for the
+ * instance admin, Instance settings, then their appearance setting and, set
+ * apart in red, sign-out. The menu is as wide as
  * the sidebar and opens above it. When the sidebar is collapsed to icons, the
  * trigger is only an initial, so the menu opens beside it and starts with the
  * name and email. Signing out ends the session; the app shell then sends them
@@ -87,6 +92,14 @@ export const AccountMenu = ({ account }: { account: Account }) => {
               <AccountAvatar account={account} />
               <AccountName account={account} whole />
             </div>
+            <DropdownMenu.Separator />
+          </>
+        ) : null}
+        {account.instanceAdmin ? (
+          <>
+            <DropdownMenu.LinkItem href="/instance" icon={GearSixIcon}>
+              Instance settings
+            </DropdownMenu.LinkItem>
             <DropdownMenu.Separator />
           </>
         ) : null}

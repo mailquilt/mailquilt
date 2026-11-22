@@ -1,10 +1,13 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
+import { SetupGate } from "../instance/setup-gate.tsx";
 import { AuthLayout } from "../layout/auth-layout.tsx";
 
 const AuthPages = () => (
   <AuthLayout>
-    <Outlet />
+    <SetupGate>
+      <Outlet />
+    </SetupGate>
   </AuthLayout>
 );
 
