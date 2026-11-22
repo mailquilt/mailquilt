@@ -1,11 +1,11 @@
 import { ApiLive, authConfigLayer } from "@repo/api";
-import { SystemMailerNotConfigured } from "@repo/core";
+import { SystemMailerConfigFromEnv, SystemMailerLive } from "@repo/core";
 import {
   postgresPortsLive,
   providePerRequest,
   SmtpProviderUnavailable,
 } from "@repo/runtime-cloudflare";
-import { Effect, Layer, Option, Redacted } from "effect";
+import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
 interface Env {
@@ -16,7 +16,33 @@ interface Env {
   readonly AUTH_SECRET: string;
   /** Keys that seal Provider Connection credentials, a secret like AUTH_SECRET (ADR 0009). Unset, every request fails saying so. */
   readonly ENCRYPTION_KEYS?: string;
+  /**
+   * The System Mailer, optional: `SYSTEM_MAILER_SMTP_HOST`, `_PORT`,
+   * `_SECURITY`, `SYSTEM_MAILER_FROM_EMAIL` and the optional `_FROM_NAME`,
+   * `_SMTP_USERNAME` and `_SMTP_PASSWORD` (a secret). Unset, the instance
+   * settings page sets it.
+   */
+  readonly [systemMailerVariable: `SYSTEM_MAILER_${string}`]:
+    | string
+    | undefined;
 }
+
+const systemMailerConfig = (env: Env) =>
+  SystemMailerConfigFromEnv.pipe(
+    Layer.provide(
+      ConfigProvider.layer(
+        ConfigProvider.fromEnv({
+          env: Object.fromEntries(
+            Object.entries(env).filter(
+              (entry): entry is [string, string] =>
+                entry[0].startsWith("SYSTEM_MAILER_") &&
+                typeof entry[1] === "string"
+            )
+          ),
+        })
+      )
+    )
+  );
 
 // WARNING: trust only `cf-connecting-ip`, which Cloudflare sets itself; a client can forge any other IP header.
 const authConfigLive = (env: Env) =>
@@ -30,16 +56,22 @@ const makeApp = (env: Env) =>
   HttpRouter.toWebHandler(
     ApiLive.pipe(
       providePerRequest(
-        postgresPortsLive(
-          env.HYPERDRIVE,
-          Redacted.make(env.ENCRYPTION_KEYS ?? "")
+        SystemMailerLive.pipe(
+          Layer.provideMerge(
+            postgresPortsLive(
+              env.HYPERDRIVE,
+              Redacted.make(env.ENCRYPTION_KEYS ?? "")
+            )
+          ),
+          Layer.provide(SmtpProviderUnavailable),
+          Layer.provide(systemMailerConfig(env))
         )
       ),
       HttpRouter.provideRequest(
         Layer.mergeAll(
           authConfigLive(env),
           SmtpProviderUnavailable,
-          SystemMailerNotConfigured
+          systemMailerConfig(env)
         )
       ),
       Layer.provide(HttpServer.layerServices),

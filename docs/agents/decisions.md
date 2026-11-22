@@ -2,7 +2,7 @@
 
 Accepted limits, and rules a review doesn't raise again unless something has changed since, such as a bug report or a new feature that depends on them. A pull request that changes one of these says so, gives the reason and updates this page.
 
-The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), tenant endpoints that name the Organization in the path (0007), long collections paged by ID (0008), secrets sealed under versioned keys bound to their row (0009), and outbound connections going to the address the guard checked (0010). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
+The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), tenant endpoints that name the Organization in the path (0007), long collections paged by ID (0008), secrets sealed under versioned keys bound to their row (0009), outbound connections going to the address the guard checked (0010), and the install set up once with settings only its instance admin can reach (0011). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
 
 ## Consent and sending
 
@@ -30,6 +30,15 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - A Provider Connection can be edited and deleted. An edit that leaves credentials out keeps them; `null` removes them. Changing the host, port or encryption while keeping saved credentials is refused (`CredentialsRequired`), so a member can't send someone else's password to a server they control or unencrypted (#9).
 - A DNS lookup that fails (timeout, server failure) is reported as `unreachable` with the resolver's reason; only a name with no address is `host-not-found` (#9).
 - Until the Workers SMTP adapter (#11), an SMTP Provider Connection can be saved on Cloudflare, and sending through it fails with `SendFailed` reason `unavailable` (#9).
+
+## The install
+
+- First-run setup makes the instance admin once, in the same transaction as the `instance` row, and never opens again. Whoever reaches a fresh install first becomes its instance admin; there is no setup token (ADR 0011, #7).
+- The instance admin's email is marked verified at setup, because a fresh install has no System Mailer yet (ADR 0011, #7).
+- Sign-up is invite-only by default, and refused before setup too, with 403 `SIGN_UP_CLOSED`. Until invitations (#34), invite-only means nobody can sign up (#7).
+- The System Mailer sends through SMTP, with the same adapter and outbound guard as Provider Connections. Its saved credentials are sealed and write-only, and only go to the server they were entered for, as a Provider Connection's do (#7).
+- `SYSTEM_MAILER_*` environment variables win over the System Mailer saved on the settings page, which then can't be changed (409 `SystemMailerFromEnvironment`). Some set but not all that are needed stops the app (#7).
+- An account email that can't be sent is logged with its subject and the failure's reason, never the address or the server's reply, which often quotes it. Sign-up still succeeds (#7).
 
 ## Data
 

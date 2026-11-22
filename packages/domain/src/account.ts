@@ -6,6 +6,12 @@ import { Schema } from "effect";
  */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/**
+ * The error code sign-up answers with when it isn't open: before first-run
+ * setup, or while the install is invite-only. The dashboard reads it.
+ */
+export const SIGN_UP_CLOSED = "SIGN_UP_CLOSED";
+
 /** The pattern browsers check an `<input type="email">` against. */
 export const BROWSER_EMAIL_INPUT_PATTERN =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/u;

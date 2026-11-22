@@ -1,5 +1,5 @@
 import { MailquiltApi } from "@repo/contract";
-import { SystemMailerOutbox } from "@repo/core/testing";
+import { SmtpOutbox, SystemMailerOutbox } from "@repo/core/testing";
 import { Effect } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
@@ -72,13 +72,23 @@ export const sessionCookie = (response: Response) =>
     .map((cookie) => cookie.split(";")[0])
     .join("; ");
 
-/** The verification link the System Mailer sent to `email`. */
+/**
+ * The verification link the System Mailer sent to `email`: from its outbox,
+ * or, where the real System Mailer runs, from what the SMTP Provider sent.
+ */
 export const verificationLinkFor = (email: string) =>
   Effect.gen(function* verificationLink() {
     const outbox = yield* SystemMailerOutbox;
-    const sent = (yield* outbox.sent).find((email_) => email_.to === email);
+    const smtp = yield* SmtpOutbox;
 
-    return sent?.text.match(URL_IN_TEXT)?.[0];
+    const texts = [
+      ...(yield* outbox.sent).filter((sent) => sent.to === email),
+      ...(yield* smtp.sent)
+        .map((sent) => sent.email)
+        .filter((sent) => sent.to === email),
+    ].map((sent) => sent.text);
+
+    return texts[0]?.match(URL_IN_TEXT)?.[0];
   });
 
 /** Signs up a new person, verifies their email and signs in. Returns the session cookie. */

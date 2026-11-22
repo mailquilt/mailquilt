@@ -31,6 +31,8 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  /** Can see and change the install's settings. Better Auth shows it in the session and never lets sign-up set it. */
+  instanceAdmin: boolean("instance_admin").notNull().default(false),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -100,6 +102,47 @@ export const rateLimits = pgTable(
     resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
   },
   (table) => [index("rate_limits_reset_at_idx").on(table.resetAt)]
+);
+
+/**
+ * The install itself: one row, written by first-run setup in the same
+ * transaction as the instance admin, so setup can never run twice. Who may
+ * sign up, and the System Mailer saved on the settings page. The System
+ * Mailer's `credentials` are sealed like a Provider Connection's (ADR 0009),
+ * bound to `instance:system_mailer`.
+ */
+export const instance = pgTable(
+  "instance",
+  {
+    id: boolean("id").primaryKey().default(true),
+    signUp: text("sign_up").notNull().default("invite-only"),
+    systemMailerFromName: text("system_mailer_from_name"),
+    systemMailerFromEmail: text("system_mailer_from_email"),
+    systemMailerSmtp: jsonb("system_mailer_smtp"),
+    systemMailerCredentials: text("system_mailer_credentials"),
+    systemMailerCredentialsKeyVersion: integer(
+      "system_mailer_credentials_key_version"
+    ),
+    setUpAt: timestamp("set_up_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    check("instance_id_check", sql`${table.id}`),
+    check(
+      "instance_sign_up_check",
+      sql`${table.signUp} in ('invite-only', 'open')`
+    ),
+    check(
+      "instance_system_mailer_check",
+      sql`(${table.systemMailerFromEmail} is null) = (${table.systemMailerSmtp} is null)`
+    ),
+    check(
+      "instance_system_mailer_credentials_check",
+      sql`(${table.systemMailerCredentials} is null) = (${table.systemMailerCredentialsKeyVersion} is null) and (${table.systemMailerCredentials} is null or ${table.systemMailerSmtp} is not null)`
+    ),
+  ]
 );
 
 /** The tenant. Every Organization's data is scoped by its ID (`org_…`). */
