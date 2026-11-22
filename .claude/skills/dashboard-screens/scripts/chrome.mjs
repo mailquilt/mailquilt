@@ -246,7 +246,7 @@ export const pressKey = async (page, key) => {
 /** Opens `url`, and fails instead of capturing Chrome's error page when it can't load. */
 export const navigate = async (page, url) => {
   const reply = await page.send("Page.navigate", { url });
-  const errorText = reply.result?.errorText;
+  const errorText = reply.error?.message ?? reply.result?.errorText;
 
   if (errorText) {
     throw new Error(`Couldn't load ${url}: ${errorText}. Is the app running?`);
