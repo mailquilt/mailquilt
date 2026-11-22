@@ -56,7 +56,7 @@ const InstanceSettingsStandIn = () => {
   return <p>Instance settings{state.justSetUp ? ", welcome" : ""}</p>;
 };
 
-const renderAt = (path: string) => {
+const renderAt = (path: string, queryClient = new QueryClient()) => {
   const root = createRootRoute({ component: Outlet });
 
   const signedOut = createRoute({
@@ -111,7 +111,7 @@ const renderAt = (path: string) => {
   });
 
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <LinkProvider component={RouterLink}>
         <RouterProvider router={router} />
       </LinkProvider>
@@ -220,6 +220,54 @@ describe("first-run setup", () => {
       name: "Grace",
       password: "an instance admin's password",
     });
+  });
+
+  it("isn't sent back to setup by a status answer that left before setup finished", async () => {
+    let statusRequests = 0;
+    let answerLate: ((value: undefined) => void) | undefined;
+
+    // oxlint-disable-next-line promise/avoid-new -- the test holds the late status answer open and releases it itself.
+    const lateAnswer = new Promise<undefined>((resolve) => {
+      answerLate = resolve;
+    });
+
+    const queryClient = new QueryClient();
+    answerStatus({ setUp: false, signUp: "invite-only" });
+    api.use(
+      http.get("*/api/instance", async () => {
+        statusRequests += 1;
+
+        if (statusRequests > 1) {
+          await lateAnswer;
+        }
+
+        return HttpResponse.json({ setUp: false, signUp: "invite-only" });
+      }),
+      http.post(
+        "*/api/instance/setup",
+        () => new HttpResponse(null, { status: 204 })
+      ),
+      http.post("*/api/auth/sign-in/email", () =>
+        HttpResponse.json(
+          { code: "TOO_MANY_REQUESTS", message: "Too many requests" },
+          { status: 429 }
+        )
+      )
+    );
+    renderAt("/setup", queryClient);
+    await screen.findByLabelText("Your name");
+
+    void queryClient.refetchQueries({ queryKey: ["instance"] });
+    await expect.poll(() => statusRequests).toBe(2);
+    fillAndSubmit();
+    await screen.findByRole("heading", { name: "Sign in" });
+
+    answerLate?.(undefined);
+    await expect.poll(() => queryClient.isFetching()).toBe(0);
+    await act(() => lateAnswer);
+
+    expect(screen.getByRole("heading", { name: "Sign in" })).toBeDefined();
+    expect(screen.queryByLabelText("Your name")).toBeNull();
   });
 
   it("sends the new admin to sign in, saying their account is ready, when its own sign-in fails", async () => {
