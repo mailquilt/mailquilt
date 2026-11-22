@@ -18,12 +18,22 @@ const AccountAvatar = ({ account }: { account: Account }) => (
   </span>
 );
 
-const AccountName = ({ account }: { account: Account }) => (
+const AccountName = ({
+  account,
+  whole = false,
+}: {
+  account: Account;
+  whole?: boolean;
+}) => (
   <span className="flex min-w-0 flex-1 flex-col text-sm leading-4">
-    <span className="truncate font-medium text-kumo-strong">
+    <span
+      className={`font-medium text-kumo-strong ${whole ? "break-words" : "truncate"}`}
+    >
       {account.name}
     </span>
-    <span className="truncate text-kumo-subtle">{account.email}</span>
+    <span className={`text-kumo-subtle ${whole ? "break-all" : "truncate"}`}>
+      {account.email}
+    </span>
   </span>
 );
 
@@ -75,12 +85,12 @@ export const AccountMenu = ({ account }: { account: Account }) => {
           <>
             <div className="flex items-center gap-2.5 px-2 pt-1.5 pb-2">
               <AccountAvatar account={account} />
-              <AccountName account={account} />
+              <AccountName account={account} whole />
             </div>
             <DropdownMenu.Separator />
           </>
         ) : null}
-        <ThemePicker />
+        <ThemePicker opensAbove={isMobile} />
         <DropdownMenu.Separator />
         <DropdownMenu.Item
           closeOnClick={false}

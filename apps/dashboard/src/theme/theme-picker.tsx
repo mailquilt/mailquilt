@@ -28,12 +28,21 @@ const OPTIONS = [
   value: ThemePreference;
 }[];
 
+const MENU_PADDING = 6;
+
+const GAP_BETWEEN_MENUS = 8;
+
 /**
  * One "Appearance" row showing the current choice, which opens a submenu:
  * light, dark or the device's setting, remembered in this browser. Lives
- * inside a `DropdownMenu`.
+ * inside a `DropdownMenu`. With `opensAbove`, for a narrow screen with no
+ * room beside the menu, the submenu sits directly above it, edge to edge.
  */
-export const ThemePicker = () => {
+export const ThemePicker = ({
+  opensAbove = false,
+}: {
+  opensAbove?: boolean;
+}) => {
   const preference = useSyncExternalStore(
     subscribeToThemePreference,
     readThemePreference,
@@ -50,7 +59,17 @@ export const ThemePicker = () => {
           Appearance <span className="text-kumo-subtle">{current.short}</span>
         </span>
       </DropdownMenu.SubTrigger>
-      <DropdownMenu.SubContent className="w-52 rounded-xl">
+      <DropdownMenu.SubContent
+        {...(opensAbove
+          ? {
+              align: "start",
+              alignOffset: -MENU_PADDING,
+              className: "w-menu-from-row rounded-xl",
+              side: "top",
+              sideOffset: MENU_PADDING + GAP_BETWEEN_MENUS,
+            }
+          : { className: "w-52 rounded-xl" })}
+      >
         <DropdownMenu.RadioGroup value={preference}>
           {OPTIONS.map(({ icon, label, value }) => (
             <DropdownMenu.RadioItem
