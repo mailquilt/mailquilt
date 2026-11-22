@@ -23,6 +23,8 @@ export { CredentialsUnreadable } from "./credentials-unreadable.ts";
 
 export type { SealedSecret } from "./credential-cipher.ts";
 
+export { HostLookupFailed } from "./host-lookup-failed.ts";
+
 export { HostNotFound } from "./host-not-found.ts";
 
 export { InvalidNotification } from "./invalid-notification.ts";
@@ -50,14 +52,18 @@ export type {
 
 export {
   createProviderConnection,
+  deleteProviderConnection,
   listProviderConnections,
   ProviderConnections,
   sendTestEmail,
+  TEST_EMAIL_LIMIT,
   TEST_EMAIL_SUBJECT,
+  updateProviderConnection,
 } from "./provider-connections.ts";
 
 export type {
   NewProviderConnection,
+  ProviderConnectionChanges,
   ProviderConnectionWithCredentials,
 } from "./provider-connections.ts";
 

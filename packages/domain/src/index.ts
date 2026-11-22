@@ -16,6 +16,8 @@ export { ContactPage, PAGE_SIZE } from "./contact-page.ts";
 
 export { Contact, ContactEmail } from "./contact.ts";
 
+export { CredentialsRequired } from "./credentials-required.ts";
+
 export { DatabaseUnreachable } from "./database-unreachable.ts";
 
 export { Health } from "./health.ts";
@@ -73,6 +75,8 @@ export {
 } from "./provider-connection.ts";
 
 export type { SmtpSecurity } from "./provider-connection.ts";
+
+export { RateLimited } from "./rate-limited.ts";
 
 export { SendFailed, SendFailureReasonSchema } from "./send-failed.ts";
 

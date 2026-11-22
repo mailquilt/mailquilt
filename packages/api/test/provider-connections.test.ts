@@ -221,4 +221,186 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
       );
     })
   );
+
+  test.effect(
+    "edits a connection and keeps its credentials when they're left out",
+    () =>
+      Effect.gen(function* editKeepingCredentials() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: WITH_CREDENTIALS,
+        });
+
+        const connectionParams = {
+          ...params,
+          providerConnectionId: created.id,
+        };
+
+        const edited = yield* client.providerConnections.update({
+          params: connectionParams,
+          payload: {
+            ...WITHOUT_CREDENTIALS,
+            from: { email: "hello@acme.example" },
+            name: "Postmark (broadcasts)",
+          },
+        });
+
+        yield* client.providerConnections.sendTestEmail({
+          params: connectionParams,
+          payload: { to: "ada@example.com" },
+        });
+
+        const { email, settings } = yield* lastSend;
+        const credentials = Option.getOrThrow(settings.credentials);
+
+        assert.strictEqual(edited.name, "Postmark (broadcasts)");
+        assert.deepStrictEqual(
+          { ...edited.from },
+          { email: "hello@acme.example" }
+        );
+        assert.deepStrictEqual(
+          yield* client.providerConnections.list({ params }),
+          [edited]
+        );
+        assert.strictEqual(Redacted.value(credentials.password), PASSWORD);
+        assert.strictEqual(email.from.email, "hello@acme.example");
+      })
+  );
+
+  test.effect("replaces credentials, or removes them with null", () =>
+    Effect.gen(function* replaceCredentials() {
+      const { client, params } = yield* owner;
+
+      const created = yield* client.providerConnections.create({
+        params,
+        payload: WITH_CREDENTIALS,
+      });
+
+      const connectionParams = { ...params, providerConnectionId: created.id };
+
+      const testEmail = client.providerConnections.sendTestEmail({
+        params: connectionParams,
+        payload: { to: "ada@example.com" },
+      });
+
+      yield* client.providerConnections.update({
+        params: connectionParams,
+        payload: {
+          ...WITHOUT_CREDENTIALS,
+          credentials: {
+            password: Redacted.make("the new smtp password"),
+            username: Redacted.make(USERNAME),
+          },
+        },
+      });
+      yield* testEmail;
+
+      const replaced = Option.getOrThrow(
+        (yield* lastSend).settings.credentials
+      );
+
+      yield* client.providerConnections.update({
+        params: connectionParams,
+        payload: { ...WITHOUT_CREDENTIALS, credentials: null },
+      });
+      yield* testEmail;
+
+      assert.strictEqual(
+        Redacted.value(replaced.password),
+        "the new smtp password"
+      );
+      assert.isTrue(Option.isNone((yield* lastSend).settings.credentials));
+    })
+  );
+
+  test.effect(
+    "needs credentials entered again before they go to another server",
+    () =>
+      Effect.gen(function* credentialsFollowTheServer() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: WITH_CREDENTIALS,
+        });
+
+        const connectionParams = {
+          ...params,
+          providerConnectionId: created.id,
+        };
+
+        const errors = yield* Effect.forEach(
+          [
+            { ...SMTP, host: "smtp.attacker.example" },
+            { ...SMTP, port: 2525 },
+            { ...SMTP, security: "none" as const },
+          ],
+          (smtp) =>
+            client.providerConnections
+              .update({
+                params: connectionParams,
+                payload: { ...WITHOUT_CREDENTIALS, smtp },
+              })
+              .pipe(Effect.flip)
+        );
+
+        assert.deepStrictEqual(
+          errors.map((error) => error._tag),
+          ["CredentialsRequired", "CredentialsRequired", "CredentialsRequired"]
+        );
+        assert.deepStrictEqual(
+          yield* client.providerConnections.list({ params }),
+          [created]
+        );
+      })
+  );
+
+  test.effect("deletes a connection", () =>
+    Effect.gen(function* deleteConnection() {
+      const { client, params } = yield* owner;
+
+      const created = yield* client.providerConnections.create({
+        params,
+        payload: WITH_CREDENTIALS,
+      });
+
+      const connectionParams = { ...params, providerConnectionId: created.id };
+
+      yield* client.providerConnections.delete({ params: connectionParams });
+
+      const again = yield* client.providerConnections
+        .delete({ params: connectionParams })
+        .pipe(Effect.flip);
+
+      assert.deepStrictEqual(
+        yield* client.providerConnections.list({ params }),
+        []
+      );
+      assert.strictEqual(again._tag, "ProviderConnectionNotFound");
+    })
+  );
+
+  test.effect("allows each person 10 test emails every 10 minutes", () =>
+    Effect.gen(function* testEmailLimit() {
+      const { client, params } = yield* owner;
+
+      const created = yield* client.providerConnections.create({
+        params,
+        payload: WITH_CREDENTIALS,
+      });
+
+      const testEmail = client.providerConnections.sendTestEmail({
+        params: { ...params, providerConnectionId: created.id },
+        payload: { to: "ada@example.com" },
+      });
+
+      yield* Effect.replicateEffect(testEmail, 10);
+
+      const error = yield* testEmail.pipe(Effect.flip);
+
+      assert.strictEqual(error._tag, "RateLimited");
+    })
+  );
 });

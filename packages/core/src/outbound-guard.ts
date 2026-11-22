@@ -1,6 +1,8 @@
 import { Array as Arr, Context, Effect, Layer, Option } from "effect";
+import type { Dns } from "effect/net";
 import { AddressResolver, IpNetwork, NetAddress } from "effect/net";
 
+import { HostLookupFailed } from "./host-lookup-failed.ts";
 import { HostNotFound } from "./host-not-found.ts";
 import { OutboundBlocked } from "./outbound-blocked.ts";
 
@@ -142,7 +144,10 @@ export class OutboundGuard extends Context.Service<
     readonly check: (
       host: string,
       port: number
-    ) => Effect.Effect<NetAddress.InetAddress, OutboundBlocked | HostNotFound>;
+    ) => Effect.Effect<
+      NetAddress.InetAddress,
+      OutboundBlocked | HostNotFound | HostLookupFailed
+    >;
   }
 >()("@repo/core/OutboundGuard") {}
 
@@ -151,6 +156,19 @@ const ALWAYS_BLOCKED: ReadonlySet<AddressClass> = new Set([
   "metadata",
   "reserved",
 ]);
+
+const NO_SUCH_HOST: ReadonlySet<Dns.DnsErrorReason> = new Set([
+  "NotFound",
+  "BadName",
+]);
+
+const lookupError = (
+  host: string,
+  error: Dns.DnsError | NetAddress.NetAddressError
+) =>
+  error._tag === "DnsError" && !NO_SUCH_HOST.has(error.reason)
+    ? new HostLookupFailed({ detail: error.message, host })
+    : new HostNotFound({ host });
 
 /**
  * The outbound guard. With `blockPrivateNetworks`, as on the hosted service,
@@ -181,7 +199,7 @@ export const outboundGuardLayer = (policy: {
           Effect.gen(function* check() {
             const addresses = yield* resolver
               .resolve({ host, port })
-              .pipe(Effect.mapError(() => new HostNotFound({ host })));
+              .pipe(Effect.mapError((error) => lookupError(host, error)));
 
             if (addresses.some((address) => isBlocked(address))) {
               return yield* new OutboundBlocked({ host });

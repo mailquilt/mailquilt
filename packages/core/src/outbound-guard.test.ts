@@ -129,6 +129,41 @@ describe("the outbound guard on the hosted service", () => {
   );
 });
 
+const failingDns = Layer.succeed(
+  Dns.Dns,
+  Dns.make({
+    lookup: (host) =>
+      Effect.fail(
+        new Dns.DnsError({
+          hostname: host,
+          method: "lookup",
+          reason: "Timeout",
+        })
+      ),
+  })
+);
+
+describe("the outbound guard when DNS fails", () => {
+  it.effect("reports a lookup that failed, not a host with no address", () =>
+    Effect.gen(function* lookupFailed() {
+      const guard = yield* OutboundGuard;
+
+      const error = yield* guard
+        .check("mail.example.com", 587)
+        .pipe(Effect.flip);
+
+      assert.strictEqual(error._tag, "HostLookupFailed");
+    }).pipe(
+      Effect.provide(
+        outboundGuardLayer({ blockPrivateNetworks: true }).pipe(
+          Layer.provide(AddressResolver.layer()),
+          Layer.provide(failingDns)
+        )
+      )
+    )
+  );
+});
+
 describe("the outbound guard on a self-hosted install", () => {
   it.effect("connects to private networks and loopback by default", () =>
     Effect.gen(function* selfHosted() {

@@ -95,6 +95,17 @@ const TENANT_ENDPOINTS = {
       params: { organizationId },
       payload: intruderConnection,
     }),
+  "PUT /api/organizations/:organizationId/provider-connections/:providerConnectionId":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.update({
+        params: { organizationId, providerConnectionId },
+        payload: { ...intruderConnection, credentials: null },
+      }),
+  "DELETE /api/organizations/:organizationId/provider-connections/:providerConnectionId":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.delete({
+        params: { organizationId, providerConnectionId },
+      }),
   "POST /api/organizations/:organizationId/provider-connections/:providerConnectionId/test-emails":
     (client: Client, { organizationId, providerConnectionId }: Target) =>
       client.providerConnections.sendTestEmail({
@@ -230,11 +241,35 @@ layer(TestApp, { timeout: "2 minutes" })(
             })
             .pipe(Effect.flip);
 
+          const foreign = {
+            ...params,
+            providerConnectionId: target.providerConnectionId,
+          };
+
+          const edit = yield* outsider.providerConnections
+            .update({
+              params: foreign,
+              payload: { ...intruderConnection, credentials: null },
+            })
+            .pipe(Effect.flip);
+
+          const removal = yield* outsider.providerConnections
+            .delete({ params: foreign })
+            .pipe(Effect.flip);
+
           const connections = yield* outsider.providerConnections.list({
             params,
           });
 
           assert.strictEqual(testEmail._tag, "ProviderConnectionNotFound");
+          assert.strictEqual(edit._tag, "ProviderConnectionNotFound");
+          assert.strictEqual(removal._tag, "ProviderConnectionNotFound");
+          assert.lengthOf(
+            yield* owner.providerConnections.list({
+              params: { organizationId: target.organizationId },
+            }),
+            1
+          );
           assert.deepStrictEqual(
             connections.map((connection) => connection.id),
             [own.providerConnectionId]

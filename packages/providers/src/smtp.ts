@@ -3,6 +3,7 @@ import type { ConnectionOptions } from "node:tls";
 
 import { OutboundGuard, SmtpProvider } from "@repo/core";
 import type {
+  HostLookupFailed,
   HostNotFound,
   OutboundBlocked,
   OutgoingEmail,
@@ -78,16 +79,26 @@ const toSendFailed = (error: Option.Option<typeof NodemailerError.Type>) => {
   });
 };
 
-const refused = (error: OutboundBlocked | HostNotFound) =>
-  error._tag === "OutboundBlocked"
-    ? new SendFailed({
-        detail: `${error.host} resolves to an address this deployment doesn't connect to, such as a private network.`,
-        reason: "blocked",
-      })
-    : new SendFailed({
-        detail: `${error.host} has no address.`,
-        reason: "host-not-found",
-      });
+const refused = (error: OutboundBlocked | HostNotFound | HostLookupFailed) => {
+  if (error._tag === "OutboundBlocked") {
+    return new SendFailed({
+      detail: `${error.host} resolves to an address this deployment doesn't connect to, such as a private network.`,
+      reason: "blocked",
+    });
+  }
+
+  if (error._tag === "HostLookupFailed") {
+    return new SendFailed({
+      detail: `Couldn't look up ${error.host}: ${error.detail}`,
+      reason: "unreachable",
+    });
+  }
+
+  return new SendFailed({
+    detail: `${error.host} has no address.`,
+    reason: "host-not-found",
+  });
+};
 
 /** Options for servers this deployment trusts beyond the public certificate authorities. */
 export interface SmtpProviderOptions {

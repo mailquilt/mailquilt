@@ -1,10 +1,12 @@
 import {
+  CredentialsRequired,
   MailAddress,
   OrganizationIdSchema,
   ProviderConnection,
   ProviderConnectionIdSchema,
   ProviderConnectionName,
   ProviderConnectionNotFound,
+  RateLimited,
   SendFailed,
   Sender,
   SmtpCredentials,
@@ -18,11 +20,24 @@ import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
 
 const params = { organizationId: OrganizationIdSchema };
 
+const connectionParams = {
+  ...params,
+  providerConnectionId: ProviderConnectionIdSchema,
+};
+
+const ProviderConnectionNotFoundError = ProviderConnectionNotFound.pipe(
+  HttpApiSchema.status(404)
+);
+
 /**
  * An Organization's Provider Connections. Credentials are write-only: `create`
- * accepts them and no endpoint returns them. `sendTestEmail` sends a short
- * email through a connection; when the Provider refuses it, `SendFailed`
- * (502) says why in the Provider's words.
+ * accepts them and no endpoint returns them. `update` keeps the saved
+ * credentials when it leaves them out, and removes them when they are
+ * `null`; a change of host, port or encryption needs them entered again
+ * (`CredentialsRequired`), so saved credentials only ever go to the server
+ * they were entered for. `sendTestEmail` sends a short email through a
+ * connection, at most 10 every 10 minutes per person; when the Provider
+ * refuses it, `SendFailed` (502) says why in the Provider's words.
  */
 export class ProviderConnectionsApi extends HttpApiGroup.make(
   "providerConnections"
@@ -56,6 +71,43 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
     )
   )
   .add(
+    HttpApiEndpoint.put(
+      "update",
+      "/organizations/:organizationId/provider-connections/:providerConnectionId",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          ProviderConnectionNotFoundError,
+          CredentialsRequired.pipe(HttpApiSchema.status(422)),
+        ],
+        params: connectionParams,
+        payload: Schema.Struct({
+          name: ProviderConnectionName,
+          from: Sender,
+          smtp: SmtpServer,
+          credentials: Schema.optionalKey(Schema.NullOr(SmtpCredentials)),
+        }),
+        success: ProviderConnection,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.delete(
+      "delete",
+      "/organizations/:organizationId/provider-connections/:providerConnectionId",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          ProviderConnectionNotFoundError,
+        ],
+        params: connectionParams,
+        success: HttpApiSchema.NoContent,
+      }
+    )
+  )
+  .add(
     HttpApiEndpoint.post(
       "sendTestEmail",
       "/organizations/:organizationId/provider-connections/:providerConnectionId/test-emails",
@@ -63,13 +115,11 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
         error: [
           SignInRequiredError,
           OrganizationNotFoundError,
-          ProviderConnectionNotFound.pipe(HttpApiSchema.status(404)),
+          ProviderConnectionNotFoundError,
           SendFailed.pipe(HttpApiSchema.status(502)),
+          RateLimited.pipe(HttpApiSchema.status(429)),
         ],
-        params: {
-          ...params,
-          providerConnectionId: ProviderConnectionIdSchema,
-        },
+        params: connectionParams,
         payload: Schema.Struct({ to: MailAddress }),
         success: TestEmailSent,
       }

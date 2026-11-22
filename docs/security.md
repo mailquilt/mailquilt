@@ -70,6 +70,7 @@ One `RateLimiter` port is used everywhere, including by Better Auth through its 
 | --- | --- | --- |
 | IP | Sign-in | 5 per minute |
 | Account | Sign-in | 20 per hour |
+| User | Test emails through a Provider Connection | 10 per 10 minutes |
 | Email address | Password reset, magic link | 3 per hour |
 | IP | Public signup form | 10 per minute |
 | API key | Public API | 600 per minute |
@@ -121,6 +122,7 @@ Outgoing webhooks are HMAC-signed with a timestamp.
 
 ### Secrets and personal data
 
+- Saved Provider credentials go only to the server they were entered for: changing a connection's host, port or encryption needs them entered again.
 - Provider credentials are encrypted with AES-256-GCM under a versioned key from `ENCRYPTION_KEYS`, bound to their row so a copied value doesn't open elsewhere ([ADR 0009](adr/0009-secrets-are-sealed-under-versioned-keys-bound-to-their-row.md)). They are write-only in the API and held as Effect `Redacted` values so they never reach logs.
 - Logs never contain email addresses or message content.
 - Delivery events reference Contacts by ID. Deleting a Contact anonymizes their history.

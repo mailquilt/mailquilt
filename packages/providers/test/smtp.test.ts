@@ -147,17 +147,19 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
     })
   );
 
-  test.effect("checks the certificate of a host written with a trailing dot", () =>
-    Effect.gen(function* fullyQualifiedHost() {
-      const { tls } = yield* Mailpits;
+  test.effect(
+    "checks the certificate of a host written with a trailing dot",
+    () =>
+      Effect.gen(function* fullyQualifiedHost() {
+        const { tls } = yield* Mailpits;
 
-      yield* sendWith(
-        settings(tls, "tls", { host: `${CERTIFICATE_HOST}.` }),
-        emailTo("trailing-dot@example.com")
-      );
+        yield* sendWith(
+          settings(tls, "tls", { host: `${CERTIFICATE_HOST}.` }),
+          emailTo("trailing-dot@example.com")
+        );
 
-      assert.lengthOf(yield* tls.received("trailing-dot@example.com"), 1);
-    })
+        assert.lengthOf(yield* tls.received("trailing-dot@example.com"), 1);
+      })
   );
 
   test.effect("says the server refused the credentials", () =>

@@ -26,7 +26,9 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Plain SMTP has no bounce handling beyond signed bounce addresses until bounce-mailbox polling in P2.
 - An SMTP Provider Connection's encryption is `tls` (from the start), `starttls` or `none`. `starttls` refuses a server that doesn't offer STARTTLS rather than sending unencrypted (#9).
 - Both the SMTP username and password are credentials: sealed, write-only, never returned. Some services, such as Postmark, use the same secret token for both (#9).
-- A test email goes to any address the member types, through the connection's default sender. When the Provider refuses it, the API answers 502 `SendFailed` with the Provider's own words, so the member can fix the settings (#9).
+- A test email goes to any address the member types, through the connection's default sender, at most 10 every 10 minutes per person across Organizations. When the Provider refuses it, the API answers 502 `SendFailed` with the Provider's own words, so the member can fix the settings (#9).
+- A Provider Connection can be edited and deleted. An edit that leaves credentials out keeps them; `null` removes them. Changing the host, port or encryption while keeping saved credentials is refused (`CredentialsRequired`), so a member can't send someone else's password to a server they control or unencrypted (#9).
+- A DNS lookup that fails (timeout, server failure) is reported as `unreachable` with the resolver's reason; only a name with no address is `host-not-found` (#9).
 - Until the Workers SMTP adapter (#11), an SMTP Provider Connection can be saved on Cloudflare, and sending through it fails with `SendFailed` reason `unavailable` (#9).
 
 ## Data

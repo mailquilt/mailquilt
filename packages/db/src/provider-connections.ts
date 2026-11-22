@@ -11,7 +11,7 @@ import {
   SmtpCredentials,
   SmtpServer,
 } from "@repo/domain";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
 
@@ -39,6 +39,12 @@ const withoutCredentials = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       () => new Error("Provider Connection credentials didn't convert")
     ),
     Effect.orDie
+  );
+
+const inOrganization = (organization: OrganizationId, id: string) =>
+  and(
+    eq(providerConnections.organizationId, organization),
+    eq(providerConnections.id, id)
   );
 
 const sealedFor = (organization: OrganizationId, id: string) =>
@@ -90,6 +96,26 @@ export const ProviderConnectionsLive = Layer.effect(
     const cipher = yield* CredentialCipher;
     const random = yield* SecureRandom.SecureRandom;
 
+    const sealedColumns = (
+      organization: OrganizationId,
+      id: string,
+      credentials: Option.Option<typeof SmtpCredentials.Type>
+    ) =>
+      Option.match(credentials, {
+        onNone: () =>
+          Effect.succeed({ credentials: null, credentialsKeyVersion: null }),
+        onSome: (opened) =>
+          withoutCredentials(encodeCredentials(opened)).pipe(
+            Effect.flatMap((json) =>
+              cipher.seal(Redacted.make(json), sealedFor(organization, id))
+            ),
+            Effect.map((sealed) => ({
+              credentials: sealed.value,
+              credentialsKeyVersion: sealed.keyVersion,
+            }))
+          ),
+      });
+
     return {
       all: Effect.gen(function* allConnections() {
         const organization = (yield* CurrentOrganization).id;
@@ -114,21 +140,16 @@ export const ProviderConnectionsLive = Layer.effect(
             Effect.provideService(SecureRandom.SecureRandom, random)
           );
 
-          const sealed = yield* Option.match(connection.credentials, {
-            onNone: () => Effect.succeed(null),
-            onSome: (credentials) =>
-              withoutCredentials(encodeCredentials(credentials)).pipe(
-                Effect.flatMap((json) =>
-                  cipher.seal(Redacted.make(json), sealedFor(organization, id))
-                )
-              ),
-          });
+          const sealed = yield* sealedColumns(
+            organization,
+            id,
+            connection.credentials
+          );
 
           const [created] = yield* db
             .insert(providerConnections)
             .values({
-              credentials: sealed?.value ?? null,
-              credentialsKeyVersion: sealed?.keyVersion ?? null,
+              ...sealed,
               fromEmail: connection.from.email,
               fromName: connection.from.name ?? null,
               id,
@@ -147,6 +168,53 @@ export const ProviderConnectionsLive = Layer.effect(
 
           return yield* decodeConnection(toConnection(created));
         }).pipe(Effect.orDie),
+
+      remove: (id) =>
+        Effect.gen(function* removeConnection() {
+          const organization = (yield* CurrentOrganization).id;
+
+          const removed = yield* db
+            .delete(providerConnections)
+            .where(inOrganization(organization, id))
+            .returning({ id: providerConnections.id })
+            .pipe(Effect.orDie);
+
+          if (removed.length === 0) {
+            return yield* new ProviderConnectionNotFound();
+          }
+        }),
+
+      update: (id, changes) =>
+        Effect.gen(function* updateConnection() {
+          const organization = (yield* CurrentOrganization).id;
+
+          const credentials =
+            changes.credentials === "keep"
+              ? {}
+              : yield* sealedColumns(organization, id, changes.credentials);
+
+          const [updated] = yield* db
+            .update(providerConnections)
+            .set({
+              ...credentials,
+              fromEmail: changes.from.email,
+              fromName: changes.from.name ?? null,
+              name: changes.name,
+              settings: yield* encodeServer(changes.smtp).pipe(Effect.orDie),
+              updatedAt: sql`now()`,
+            })
+            .where(inOrganization(organization, id))
+            .returning(connectionColumns)
+            .pipe(Effect.orDie);
+
+          if (updated === undefined) {
+            return yield* new ProviderConnectionNotFound();
+          }
+
+          return yield* decodeConnection(toConnection(updated)).pipe(
+            Effect.orDie
+          );
+        }),
 
       withCredentials: (id) =>
         Effect.gen(function* connectionWithCredentials() {
