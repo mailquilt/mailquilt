@@ -49,8 +49,9 @@ node $S/screens.mjs --out /tmp/shots --name new-org-error --widths 390,1440 \
   --step 'press=Enter'
 
 # An error state: block a request the screen makes, as if it failed (here the
-# Organizations list from #6); --wait covers the retries before the error shows
-node $S/screens.mjs --out /tmp/shots --name orgs-failed --block '*/api/organizations' --wait 9000
+# session check, which every signed-in page makes); --wait covers any retries
+# before the error shows
+node $S/screens.mjs --out /tmp/shots --name session-failed --block '*/api/auth/get-session' --wait 3000
 
 # Every frame painted while the screen loads, with 120 ms of latency
 node $S/filmstrip.mjs --out /tmp/shots --name home-load --path / --width 1280
