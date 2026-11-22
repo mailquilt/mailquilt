@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { SetupSteps } from "../../home/setup-steps.tsx";
+import { PageColumn } from "../../layout/page-column.tsx";
 import { useAccount } from "../../layout/session-gates.tsx";
 
 const firstName = (name: string) => name.trim().split(/\s+/u)[0] ?? name;
@@ -9,7 +10,7 @@ const Home = () => {
   const account = useAccount();
 
   return (
-    <div className="mx-auto w-full max-w-[50rem] px-6 py-10 md:px-12 md:py-16">
+    <PageColumn>
       <header className="mb-11 flex flex-col gap-4">
         <p className="text-base text-kumo-subtle">
           Welcome to Mailquilt, {firstName(account.name)}.
@@ -23,7 +24,7 @@ const Home = () => {
         </p>
       </header>
       <SetupSteps />
-    </div>
+    </PageColumn>
   );
 };
 

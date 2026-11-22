@@ -42,7 +42,7 @@ const Home = () => {
   );
 };
 
-const renderAt = (path: string) => {
+const renderAt = (path: string, queryClient = new QueryClient()) => {
   const root = createRootRoute({ component: Outlet });
 
   const router = createRouter({
@@ -70,7 +70,7 @@ const renderAt = (path: string) => {
   });
 
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>
   );
@@ -158,6 +158,28 @@ describe("session gates", () => {
     await expect(
       screen.findByRole("button", { name: "Sign in" })
     ).resolves.toBeDefined();
+  });
+
+  it("forgets what it loaded for the person once their session ends, wherever it ended", async () => {
+    let signedIn = true;
+    api.use(
+      http.get("*/api/auth/get-session", () =>
+        HttpResponse.json(signedIn ? SESSION : null)
+      )
+    );
+    const queryClient = new QueryClient();
+
+    renderAt("/", queryClient);
+    await screen.findByText("Home for Ada");
+    queryClient.setQueryData(["organizations"], [{ name: "Acme" }]);
+
+    signedIn = false;
+    act(() => authClient.$store.notify("$sessionSignal"));
+
+    await expect(
+      screen.findByRole("button", { name: "Sign in" })
+    ).resolves.toBeDefined();
+    expect(queryClient.getQueryData(["organizations"])).toBeUndefined();
   });
 
   it("offers a retry instead of signing the person out when the session check fails", async () => {

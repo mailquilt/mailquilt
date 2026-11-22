@@ -8,6 +8,8 @@ Mailquilt is an open-source email platform for newsletters, automations and tran
 
 **Organization**: The top-level tenant that owns all Contacts, content, Provider Connections and settings; users act inside it as members. _Avoid_: Workspace, account, team, brand, client
 
+**Member**: A user's place in one Organization, with a role: owner, admin or member. Whoever creates an Organization is its owner. _Avoid_: Seat, user (for the membership), teammate
+
 ### Audience
 
 **Contact**: One person, identified by one email address, within an Organization. _Avoid_: Subscriber, recipient, member, lead

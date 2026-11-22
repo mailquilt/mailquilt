@@ -15,6 +15,13 @@ import { useLocation } from "@tanstack/react-router";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
+import { OrganizationPatch } from "../organizations/organization-patch.tsx";
+import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
+import { OrganizationsUnavailable } from "../organizations/organizations-unavailable.tsx";
+import {
+  useOrganizations,
+  useOrganizationsStatus,
+} from "../organizations/organizations.tsx";
 import { useAccount } from "./session-gates.tsx";
 
 const SECTIONS_DIMMED_UNTIL_THEY_EXIST = [
@@ -78,6 +85,7 @@ const SidebarHeaderControls = () => {
 
 const MobileBarOpeningSidebarSheet = () => {
   const { isMobile, openMobile, toggleSidebar } = useSidebar();
+  const { active } = useOrganizations();
 
   if (!isMobile) {
     return null;
@@ -94,7 +102,13 @@ const MobileBarOpeningSidebarSheet = () => {
       >
         <ListIcon aria-hidden="true" className="size-5" />
       </button>
-      <MailquiltLogo className="h-5 w-auto" />
+      <MailquiltLogo className="h-5 w-auto shrink-0" />
+      {active ? (
+        <p className="ml-auto flex min-w-0 items-center gap-2 text-base font-medium text-kumo-strong">
+          <OrganizationPatch className="size-5" organizationId={active.id} />
+          <span className="truncate">{active.name}</span>
+        </p>
+      ) : null}
     </div>
   );
 };
@@ -108,6 +122,7 @@ const MobileBarOpeningSidebarSheet = () => {
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const { pathname } = useLocation();
   const account = useAccount();
+  const { status } = useOrganizationsStatus();
 
   return (
     <Sidebar.Provider className="h-svh">
@@ -116,6 +131,9 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeaderControls />
         </Sidebar.Header>
         <Sidebar.Content>
+          <div className="mb-2 border-b border-kumo-hairline pb-2 empty:hidden">
+            <OrganizationSwitcher />
+          </div>
           <nav aria-label="Main">
             <Sidebar.Group>
               <Sidebar.Menu>
@@ -164,7 +182,9 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <div className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-base">
         <MobileBarOpeningSidebarSheet />
         <HealthStatus bannerClassName="m-6 md:mx-12" />
-        <main className="flex min-h-0 flex-1 flex-col">{children}</main>
+        <main className="flex min-h-0 flex-1 flex-col">
+          {status === "failed" ? <OrganizationsUnavailable /> : children}
+        </main>
       </div>
     </Sidebar.Provider>
   );
