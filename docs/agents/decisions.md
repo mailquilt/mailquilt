@@ -2,7 +2,7 @@
 
 Accepted limits, and rules a review doesn't raise again unless something has changed since, such as a bug report or a new feature that depends on them. A pull request that changes one of these says so, gives the reason and updates this page.
 
-The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
+The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), and tenant endpoints that name the Organization in the path (0007). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
 
 ## Consent and sending
 
@@ -28,8 +28,9 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 ## Data
 
 - Postgres is the only database, including on Cloudflare (ADR 0001).
-- IDs are a type prefix plus a UUIDv7, such as `cnt_…`. They're part of the public API.
-- Every repository method takes the Organization ID from the request context. There's no unscoped query path for tenant data, and Postgres row-level security isn't used.
+- IDs are a type prefix plus a UUIDv7 in the TypeID format, such as `org_01h455vb4pex5vsknk084sn02q`. They're part of the public API (ADR 0006).
+- Every repository method for tenant data requires `CurrentOrganization` from the request context, which only `asMemberOf` provides after checking membership. There's no unscoped query path for tenant data, and Postgres row-level security isn't used (ADR 0007).
+- The Organization a request acts in is named in its path, not stored on the session, so two tabs can work in two Organizations. The dashboard remembers each tab's choice (ADR 0007, #6).
 - Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default. Campaign totals and Contact engagement summaries outlive them.
 - Imports, recipient snapshots and event writes are set-based. There's never a query per Contact.
 - Migrations are expand-then-contract. They run on boot behind an advisory lock in Docker, and in the deploy step on Cloudflare.

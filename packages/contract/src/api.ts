@@ -1,5 +1,6 @@
 import { HttpApi } from "effect/http-api";
 
+import { OrganizationsApi } from "./organizations.ts";
 import { SystemApi } from "./system.ts";
 
 /**
@@ -8,5 +9,6 @@ import { SystemApi } from "./system.ts";
  * health checks can reach `/health`.
  */
 export class MailquiltApi extends HttpApi.make("mailquilt")
+  .add(OrganizationsApi)
   .prefix("/api")
   .add(SystemApi) {}

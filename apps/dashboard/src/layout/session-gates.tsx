@@ -1,6 +1,7 @@
 import { Button, Loader } from "@cloudflare/kumo";
+import { useQueryClient } from "@tanstack/react-query";
 import { Navigate } from "@tanstack/react-router";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect } from "react";
 
 import { authClient } from "../auth/auth-client.ts";
 import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
@@ -26,10 +27,20 @@ export const useAccount = () => {
 /**
  * Renders its pages for a signed-in person and gives them the account; sends
  * anyone else to sign in. If the session can't be checked, it offers a retry
- * rather than treating the person as signed out.
+ * rather than treating the person as signed out. When the session ends, here
+ * or in another tab, it forgets everything loaded for the person, so whoever
+ * signs in next on this browser never sees it.
  */
 export const SignedInOnly = ({ children }: { children: React.ReactNode }) => {
   const { data: session, error, isPending, refetch } = authClient.useSession();
+  const queryClient = useQueryClient();
+  const signedOut = !isPending && !session && !error;
+
+  useEffect(() => {
+    if (signedOut) {
+      queryClient.clear();
+    }
+  }, [queryClient, signedOut]);
 
   if (isPending) {
     return (

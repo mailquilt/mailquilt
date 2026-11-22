@@ -15,6 +15,7 @@ import { useLocation } from "@tanstack/react-router";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
+import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
 import { useAccount } from "./session-gates.tsx";
 
 const SECTIONS_DIMMED_UNTIL_THEY_EXIST = [
@@ -116,6 +117,9 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
           <SidebarHeaderControls />
         </Sidebar.Header>
         <Sidebar.Content>
+          <div className="px-2 pt-1 pb-2 group-data-[state=collapsed]/sidebar:flex group-data-[state=collapsed]/sidebar:justify-center">
+            <OrganizationSwitcher />
+          </div>
           <nav aria-label="Main">
             <Sidebar.Group>
               <Sidebar.Menu>

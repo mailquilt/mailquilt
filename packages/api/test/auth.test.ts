@@ -1,12 +1,18 @@
 import { assert, layer } from "@effect/vitest";
-import { SystemMailerOutbox } from "@repo/core/testing";
 import { Effect, Schema } from "effect";
 
+import {
+  PASSWORD,
+  send,
+  sessionCookie,
+  signIn,
+  signUp,
+  uniqueEmail,
+  uniqueIp,
+  verificationLinkFor,
+} from "./accounts.ts";
 import { betterAuthEndpoints } from "./better-auth-endpoints.ts";
 import { APP_URL, AppFetch, TestApp, TRUSTED_IP_HEADER } from "./harness.ts";
-
-const PASSWORD = "correct horse battery staple";
-const URL_IN_TEXT = /https?:\/\/\S+/u;
 
 const ENDPOINTS_MAILQUILT_USES = new Set([
   "POST /sign-up/email",
@@ -21,55 +27,6 @@ const Session = Schema.NullOr(
   Schema.Struct({ user: Schema.Struct({ email: Schema.String }) })
 );
 
-let uniqueCounter = 0;
-
-const uniqueEmail = () => {
-  uniqueCounter += 1;
-
-  return `person-${uniqueCounter}@example.com`;
-};
-
-const uniqueIp = () => {
-  uniqueCounter += 1;
-
-  return `198.51.100.${uniqueCounter % 250}`;
-};
-
-const send = (
-  method: string,
-  path: string,
-  options: {
-    readonly body?: object;
-    readonly headers?: Readonly<Record<string, string>>;
-  } = {}
-) =>
-  Effect.gen(function* sendRequest() {
-    const fetch = yield* AppFetch;
-
-    return yield* Effect.promise(() =>
-      fetch(`${APP_URL}${path}`, {
-        body: options.body === undefined ? null : JSON.stringify(options.body),
-        headers: {
-          "content-type": "application/json",
-          origin: APP_URL,
-          ...options.headers,
-        },
-        method,
-      })
-    );
-  });
-
-const signIn = (
-  email: string,
-  password: string,
-  ip: string,
-  headers: Readonly<Record<string, string>> = {}
-) =>
-  send("POST", "/api/auth/sign-in/email", {
-    body: { email, password },
-    headers: { [TRUSTED_IP_HEADER]: ip, ...headers },
-  });
-
 const signInWithForm = (email: string, password: string, ip: string) =>
   Effect.gen(function* signInWithFormBody() {
     const fetch = yield* AppFetch;
@@ -82,18 +39,6 @@ const signInWithForm = (email: string, password: string, ip: string) =>
       })
     );
   });
-
-const signUp = (email: string) =>
-  send("POST", "/api/auth/sign-up/email", {
-    body: { email, name: "Ada", password: PASSWORD },
-    headers: { [TRUSTED_IP_HEADER]: uniqueIp() },
-  });
-
-const sessionCookie = (response: Response) =>
-  response.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0])
-    .join("; ");
 
 const sessionFor = (cookie: string) =>
   Effect.gen(function* readSession() {
@@ -143,13 +88,7 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
         assert.strictEqual(unverified.status, 403);
         assert.strictEqual(sessionCookie(unverified), "");
 
-        const outbox = yield* SystemMailerOutbox;
-
-        const verificationEmail = (yield* outbox.sent).find(
-          (sent) => sent.to === email
-        );
-
-        const link = verificationEmail?.text.match(URL_IN_TEXT)?.[0];
+        const link = yield* verificationLinkFor(email);
 
         assert.isDefined(link);
         assert.isTrue(link.startsWith(`${APP_URL}/api/auth/verify-email?`));

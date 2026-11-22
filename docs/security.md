@@ -52,8 +52,10 @@ Mailquilt's threat model and the controls that answer it. Each control ships in 
 ### Authorization and tenant isolation
 
 - Every endpoint declares the role it needs.
-- Every repository method requires the Organization ID from the request context.
-- A CI test suite attempts cross-Organization reads and writes.
+- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)).
+- Every repository method for tenant data requires the Organization from the request context.
+- A CI test suite attempts cross-Organization reads and writes, and fails when an endpoint for one Organization's data has no case in it.
+- A write that uses the session cookie is refused when its `Origin` is another site.
 - **API keys:**
   - shown once and stored as a hash
   - `mq_` prefix, so GitHub secret scanning catches leaks

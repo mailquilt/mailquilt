@@ -1,10 +1,13 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   pgTable,
   text,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
 
 const createdAt = () =>
@@ -94,4 +97,39 @@ export const rateLimits = pgTable(
     resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
   },
   (table) => [index("rate_limits_reset_at_idx").on(table.resetAt)]
+);
+
+/** The tenant. Every Organization's data is scoped by its ID (`org_…`). */
+export const organizations = pgTable("organizations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+/** A user's place in an Organization (`mem_…`), with their role. */
+export const members = pgTable(
+  "members",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    unique("members_organization_id_user_id_key").on(
+      table.organizationId,
+      table.userId
+    ),
+    index("members_user_id_idx").on(table.userId),
+    check(
+      "members_role_check",
+      sql`${table.role} in ('owner', 'admin', 'member')`
+    ),
+  ]
 );
