@@ -2,6 +2,7 @@ import { Schema } from "effect";
 
 import { BROWSER_EMAIL_INPUT_PATTERN } from "./account.ts";
 import { ContactIdSchema } from "./ids.ts";
+import { Subscription } from "./subscription.ts";
 
 const MAX_SMTP_ADDRESS_LENGTH = 254;
 
@@ -20,8 +21,13 @@ export const ContactEmail = Schema.Trim.check(
   })
 );
 
-/** One person in an Organization, identified by their email address. */
+/**
+ * One person in an Organization, identified by their email address, with
+ * their Subscriptions, oldest first.
+ */
 export class Contact extends Schema.Class<Contact>("Contact")({
   id: ContactIdSchema,
   email: ContactEmail,
+  createdAt: Schema.DateTimeUtc,
+  subscriptions: Schema.Array(Subscription),
 }) {}

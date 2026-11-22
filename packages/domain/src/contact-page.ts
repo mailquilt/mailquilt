@@ -1,13 +1,19 @@
 import { Schema } from "effect";
 
 import { Contact } from "./contact.ts";
+import { Count } from "./count.ts";
 import { ContactIdSchema } from "./ids.ts";
 
 /**
- * One page of an Organization's Contacts, newest first. `next` is the cursor
- * for the following page, or null on the last one (ADR 0008).
+ * One page of an Organization's Contacts, newest first (ADR 0008). `total`
+ * counts every Contact the filters match, and `start` is how many of them
+ * come before this page. `previous` and `next` are the cursors for the pages
+ * either side, or null at either end.
  */
 export class ContactPage extends Schema.Class<ContactPage>("ContactPage")({
   contacts: Schema.Array(Contact),
+  total: Count,
+  start: Count,
+  previous: Schema.NullOr(ContactIdSchema),
   next: Schema.NullOr(ContactIdSchema),
 }) {}

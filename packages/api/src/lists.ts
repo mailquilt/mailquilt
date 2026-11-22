@@ -5,9 +5,7 @@ import {
   createList,
   getList,
   listLists,
-  listSubscriptions,
 } from "@repo/core";
-import { Option } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { signedIn } from "./auth/signed-in.ts";
@@ -30,14 +28,8 @@ export const ListsHandlers = HttpApiBuilder.group(
       .handle("get", ({ params }) =>
         getList(params.listId).pipe(asMemberOf(params.organizationId), signedIn)
       )
-      .handle("subscriptions", ({ params, query }) =>
-        listSubscriptions(
-          params.listId,
-          Option.fromUndefinedOr(query.after)
-        ).pipe(asMemberOf(params.organizationId), signedIn)
-      )
-      .handle("subscribe", ({ params }) =>
-        addToList(params.listId, params.contactId).pipe(
+      .handle("addContacts", ({ params, payload }) =>
+        addToList(params.listId, payload.contactIds).pipe(
           asMemberOf(params.organizationId),
           signedIn
         )

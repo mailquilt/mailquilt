@@ -1,27 +1,24 @@
 import { assert, layer } from "@effect/vitest";
 import { PAGE_SIZE } from "@repo/db";
-import { Contact } from "@repo/domain";
+import { Contact, ListIdSchema } from "@repo/domain";
 import { Effect, Schema } from "effect";
+import { SqlClient } from "effect/sql";
 
 import {
   clientWithCookie,
+  ownOrganization,
   send,
-  signedInClient,
   signedInPerson,
 } from "./accounts.ts";
 import { TestApp } from "./harness.ts";
 
 const CONTACT_ID = /^cnt_[0-7][0-9a-hjkmnp-tv-z]{25}$/u;
 
-const ownOrganization = Effect.gen(function* ownOrganization() {
-  const client = yield* signedInClient;
+const NO_SUCH_LIST = ListIdSchema.make("lst_00000000000000000000000000");
 
-  const organization = yield* client.organizations.create({
-    payload: { name: "Acme" },
-  });
-
-  return { client, params: { organizationId: organization.id } };
-});
+const newestFirst = <Item extends { readonly id: string }>(
+  items: readonly Item[]
+) => items.toSorted((a, b) => (a.id < b.id ? 1 : -1));
 
 layer(TestApp, { timeout: "2 minutes" })("Contacts", (test) => {
   test.effect("creates a Contact and lists it in its Organization", () =>
@@ -35,10 +32,15 @@ layer(TestApp, { timeout: "2 minutes" })("Contacts", (test) => {
 
       assert.match(created.id, CONTACT_ID);
       assert.strictEqual(created.email, "ada@example.com");
+      assert.deepStrictEqual(created.subscriptions, []);
 
       const page = yield* client.contacts.list({ params, query: {} });
 
       assert.deepStrictEqual(page.contacts, [created]);
+      assert.strictEqual(page.total, 1);
+      assert.strictEqual(page.start, 0);
+      assert.isNull(page.previous);
+      assert.isNull(page.next);
     })
   );
 
@@ -101,7 +103,9 @@ layer(TestApp, { timeout: "2 minutes" })("Contacts", (test) => {
         });
 
         const contact = yield* Effect.promise(() => trimmed.json()).pipe(
-          Effect.flatMap(Schema.decodeUnknownEffect(Contact))
+          Effect.flatMap(
+            Schema.decodeUnknownEffect(Schema.toCodecJson(Contact))
+          )
         );
 
         assert.strictEqual(trimmed.status, 201);
@@ -116,24 +120,71 @@ layer(TestApp, { timeout: "2 minutes" })("Contacts", (test) => {
       })
   );
 
-  test.effect("pages through Contacts newest first", () =>
+  test.effect("subscribes a new Contact to the Lists chosen with it", () =>
+    Effect.gen(function* createSubscribed() {
+      const { client, params } = yield* ownOrganization;
+
+      const news = yield* client.lists.create({
+        params,
+        payload: { name: "Weekly news" },
+      });
+
+      const created = yield* client.contacts.create({
+        params,
+        payload: { email: "ada@example.com", listIds: [news.id] },
+      });
+
+      assert.deepStrictEqual(
+        created.subscriptions.map(({ listId, status }) => ({ listId, status })),
+        [{ listId: news.id, status: "subscribed" }]
+      );
+      assert.deepStrictEqual(
+        (yield* client.contacts.list({ params, query: {} })).contacts,
+        [created]
+      );
+    })
+  );
+
+  test.effect("creates no Contact when a chosen List doesn't exist", () =>
+    Effect.gen(function* unknownList() {
+      const { client, params } = yield* ownOrganization;
+
+      const error = yield* client.contacts
+        .create({
+          params,
+          payload: { email: "ada@example.com", listIds: [NO_SUCH_LIST] },
+        })
+        .pipe(Effect.flip);
+
+      assert.strictEqual(error._tag, "ListNotFound");
+      assert.strictEqual(
+        (yield* client.contacts.list({ params, query: {} })).total,
+        0
+      );
+    })
+  );
+
+  test.effect("pages through Contacts newest first, forward and back", () =>
     Effect.gen(function* pages() {
       const { client, params } = yield* ownOrganization;
 
-      const created = yield* Effect.forEach(
-        Array.from({ length: PAGE_SIZE + 1 }, (_, index) => index),
-        (index) =>
-          client.contacts.create({
-            params,
-            payload: { email: `person-${index}@example.com` },
-          })
+      const created = newestFirst(
+        yield* Effect.forEach(
+          Array.from({ length: PAGE_SIZE + 1 }, (_, index) => index),
+          (index) =>
+            client.contacts.create({
+              params,
+              payload: { email: `person-${index}@example.com` },
+            })
+        )
       );
-
-      const newestFirst = created.toSorted((a, b) => (a.id < b.id ? 1 : -1));
 
       const first = yield* client.contacts.list({ params, query: {} });
 
-      assert.deepStrictEqual(first.contacts, newestFirst.slice(0, PAGE_SIZE));
+      assert.deepStrictEqual(first.contacts, created.slice(0, PAGE_SIZE));
+      assert.strictEqual(first.total, PAGE_SIZE + 1);
+      assert.strictEqual(first.start, 0);
+      assert.isNull(first.previous);
       assert.isNotNull(first.next);
 
       const second = yield* client.contacts.list({
@@ -141,8 +192,99 @@ layer(TestApp, { timeout: "2 minutes" })("Contacts", (test) => {
         query: { after: first.next ?? undefined },
       });
 
-      assert.deepStrictEqual(second.contacts, newestFirst.slice(PAGE_SIZE));
+      assert.deepStrictEqual(second.contacts, created.slice(PAGE_SIZE));
+      assert.strictEqual(second.start, PAGE_SIZE);
       assert.isNull(second.next);
+      assert.isNotNull(second.previous);
+
+      const back = yield* client.contacts.list({
+        params,
+        query: { before: second.previous ?? undefined },
+      });
+
+      assert.deepStrictEqual(back, first);
+    })
+  );
+
+  test.effect("filters Contacts by List, and by their status on it", () =>
+    Effect.gen(function* filtered() {
+      const { client, params } = yield* ownOrganization;
+
+      const news = yield* client.lists.create({
+        params,
+        payload: { name: "Weekly news" },
+      });
+
+      const onNews = yield* Effect.forEach(
+        ["ada@example.com", "grace@example.com"],
+        (email) =>
+          client.contacts.create({
+            params,
+            payload: { email, listIds: [news.id] },
+          })
+      );
+
+      yield* client.contacts.create({
+        params,
+        payload: { email: "alan@example.com" },
+      });
+      const sql = yield* SqlClient.SqlClient;
+
+      yield* sql`update subscriptions set status = 'unsubscribed' where contact_id = ${onNews[1]?.id ?? ""}`;
+
+      const onList = yield* client.contacts.list({
+        params,
+        query: { list: news.id },
+      });
+
+      const unsubscribed = yield* client.contacts.list({
+        params,
+        query: { list: news.id, status: "unsubscribed" },
+      });
+
+      assert.deepStrictEqual(
+        onList.contacts.map((contact) => contact.id),
+        newestFirst(onNews).map((contact) => contact.id)
+      );
+      assert.strictEqual(onList.total, 2);
+      assert.deepStrictEqual(
+        unsubscribed.contacts.map((contact) => contact.email),
+        ["grace@example.com"]
+      );
+      assert.strictEqual(unsubscribed.total, 1);
+    })
+  );
+
+  test.effect(
+    "answers a filter by a List it doesn't have with ListNotFound",
+    () =>
+      Effect.gen(function* missingList() {
+        const { client, params } = yield* ownOrganization;
+
+        const error = yield* client.contacts
+          .list({ params, query: { list: NO_SUCH_LIST } })
+          .pipe(Effect.flip);
+
+        assert.strictEqual(error._tag, "ListNotFound");
+      })
+  );
+
+  test.effect("refuses a status filter without a List", () =>
+    Effect.gen(function* statusWithoutList() {
+      const cookie = yield* signedInPerson;
+      const client = yield* clientWithCookie(cookie);
+
+      const organization = yield* client.organizations.create({
+        payload: { name: "Acme" },
+      });
+
+      const response = yield* send(
+        "GET",
+        `/api/organizations/${organization.id}/contacts?status=pending`,
+        { headers: { cookie } }
+      );
+
+      assert.strictEqual(response.status, 400);
     })
   );
 });

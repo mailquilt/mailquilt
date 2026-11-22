@@ -32,8 +32,9 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Every repository method for tenant data requires `CurrentOrganization` from the request context, which only `asMemberOf` provides after checking membership. There's no unscoped query path for tenant data, and Postgres row-level security isn't used (ADR 0007).
 - The Organization a request acts in is named in its path, not stored on the session, so two tabs can work in two Organizations. The dashboard remembers each tab's choice (ADR 0007, #6).
 - A Contact's email address is unique per Organization regardless of case, and kept as entered (#8).
-- Adding a Contact to a List subscribes it only if it has no Subscription to that List yet. An existing Subscription keeps its status, so a member can't subscribe again someone who unsubscribed, or skip a pending confirmation (#8).
-- Collections that grow with an Organization's audience are paged by ID, newest first, 50 per page. Lists and Organizations are returned whole (ADR 0008, #8).
+- Adding Contacts to a List subscribes only those with no Subscription to that List yet. An existing Subscription keeps its status, so a member can't subscribe again someone who unsubscribed, or skip a pending confirmation. The answer says how many were left as they were (#8).
+- Adding Contacts to a List takes up to 50 at once (one page), and adds nobody if one of them doesn't exist (#8).
+- Collections that grow with an Organization's audience are paged by ID, newest first, 50 per page, with a total and cursors both ways. Lists and Organizations are returned whole (ADR 0008, #8).
 - Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default. Campaign totals and Contact engagement summaries outlive them.
 - Imports, recipient snapshots and event writes are set-based. There's never a query per Contact.
 - Migrations are expand-then-contract. They run on boot behind an advisory lock in Docker, and in the deploy step on Cloudflare.

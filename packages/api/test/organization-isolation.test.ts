@@ -29,8 +29,12 @@ const TENANT_ENDPOINTS = {
   ) => client.organizations.get({ params: { organizationId } }),
   "GET /api/organizations/:organizationId/contacts": (
     client: Client,
-    { organizationId }: Target
-  ) => client.contacts.list({ params: { organizationId }, query: {} }),
+    { listId, organizationId }: Target
+  ) =>
+    client.contacts.list({
+      params: { organizationId },
+      query: { list: listId },
+    }),
   "GET /api/organizations/:organizationId/lists": (
     client: Client,
     { organizationId }: Target
@@ -39,21 +43,13 @@ const TENANT_ENDPOINTS = {
     client: Client,
     { listId, organizationId }: Target
   ) => client.lists.get({ params: { listId, organizationId } }),
-  "GET /api/organizations/:organizationId/lists/:listId/subscriptions": (
+  "POST /api/organizations/:organizationId/contacts": (
     client: Client,
     { listId, organizationId }: Target
   ) =>
-    client.lists.subscriptions({
-      params: { listId, organizationId },
-      query: {},
-    }),
-  "POST /api/organizations/:organizationId/contacts": (
-    client: Client,
-    { organizationId }: Target
-  ) =>
     client.contacts.create({
       params: { organizationId },
-      payload: { email: "intruder@example.com" },
+      payload: { email: "intruder@example.com", listIds: [listId] },
     }),
   "POST /api/organizations/:organizationId/lists": (
     client: Client,
@@ -63,9 +59,14 @@ const TENANT_ENDPOINTS = {
       params: { organizationId },
       payload: { name: "Intruder" },
     }),
-  "PUT /api/organizations/:organizationId/lists/:listId/subscriptions/:contactId":
-    (client: Client, target: Target) =>
-      client.lists.subscribe({ params: target }),
+  "POST /api/organizations/:organizationId/lists/:listId/subscriptions": (
+    client: Client,
+    { contactId, listId, organizationId }: Target
+  ) =>
+    client.lists.addContacts({
+      params: { listId, organizationId },
+      payload: { contactIds: [contactId] },
+    }),
 } satisfies Record<string, TenantCall>;
 
 const NO_SUCH_ORGANIZATION = OrganizationIdSchema.make(
@@ -87,11 +88,7 @@ const ownedData = (owner: Client) =>
 
     const contact = yield* owner.contacts.create({
       params,
-      payload: { email: "ada@example.com" },
-    });
-
-    yield* owner.lists.subscribe({
-      params: { ...params, contactId: contact.id, listId: list.id },
+      payload: { email: "ada@example.com", listIds: [list.id] },
     });
 
     return {
@@ -183,47 +180,57 @@ layer(TestApp, { timeout: "2 minutes" })(
             .get({ params: { ...params, listId: target.listId } })
             .pipe(Effect.flip);
 
-          const foreignSubscriptions = yield* outsider.lists
-            .subscriptions({
-              params: { ...params, listId: target.listId },
-              query: {},
+          const filteredByForeignList = yield* outsider.contacts
+            .list({ params, query: { list: target.listId } })
+            .pipe(Effect.flip);
+
+          const createdOnForeignList = yield* outsider.contacts
+            .create({
+              params,
+              payload: {
+                email: "grace@example.com",
+                listIds: [target.listId],
+              },
             })
             .pipe(Effect.flip);
 
           const foreignContact = yield* outsider.lists
-            .subscribe({ params: { ...own, contactId: target.contactId } })
+            .addContacts({
+              params: { ...params, listId: own.listId },
+              payload: { contactIds: [target.contactId] },
+            })
             .pipe(Effect.flip);
 
           const ontoForeignList = yield* outsider.lists
-            .subscribe({ params: { ...own, listId: target.listId } })
+            .addContacts({
+              params: { ...params, listId: target.listId },
+              payload: { contactIds: [own.contactId] },
+            })
             .pipe(Effect.flip);
 
           assert.strictEqual(foreignList._tag, "ListNotFound");
-          assert.strictEqual(foreignSubscriptions._tag, "ListNotFound");
+          assert.strictEqual(filteredByForeignList._tag, "ListNotFound");
+          assert.strictEqual(createdOnForeignList._tag, "ListNotFound");
           assert.strictEqual(foreignContact._tag, "ContactNotFound");
           assert.strictEqual(ontoForeignList._tag, "ListNotFound");
 
           const contacts = yield* outsider.contacts.list({ params, query: {} });
           const lists = yield* outsider.lists.list({ params });
 
-          const subscriptions = yield* outsider.lists.subscriptions({
-            params: { ...params, listId: own.listId },
-            query: {},
-          });
-
           assert.deepStrictEqual(
             contacts.contacts.map((contact) => contact.id),
             [own.contactId]
           );
+          assert.strictEqual(contacts.total, 1);
           assert.deepStrictEqual(
-            lists.map((list) => list.id),
+            contacts.contacts.flatMap((contact) =>
+              contact.subscriptions.map((subscription) => subscription.listId)
+            ),
             [own.listId]
           );
           assert.deepStrictEqual(
-            subscriptions.subscriptions.map(
-              (subscription) => subscription.contact.id
-            ),
-            [own.contactId]
+            lists.map((list) => [list.id, list.subscriptions.subscribed]),
+            [[own.listId, 1]]
           );
         })
     );

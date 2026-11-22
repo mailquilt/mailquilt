@@ -1,15 +1,12 @@
 import type {
+  AddedToList,
   ContactId,
   ContactNotFound,
   List,
   ListId,
   ListNotFound,
-  Subscription,
-  SubscriptionId,
-  SubscriptionPage,
 } from "@repo/domain";
 import { Context, Effect } from "effect";
-import type { Option } from "effect";
 
 import type { CurrentOrganization } from "./current-organization.ts";
 
@@ -28,22 +25,18 @@ export class Lists extends Context.Service<
       id: ListId
     ) => Effect.Effect<List, ListNotFound, CurrentOrganization>;
     /**
-     * Adds `contact` to the List as subscribed. If the Contact already has a
-     * Subscription to it, that Subscription is returned unchanged.
+     * Subscribes `contacts` to the List. Contacts that already have a
+     * Subscription to it keep it unchanged. Fails, adding nobody, if the
+     * Organization doesn't have the List or one of the Contacts.
      */
-    readonly subscribe: (
+    readonly addContacts: (
       list: ListId,
-      contact: ContactId
+      contacts: readonly ContactId[]
     ) => Effect.Effect<
-      Subscription,
+      AddedToList,
       ListNotFound | ContactNotFound,
       CurrentOrganization
     >;
-    /** One page of the List's Subscriptions, newest first, after `after`. */
-    readonly subscriptions: (
-      list: ListId,
-      after: Option.Option<SubscriptionId>
-    ) => Effect.Effect<SubscriptionPage, ListNotFound, CurrentOrganization>;
   }
 >()("@repo/core/Lists") {}
 
@@ -71,23 +64,12 @@ export const getList = (id: ListId) =>
   });
 
 /**
- * Adds a Contact to a List as subscribed, keeping any Subscription it
- * already has to that List.
+ * Subscribes Contacts to a List, keeping any Subscription they already have
+ * to it.
  */
-export const addToList = (list: ListId, contact: ContactId) =>
-  Effect.gen(function* addContactToList() {
+export const addToList = (list: ListId, contacts: readonly ContactId[]) =>
+  Effect.gen(function* addContactsToList() {
     const lists = yield* Lists;
 
-    return yield* lists.subscribe(list, contact);
-  });
-
-/** One page of a List's Subscriptions, newest first. */
-export const listSubscriptions = (
-  list: ListId,
-  after: Option.Option<SubscriptionId>
-) =>
-  Effect.gen(function* listListSubscriptions() {
-    const lists = yield* Lists;
-
-    return yield* lists.subscriptions(list, after);
+    return yield* lists.addContacts(list, contacts);
   });

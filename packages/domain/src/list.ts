@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 
+import { Count } from "./count.ts";
 import { ListIdSchema } from "./ids.ts";
 
 const MAX_NAME_LENGTH = 100;
@@ -12,8 +13,17 @@ export const ListName = Schema.Trim.check(
   })
 );
 
-/** A named group of Contacts, representing what they agreed to receive. */
+/**
+ * A named group of Contacts, representing what they agreed to receive, with
+ * how many of its Subscriptions have each status.
+ */
 export class List extends Schema.Class<List>("List")({
   id: ListIdSchema,
   name: ListName,
+  createdAt: Schema.DateTimeUtc,
+  subscriptions: Schema.Struct({
+    subscribed: Count,
+    pending: Count,
+    unsubscribed: Count,
+  }),
 }) {}

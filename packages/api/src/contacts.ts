@@ -1,6 +1,5 @@
 import { MailquiltApi } from "@repo/contract";
 import { asMemberOf, createContact, listContacts } from "@repo/core";
-import { Option } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { signedIn } from "./auth/signed-in.ts";
@@ -12,13 +11,10 @@ export const ContactsHandlers = HttpApiBuilder.group(
   (handlers) =>
     handlers
       .handle("list", ({ params, query }) =>
-        listContacts(Option.fromUndefinedOr(query.after)).pipe(
-          asMemberOf(params.organizationId),
-          signedIn
-        )
+        listContacts(query).pipe(asMemberOf(params.organizationId), signedIn)
       )
       .handle("create", ({ params, payload }) =>
-        createContact(payload.email).pipe(
+        createContact(payload.email, payload.listIds ?? []).pipe(
           asMemberOf(params.organizationId),
           signedIn
         )
