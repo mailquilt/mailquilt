@@ -147,11 +147,16 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
     Effect.gen(function* perAccount() {
       const email = uniqueEmail();
 
-      for (let attempt = 1; attempt <= 20; attempt += 1) {
-        const response = yield* signIn(email, "wrong password", uniqueIp());
+      const allowed = yield* Effect.forEach(
+        Array.from({ length: 20 }, uniqueIp),
+        (ip) => signIn(email, "wrong password", ip),
+        { concurrency: "unbounded" }
+      );
 
-        assert.strictEqual(response.status, 401);
-      }
+      assert.deepStrictEqual(
+        allowed.map((response) => response.status),
+        Array.from({ length: 20 }, () => 401)
+      );
 
       const limited = yield* signIn(
         email.toUpperCase(),
