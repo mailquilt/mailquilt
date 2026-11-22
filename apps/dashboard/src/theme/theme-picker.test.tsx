@@ -12,6 +12,11 @@ declare global {
   }
 }
 
+const openAppearance = (current: string) =>
+  fireEvent.click(
+    screen.getByRole("menuitem", { name: `Appearance ${current}` })
+  );
+
 const renderOpenMenu = () =>
   render(
     <DropdownMenu defaultOpen>
@@ -51,26 +56,32 @@ describe("theme picker", () => {
     setDeviceColorScheme("light");
   });
 
-  it("keeps the chosen theme after a reload", () => {
+  it("keeps the chosen theme after a reload, and shows it on the Appearance row", async () => {
     renderOpenMenu();
+    openAppearance("Device");
 
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Dark" }));
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "Dark" }));
     reloadPage();
 
     expect(document.documentElement.dataset.mode).toBe("dark");
+    openAppearance("Dark");
     expect(isChosen("Dark")).toBeTruthy();
   });
 
-  it("follows the device setting only while matching the device is chosen", () => {
+  it("follows the device setting only while matching the device is chosen", async () => {
     setDeviceColorScheme("dark");
     renderOpenMenu();
+    openAppearance("Device");
 
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Light" }));
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: "Light" })
+    );
     reloadPage();
     expect(document.documentElement.dataset.mode).toBe("light");
 
+    openAppearance("Light");
     fireEvent.click(
-      screen.getByRole("menuitemradio", { name: "Match my device" })
+      await screen.findByRole("menuitemradio", { name: "Match my device" })
     );
     reloadPage();
     expect(document.documentElement.dataset.mode).toBe("dark");

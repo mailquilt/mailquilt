@@ -48,6 +48,11 @@
   --shadow-quilt-label: 0 30px 60px -20px rgb(0 0 0 / 0.55);
 }
 
+@theme inline {
+  /* A submenu stacked above its menu is as wide as the menu: its row plus the menu's 6px padding each side. */
+  --spacing-menu-from-row: calc(var(--anchor-width) + 0.75rem);
+}
+
 /*
  * WARNING: Kumo also declares these tokens unlayered on :root (compiled from
  * light-dark()), and unlayered rules beat every @layer. So the overrides stay
