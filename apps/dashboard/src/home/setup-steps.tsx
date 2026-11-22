@@ -4,6 +4,7 @@ import { OrganizationIdSchema } from "@repo/domain";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { TableLoadFailed } from "../audience/table-card.tsx";
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
@@ -192,7 +193,17 @@ export const useSetupProgress = () => {
     return;
   }
 
-  const [first] = connections.data ?? [];
+  if (connections.data === undefined) {
+    return {
+      doneCount: 1,
+      failed: {
+        retry: () => connections.refetch(),
+        retrying: connections.isFetching,
+      },
+    };
+  }
+
+  const [first] = connections.data;
 
   return first === undefined
     ? { doneCount: 1 }
@@ -201,9 +212,21 @@ export const useSetupProgress = () => {
 
 /** The five steps from a new account to the first Campaign, in order. */
 export const SetupSteps = () => {
-  const { connectedProvider, doneCount } = useSetupProgress() ?? {
+  const { connectedProvider, doneCount, failed } = useSetupProgress() ?? {
     doneCount: 1,
   };
+
+  if (failed !== undefined) {
+    return (
+      <section className="rounded-xl border border-kumo-fill bg-kumo-base">
+        <TableLoadFailed
+          onRetry={() => failed.retry()}
+          retrying={failed.retrying}
+          title="Your setup didn’t load"
+        />
+      </section>
+    );
+  }
 
   return (
     <ol

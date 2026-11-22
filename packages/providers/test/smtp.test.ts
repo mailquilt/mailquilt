@@ -4,7 +4,7 @@ import type { AddressInfo, Socket } from "node:net";
 
 import { assert, layer } from "@effect/vitest";
 import type { OutgoingEmail, SmtpSettings } from "@repo/core";
-import { outboundGuardLayer, SmtpProvider } from "@repo/core";
+import { OutboundGuard, outboundGuardLayer, SmtpProvider } from "@repo/core";
 import type { SmtpSecurity } from "@repo/domain";
 import { Effect, Fiber, Latch, Layer, Option, Redacted } from "effect";
 import { AddressResolver, Dns } from "effect/net";
@@ -299,6 +299,39 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
 
       assert.notInclude(error.detail, "OpenSSH");
       assert.notInclude(error.detail, "internal-host");
+    })
+  );
+
+  test.effect("counts looking up the host towards the 60 seconds", () =>
+    Effect.gen(function* slowLookup() {
+      const lookingUp = yield* Latch.make();
+
+      const neverAnswers = Layer.succeed(OutboundGuard, {
+        check: () => lookingUp.open.pipe(Effect.andThen(Effect.never)),
+      });
+
+      const sending = yield* Effect.gen(function* sendThroughProvider() {
+        const provider = yield* SmtpProvider;
+
+        return yield* provider.send(
+          {
+            credentials: Option.none(),
+            server: { host: "slow-dns.test", port: 25, security: "none" },
+          },
+          emailTo("slow@example.com")
+        );
+      }).pipe(
+        Effect.provide(smtpProviderLayer().pipe(Layer.provide(neverAnswers))),
+        Effect.flip,
+        Effect.forkChild
+      );
+
+      yield* lookingUp.await;
+      yield* TestClock.adjust("61 seconds");
+
+      const error = yield* Fiber.join(sending);
+
+      assert.strictEqual(error.reason, "unreachable");
     })
   );
 

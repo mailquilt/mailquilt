@@ -67,6 +67,7 @@ describe("setup steps", () => {
     let organizations: readonly (typeof ACME)[] = [];
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json(organizations)),
+      http.get(CONNECTIONS, () => HttpResponse.json([])),
       http.post("*/api/organizations", () => {
         organizations = [ACME];
 
@@ -111,6 +112,23 @@ describe("setup steps", () => {
         name: "Steps to your first campaign, 2 of 5 done",
       })
     ).resolves.toBeDefined();
+    expect(
+      screen.queryByRole("link", { name: "Connect SMTP server" })
+    ).toBeNull();
+  });
+
+  it("says the setup didn't load, rather than guessing the next step", async () => {
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => new HttpResponse(null, { status: 500 }))
+    );
+
+    renderWithOrganizations(<SetupSteps />);
+
+    const alert = await screen.findByRole("alert");
+
+    expect(alert.textContent).toContain("Your setup didn’t load");
+    expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
     expect(
       screen.queryByRole("link", { name: "Connect SMTP server" })
     ).toBeNull();

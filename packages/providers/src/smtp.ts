@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { rootCertificates } from "node:tls";
 import type { ConnectionOptions } from "node:tls";
 
 import { OutboundGuard, SmtpProvider } from "@repo/core";
@@ -115,7 +116,7 @@ const tlsOptions = (host: string, options: SmtpProviderOptions) => {
   }
 
   if (options.trustedCertificates !== undefined) {
-    tls.ca = options.trustedCertificates;
+    tls.ca = [...rootCertificates, options.trustedCertificates];
   }
 
   return tls;
@@ -171,8 +172,8 @@ const messageFor = (email: OutgoingEmail) => {
  * never to the host name again; TLS still verifies the certificate against
  * the host name (ADR 0010). Each email opens its own connection, closed
  * afterwards. A connection waits at most 10 seconds to open and for the
- * server's greeting, and 30 seconds for any reply, and a whole send at most
- * 60 seconds; giving up, or the request being cancelled, closes the
+ * server's greeting, and 30 seconds for any reply, and a whole send,
+ * looking up the host included, at most 60 seconds; giving up, or the request being cancelled, closes the
  * connection. Nothing is logged.
  */
 export const smtpProviderLayer = (options: SmtpProviderOptions = {}) =>
@@ -196,22 +197,21 @@ export const smtpProviderLayer = (options: SmtpProviderOptions = {}) =>
               catch: (error) => toSendFailed(parseNodemailerError(error)),
               try: (signal) =>
                 transport.sendMail({ ...messageFor(email), signal }),
-            }).pipe(
-              Effect.timeoutOrElse({
-                duration: Duration.seconds(SEND_TIMEOUT_SECONDS),
-                orElse: () =>
-                  Effect.fail(
-                    new SendFailed({
-                      detail: `The server took longer than ${SEND_TIMEOUT_SECONDS} seconds to take the email.`,
-                      reason: "unreachable",
-                    })
-                  ),
-              }),
-              Effect.ensuring(Effect.sync(() => transport.close()))
-            );
+            }).pipe(Effect.ensuring(Effect.sync(() => transport.close())));
 
             return { messageId: sent.messageId };
-          }),
+          }).pipe(
+            Effect.timeoutOrElse({
+              duration: Duration.seconds(SEND_TIMEOUT_SECONDS),
+              orElse: () =>
+                Effect.fail(
+                  new SendFailed({
+                    detail: `The server took longer than ${SEND_TIMEOUT_SECONDS} seconds to take the email.`,
+                    reason: "unreachable",
+                  })
+                ),
+            })
+          ),
       };
     })
   );

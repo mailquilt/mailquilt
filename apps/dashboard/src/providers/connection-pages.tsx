@@ -129,6 +129,7 @@ export const EditPage = ({
     return (
       <ConnectionForm
         busy={update.isPending}
+        key={providerConnectionId}
         busyLabel="Saving…"
         connection={connection}
         failure={update.error}
