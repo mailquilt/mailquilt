@@ -41,6 +41,9 @@
   /* A sheet's last row stays clear of the iPhone home indicator. */
   --spacing-sheet-bottom: max(1.5rem, env(safe-area-inset-bottom));
 
+  /* The edge of a table column pinned while the rest scrolls sideways. */
+  --shadow-pinned-column: inset -1px 0 0 var(--color-kumo-fill);
+
   /* Every signed-out page lines its logo, form and footer up on this width. */
   --container-auth-form: 23.75rem;
 
@@ -135,6 +138,27 @@
   --color-kumo-brand: #f0f6fc;
   --color-kumo-brand-hover: #d4d4d8;
   --color-kumo-focus: #f0f6fc;
+}
+
+/*
+ * WARNING: Kumo rings unchecked checkboxes and radios in --color-kumo-hairline
+ * (lighter still on hover), under the 3:1 contrast WCAG 2.2 asks of a
+ * control's boundary in both themes. Unlayered, so it beats Kumo's ring
+ * utilities. Keyboard focus adds the outline every other control has, since
+ * Kumo's focus ring is hard to tell from the box itself.
+ */
+[data-theme="mailquilt"]
+  :is([role="checkbox"], [role="radio"]):not(
+    [data-checked],
+    [data-indeterminate],
+    :focus-visible
+  ) {
+  --tw-ring-color: var(--mq-patch-grey);
+}
+
+[data-theme="mailquilt"] :is([role="checkbox"], [role="radio"]):focus-visible {
+  outline: 2px solid var(--color-kumo-focus);
+  outline-offset: 2px;
 }
 
 @layer base {

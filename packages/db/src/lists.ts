@@ -158,7 +158,8 @@ export const ListsLive = Layer.effect(
 
           return yield* decodeAddedToList({
             added: added.length,
-            alreadySubscribed: withStatus("subscribed"),
+            alreadySubscribed:
+              withStatus("subscribed") + (toAdd.length - added.length),
             leftPending: withStatus("pending"),
             leftUnsubscribed: withStatus("unsubscribed"),
           }).pipe(Effect.orDie);

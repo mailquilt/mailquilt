@@ -24,32 +24,63 @@ import {
 } from "../organizations/organizations.tsx";
 import { useAccount } from "./session-gates.tsx";
 
-const SECTIONS_DIMMED_UNTIL_THEY_EXIST = [
-  {
-    items: [
-      { icon: PaperPlaneTiltIcon, label: "Campaigns" },
-      { icon: LayoutIcon, label: "Templates" },
-    ],
-    label: "Send",
-  },
-  {
-    items: [
-      { icon: UsersIcon, label: "Contacts" },
-      { icon: ListBulletsIcon, label: "Lists" },
-    ],
-    label: "Audience",
-  },
-  {
-    items: [
-      { icon: PlugsConnectedIcon, label: "Providers" },
-      { icon: GlobeSimpleIcon, label: "Domains" },
-    ],
-    label: "Deliverability",
-  },
+interface DimmedSection {
+  readonly label: string;
+  readonly items: readonly {
+    readonly icon: React.ComponentType<{ className?: string }>;
+    readonly label: string;
+  }[];
+}
+
+const SEND: DimmedSection = {
+  items: [
+    { icon: PaperPlaneTiltIcon, label: "Campaigns" },
+    { icon: LayoutIcon, label: "Templates" },
+  ],
+  label: "Send",
+};
+
+const DELIVERABILITY: DimmedSection = {
+  items: [
+    { icon: PlugsConnectedIcon, label: "Providers" },
+    { icon: GlobeSimpleIcon, label: "Domains" },
+  ],
+  label: "Deliverability",
+};
+
+const AUDIENCE = [
+  { href: "/contacts", icon: UsersIcon, label: "Contacts" },
+  { href: "/lists", icon: ListBulletsIcon, label: "Lists" },
 ] as const;
 
 const NAV_ITEM_FOCUS =
   "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kumo-focus";
+
+const SectionComingSoon = ({ section }: { section: DimmedSection }) => (
+  <Sidebar.Group>
+    <Sidebar.GroupLabel>
+      <span className="flex items-center justify-between gap-2">
+        {section.label}
+        <span className="rounded-sm bg-kumo-tint px-1.5 text-xs font-medium text-kumo-subtle">
+          Soon
+        </span>
+      </span>
+    </Sidebar.GroupLabel>
+    <Sidebar.Menu>
+      {section.items.map((item) => (
+        <Sidebar.MenuButton
+          className="cursor-default opacity-45 hover:bg-transparent"
+          disabled
+          icon={item.icon}
+          key={item.label}
+          tooltip={`${item.label} is coming soon`}
+        >
+          {item.label}
+        </Sidebar.MenuButton>
+      ))}
+    </Sidebar.Menu>
+  </Sidebar.Group>
+);
 
 const SidebarHeaderControls = () => {
   const { isMobile, state } = useSidebar();
@@ -148,31 +179,25 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                 </Sidebar.MenuButton>
               </Sidebar.Menu>
             </Sidebar.Group>
-            {SECTIONS_DIMMED_UNTIL_THEY_EXIST.map((section) => (
-              <Sidebar.Group key={section.label}>
-                <Sidebar.GroupLabel>
-                  <span className="flex items-center justify-between gap-2">
-                    {section.label}
-                    <span className="rounded-sm bg-kumo-tint px-1.5 text-xs font-medium text-kumo-subtle">
-                      Soon
-                    </span>
-                  </span>
-                </Sidebar.GroupLabel>
-                <Sidebar.Menu>
-                  {section.items.map((item) => (
-                    <Sidebar.MenuButton
-                      className="cursor-default opacity-45 hover:bg-transparent"
-                      disabled
-                      icon={item.icon}
-                      key={item.label}
-                      tooltip={`${item.label} is coming soon`}
-                    >
-                      {item.label}
-                    </Sidebar.MenuButton>
-                  ))}
-                </Sidebar.Menu>
-              </Sidebar.Group>
-            ))}
+            <SectionComingSoon section={SEND} />
+            <Sidebar.Group>
+              <Sidebar.GroupLabel>Audience</Sidebar.GroupLabel>
+              <Sidebar.Menu>
+                {AUDIENCE.map((item) => (
+                  <Sidebar.MenuButton
+                    active={pathname.startsWith(item.href)}
+                    className={NAV_ITEM_FOCUS}
+                    href={item.href}
+                    icon={item.icon}
+                    key={item.href}
+                    tooltip={item.label}
+                  >
+                    {item.label}
+                  </Sidebar.MenuButton>
+                ))}
+              </Sidebar.Menu>
+            </Sidebar.Group>
+            <SectionComingSoon section={DELIVERABILITY} />
           </nav>
         </Sidebar.Content>
         <Sidebar.Footer className="h-auto py-2.5 group-data-[state=collapsed]/sidebar:justify-center">

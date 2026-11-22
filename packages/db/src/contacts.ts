@@ -7,13 +7,13 @@ import {
   ContactPage,
   newContactId,
   newSubscriptionId,
+  PAGE_SIZE,
 } from "@repo/domain";
 import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
 
 import { Database } from "./database.ts";
-import { PAGE_SIZE } from "./page.ts";
 import { requireLists } from "./require-lists.ts";
 import { contacts, subscriptions } from "./schema.ts";
 
@@ -112,10 +112,9 @@ export const ContactsLive = Layer.effect(
                 const byContact = new Map<string, SubscriptionRow[]>();
 
                 for (const row of rows) {
-                  byContact.set(row.contactId, [
-                    ...(byContact.get(row.contactId) ?? []),
-                    row,
-                  ]);
+                  const forContact = byContact.get(row.contactId) ?? [];
+                  forContact.push(row);
+                  byContact.set(row.contactId, forContact);
                 }
 
                 return byContact;

@@ -15,8 +15,6 @@ export { ListsLive } from "./lists.ts";
 
 export { OrganizationsLive } from "./organizations.ts";
 
-export { PAGE_SIZE } from "./page.ts";
-
 export { RateLimiterLive } from "./rate-limiter.ts";
 
 /** Every port backed by Postgres. Needs a `PgClient`, which each runtime provides. */

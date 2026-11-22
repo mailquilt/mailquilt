@@ -12,7 +12,7 @@ export { ContactAlreadyExists } from "./contact-already-exists.ts";
 
 export { ContactNotFound } from "./contact-not-found.ts";
 
-export { ContactPage } from "./contact-page.ts";
+export { ContactPage, PAGE_SIZE } from "./contact-page.ts";
 
 export { Contact, ContactEmail } from "./contact.ts";
 

@@ -3,7 +3,7 @@ import { Schema } from "effect";
 import { Count } from "./count.ts";
 
 /** The most Contacts one request can add to a List: one page of them. */
-export const MAX_CONTACTS_ADDED_AT_ONCE = 50;
+export { PAGE_SIZE as MAX_CONTACTS_ADDED_AT_ONCE } from "./contact-page.ts";
 
 /**
  * What adding Contacts to a List did. Only Contacts without a Subscription to

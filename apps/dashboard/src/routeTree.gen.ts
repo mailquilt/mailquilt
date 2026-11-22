@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppContactsRouteImport } from './routes/_app/contacts'
+import { Route as AppListsRouteImport } from './routes/_app/lists'
 import { Route as AuthCheckYourInboxRouteImport } from './routes/_auth/check-your-inbox'
 import { Route as AuthEmailVerifiedRouteImport } from './routes/_auth/email-verified'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
@@ -28,6 +30,16 @@ const AuthRoute = AuthRouteImport.update({
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppContactsRoute = AppContactsRouteImport.update({
+  id: '/contacts',
+  path: '/contacts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppListsRoute = AppListsRouteImport.update({
+  id: '/lists',
+  path: '/lists',
   getParentRoute: () => AppRoute,
 } as any)
 const AuthCheckYourInboxRoute = AuthCheckYourInboxRouteImport.update({
@@ -53,6 +65,8 @@ const AuthSignUpRoute = AuthSignUpRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/contacts': typeof AppContactsRoute
+  '/lists': typeof AppListsRoute
   '/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/email-verified': typeof AuthEmailVerifiedRoute
   '/sign-in': typeof AuthSignInRoute
@@ -60,6 +74,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
+  '/contacts': typeof AppContactsRoute
+  '/lists': typeof AppListsRoute
   '/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/email-verified': typeof AuthEmailVerifiedRoute
   '/sign-in': typeof AuthSignInRoute
@@ -69,6 +85,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/_auth': typeof AuthRouteWithChildren
+  '/_app/contacts': typeof AppContactsRoute
+  '/_app/lists': typeof AppListsRoute
   '/_auth/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/_auth/email-verified': typeof AuthEmailVerifiedRoute
   '/_auth/sign-in': typeof AuthSignInRoute
@@ -78,13 +96,28 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/check-your-inbox' | '/email-verified' | '/sign-in' | '/sign-up'
+    | '/'
+    | '/contacts'
+    | '/lists'
+    | '/check-your-inbox'
+    | '/email-verified'
+    | '/sign-in'
+    | '/sign-up'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/check-your-inbox' | '/email-verified' | '/sign-in' | '/sign-up'
+  to:
+    | '/'
+    | '/contacts'
+    | '/lists'
+    | '/check-your-inbox'
+    | '/email-verified'
+    | '/sign-in'
+    | '/sign-up'
   id:
     | '__root__'
     | '/_app'
     | '/_auth'
+    | '/_app/contacts'
+    | '/_app/lists'
     | '/_auth/check-your-inbox'
     | '/_auth/email-verified'
     | '/_auth/sign-in'
@@ -120,6 +153,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/contacts': {
+      id: '/_app/contacts'
+      path: '/contacts'
+      fullPath: '/contacts'
+      preLoaderRoute: typeof AppContactsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/lists': {
+      id: '/_app/lists'
+      path: '/lists'
+      fullPath: '/lists'
+      preLoaderRoute: typeof AppListsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_auth/check-your-inbox': {
       id: '/_auth/check-your-inbox'
       path: '/check-your-inbox'
@@ -152,10 +199,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppContactsRoute: typeof AppContactsRoute
+  AppListsRoute: typeof AppListsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppContactsRoute: AppContactsRoute,
+  AppListsRoute: AppListsRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

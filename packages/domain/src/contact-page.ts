@@ -4,6 +4,9 @@ import { Contact } from "./contact.ts";
 import { Count } from "./count.ts";
 import { ContactIdSchema } from "./ids.ts";
 
+/** How many items one page of a long collection holds (ADR 0008). */
+export const PAGE_SIZE = 50;
+
 /**
  * One page of an Organization's Contacts, newest first (ADR 0008). `total`
  * counts every Contact the filters match, and `start` is how many of them

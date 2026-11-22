@@ -1,6 +1,5 @@
 import { assert, layer } from "@effect/vitest";
-import { PAGE_SIZE } from "@repo/db";
-import { Contact, ListIdSchema } from "@repo/domain";
+import { Contact, ListIdSchema, PAGE_SIZE } from "@repo/domain";
 import { Effect, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 

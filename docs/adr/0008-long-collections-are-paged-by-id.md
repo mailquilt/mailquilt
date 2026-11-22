@@ -1,6 +1,6 @@
 # Long collections are paged by ID, newest first
 
-An endpoint whose collection can grow without bound, such as an Organization's Contacts, returns one page at a time. Items come newest first, ordered by ID, and the server fixes the page size (`PAGE_SIZE`, 50 items, in `packages/db/src/page.ts`). The page holds:
+An endpoint whose collection can grow without bound, such as an Organization's Contacts, returns one page at a time. Items come newest first, ordered by ID, and the server fixes the page size (`PAGE_SIZE`, 50 items, in `@repo/domain`, so the dashboard counts pages with the same number). The page holds:
 
 - the items;
 - `next`, the ID of its last item when an older page follows, and `previous`, the ID of its first item when a newer page precedes it, or `null` at either end;

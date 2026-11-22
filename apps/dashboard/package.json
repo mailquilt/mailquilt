@@ -28,6 +28,7 @@
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
     "@tanstack/react-start": "catalog:",
+    "@tanstack/react-table": "catalog:",
     "better-auth": "catalog:",
     "effect": "catalog:",
     "react": "catalog:",
