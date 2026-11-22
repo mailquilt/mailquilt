@@ -6,13 +6,15 @@ import {
   BASE_URL,
   clickTarget,
   openPage,
+  pressKey,
   readArgs,
   renderSheet,
   sleep,
+  typeText,
 } from "./chrome.mjs";
 
 const USAGE =
-  "Usage: node screens.mjs --out <dir> [--path /] [--name screen] [--widths 320,390,768,1024,1440,1920] [--themes light,dark] [--click <selector or text=Label>]... [--wait 2500]";
+  "Usage: node screens.mjs --out <dir> [--path /] [--name screen] [--widths 320,390,768,1024,1440,1920] [--themes light,dark] [--step click=<selector or text=Label> | type=<text> | press=<Enter|Escape|Tab>]... [--block <url pattern>]... [--wait 2500]";
 
 const args = readArgs(process.argv.slice(2));
 
@@ -29,7 +31,8 @@ const widths = (args.widths ?? "320,390,768,1024,1440,1920")
   .map(Number);
 
 const themes = (args.themes ?? "light,dark").split(",");
-const clicks = [args.click ?? []].flat();
+const steps = [args.step ?? []].flat();
+const blocked = [args.block ?? []].flat();
 const wait = Number(args.wait ?? 2500);
 const SHEET_ROW_HEIGHT = 420;
 const shots = [];
@@ -40,18 +43,35 @@ for (const theme of themes) {
   for (const width of widths) {
     const page = await openPage({ theme, width });
 
+    if (blocked.length > 0) {
+      await page.send("Network.setBlockedURLs", { urls: blocked });
+    }
+
     await page.send("Page.navigate", { url: `${BASE_URL}${args.path ?? "/"}` });
     await sleep(wait);
 
-    for (const target of clicks) {
-      const result = await clickTarget(page, target);
+    for (const step of steps) {
+      const [kind, ...rest] = step.split("=");
+      const value = rest.join("=");
 
-      if (result === "missing") {
-        console.warn(`${width}px ${theme}: nothing matched ${target}`);
+      if (kind === "click") {
+        const result = await clickTarget(page, value);
+
+        if (result !== "clicked") {
+          console.warn(`${width}px ${theme}: ${result} ${value}`);
+        }
+      } else if (kind === "type") {
+        await typeText(page, value);
+      } else {
+        await pressKey(page, value);
       }
 
       await sleep(800);
     }
+
+    const focus = await page.evaluate(
+      `(() => { const element = document.activeElement; return element.tagName.toLowerCase() + " " + JSON.stringify(element.getAttribute("aria-label") ?? element.textContent.trim().slice(0, 60)); })()`
+    );
 
     const shot = await page.send("Page.captureScreenshot", { format: "png" });
     const file = `${name}-${width}-${theme}.png`;
@@ -59,7 +79,7 @@ for (const theme of themes) {
     writeFileSync(path.join(out, file), Buffer.from(shot.result.data, "base64"));
     shots.push({ file, theme, width });
     page.close();
-    console.log(file);
+    console.log(`${file}  focus: ${focus}`);
   }
 }
 

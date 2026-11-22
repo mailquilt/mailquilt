@@ -40,22 +40,30 @@ Set up the data each state needs through the API with that cookie (for example, 
 # Every width in light and dark, with a contact sheet <name>-matrix.png
 node $S/screens.mjs --out /tmp/shots --name home --path /
 
-# The same with something open: a selector, or text=Label for a button or menu item
-node $S/screens.mjs --out /tmp/shots --name switcher --click '[aria-label^="Organization:"]'
-node $S/screens.mjs --out /tmp/shots --name new-org \
-  --click '[aria-label^="Organization:"]' --click 'text=New organization'
+# With steps first, run in order: click=<selector or text=Label>, type=<text>, press=Enter|Escape|Tab
+node $S/screens.mjs --out /tmp/shots --name switcher --step 'click=[aria-label^="Organization:"]'
+node $S/screens.mjs --out /tmp/shots --name new-org-error --widths 390,1440 \
+  --step 'click=[aria-label^="Organization:"]' --step 'click=text=New organization' \
+  --step 'press=Enter'
+
+# An error state: block a request, as if it failed
+node $S/screens.mjs --out /tmp/shots --name orgs-failed --block '*/api/organizations' --wait 9000
 
 # Every frame painted while the screen loads, with 120 ms of latency
 node $S/filmstrip.mjs --out /tmp/shots --name home-load --path / --width 1280
 ```
 
-Widths default to 320, 390, 768, 1024, 1440 and 1920. Phones (below 700 px) are emulated as mobile, so dialogs open as sheets.
+- Widths default to 320, 390, 768, 1024, 1440 and 1920. Phones (below 700 px) are emulated as mobile, so dialogs open as sheets.
+- Clicks are real mouse clicks at the element's centre, and keys are real key presses, so focus moves as it does for a person. Each line of output names what has focus in that shot: use it to check focus paths (where focus goes when a dialog opens and closes, after a submit, after an error).
+- `text=Label` matches the start of an element's text, so a menu row whose text continues ("Bolt WeeklyOwner") is found.
+- The scripts refuse to click Sign out, Delete, Remove or Revoke, so a run can't end the session or delete data. Sign-in is rate-limited, so a lost session costs a wait.
+- A request the page retries (TanStack Query retries three times by default) needs a longer `--wait` before its error shows.
 
 On phones the sidebar is a sheet, so anything in it (the Organization switcher, the account menu, navigation) is only reachable once the sheet is open. Shoot phones separately and open it first, as a person would, or the screenshot shows a menu no one can see:
 
 ```bash
 node $S/screens.mjs --out /tmp/shots --name switcher-phone --widths 320,390 \
-  --click '[aria-label="Open navigation"]' --click '[aria-label^="Organization:"]'
+  --step 'click=[aria-label="Open navigation"]' --step 'click=[aria-label^="Organization:"]'
 ```
 
 ## 4. Look, to find faults
@@ -66,4 +74,4 @@ Open every image yourself. You are looking for what is wrong, not confirming tha
 - **Matrix:** text that wraps or is cut off, controls that change size between rows, elements that don't line up with their neighbours, and anything that looks like an unexamined Kumo default (see "Question every default" in design.md).
 - **Phone:** dialogs are sheets with full-width actions, fields are 16 px, and nothing sits under the iPhone home indicator.
 
-Attach the matrix and filmstrip PNGs to the pull request, and answer each design.md checklist item with the image or test that shows it.
+Then hand the evidence to a fresh design reviewer (design.md, step 7), and in the pull request say what was checked and what was found. Attach images only where a reviewer needs to see a visual change.

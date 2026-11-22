@@ -42,7 +42,7 @@ Before designing or changing any screen, read `docs/agents/design.md`. It sets t
 Two gates apply to every ticket, `ready-for-agent` ones included:
 
 - **Stop at mockups.** Any new screen, component, menu, dialog or sheet is shown as rendered mockups (desktop and phone, light and dark, every state) and waits for the maintainer's pick before any code. Only copy, spacing and token changes inside an existing component skip this.
-- **Done means evidence.** UI is done only with the evidence `docs/agents/design.md` lists: the screenshot matrix, the dialogs and menus open on a phone, a load recording, and the checklist answered item by item. Make them with the `dashboard-screens` skill.
+- **Done means checked.** UI is done only after the evidence `docs/agents/design.md` lists has been made and inspected (the screenshot matrix, dialogs and menus open on a phone, a load recording, focus checked in a real browser) and a fresh design reviewer has worked through it. The pull request says what was checked and found. Make the evidence with the `dashboard-screens` skill.
 
 ### Running commands
 

@@ -15,16 +15,25 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
 
 1. **UX first.** Write down the screen's job, who arrives and in what state, every state it has (loading, empty, error, success, disabled), and its copy, before any styling.
 2. **Mock up anything new, then stop.** Every new screen, component, menu, dialog or sheet is shown as rendered mockups before it is built: desktop and phone, light and dark, every state from step 1. Show two or three directions with a recommendation, and wait for the maintainer's pick. This holds on a `ready-for-agent` ticket too. Only copy, spacing and token changes inside an existing component skip this step.
-3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes and its motion. Keep a default only when it is right for this screen, and say which ones you kept. From #6: Kumo pins dialogs near the top of the window; `LayerDialog` puts its desktop card inside the phone drawer; Kumo inputs are 14px, so Safari on iPhone zooms into them.
+3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes, its focus and its motion. Keep a default only when it is right for this screen, and say which ones you kept. Defaults that cost a round on #6:
+   - Kumo pins dialogs near the top of the window, and `LayerDialog` puts its desktop card inside the phone drawer.
+   - `LayerDialog` focuses its own frame when it opens, not its field, and has no option to change that.
+   - Kumo inputs are 14px at every size, so Safari on iPhone and iPad zooms into them.
+   - Menu radio items stay open after a click (`closeOnClick` is off).
+   - A loading `Button`'s accessible name includes its spinner's label.
+   - Kumo bundles its own copy of Base UI, so importing `@base-ui/react` ships a second one.
 4. **Build** with the dashboard's tokens and building blocks (`apps/dashboard/README.md`, "Design"). Use the `frontend-design` skill for visual direction and the `kumo-design` skill for the rules of the component system.
 5. **Review** against the `kumo-design` rules and the checklist below. Where a rule is deliberately broken, the code or this page says why. A correctness review (`code-review`) is not a design review.
-6. **Show the evidence.** UI work is done only when the pull request has:
-   - screenshots at 320, 390, 768, 1024 and 1440 px wide, plus one wider screen, in light and dark, for every state. The 768–1279 px range is the one most often missed;
+6. **Make the evidence and look at it, to find faults.** Before calling UI done, produce and inspect:
+   - screenshots at 320, 390, 768, 1024 and 1440 px wide, plus one wider screen, in light and dark, for every state, including errors. The 768–1279 px range is the one most often missed;
    - every dialog, sheet and menu open, on a phone and on desktop;
    - a frame-by-frame recording of the screen loading with 120 ms of network latency, in which nothing already drawn moves or changes;
-   - each item of the checklist below answered with the screenshot or test that shows it.
+   - focus and keyboard paths checked in a real browser with real clicks and keys. Component tests run in happy-dom, where a scripted click doesn't move focus as a person's does.
 
-   The `dashboard-screens` skill makes the screenshots and the recording. Tests passing is not evidence of design, and "I looked at it" is not evidence at all.
+   The `dashboard-screens` skill makes all of these. Tests passing is not evidence of design.
+
+7. **Get a fresh design review.** Give a reviewer agent that hasn't seen your work this page, the brand docs, the `kumo-design` and `frontend-design` skills, the code and the evidence, but not your conclusions. Fix each finding or say why it stays. On #6 this found seven defects the author's own review had passed.
+8. **Say what was checked in the pull request:** each checklist item with what showed it, what the design review found and what changed. Images go in only when a human reviewer needs to see a visual change, such as a before and after; attach them by hand. The value is in making and inspecting them, not in attaching them.
 
 ## Brand
 
@@ -54,7 +63,7 @@ Run this on every UI change, and explain each finding in plain words: what a use
    - Each component has one job, a small props API, and no dead code.
    - Names say what things are.
 6. **React and types:** no needless casts. Effects clean up and have the right dependencies. Keys are stable, and hooks follow the rules.
-7. **Performance:** watch what each font, icon set and library adds to the bundle. Avoid needless re-renders. Animate `transform` and `opacity` only.
+7. **Performance:** watch what each font, icon set and library adds to the bundle. A new dependency states its cost: the gzipped JavaScript total from a build before and after. Avoid needless re-renders. Animate `transform` and `opacity` only.
 8. **Privacy and security:** no personal data in URLs or logs. External links use `rel="noopener noreferrer"`. No open redirects.
 9. **Copy:** plain and true, with the same name for an action everywhere it appears. Nothing on screen promises a feature that doesn't exist.
 10. **Tests:** behaviour tests at the right level (`docs/agents/testing.md`), each seen failing without its code.

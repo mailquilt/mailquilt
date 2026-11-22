@@ -22,6 +22,7 @@ Closes #
 For a change to the dashboard (see `docs/agents/design.md`):
 
 - [ ] The maintainer picked this design from rendered mockups before it was built, or the change is only copy, spacing or tokens
-- [ ] Screenshots at every width in light and dark, for every state, are attached, with each dialog, sheet and menu open on a phone and on desktop
-- [ ] A load recording is attached, and nothing already drawn moves or changes in it
-- [ ] Each item of the design checklist is answered with the screenshot or test that shows it
+- [ ] Screenshots at every width in light and dark, for every state, each dialog, sheet and menu open on a phone and on desktop, and a load recording were made and inspected; nothing already drawn moves or changes on load
+- [ ] Focus and keyboard paths were checked in a real browser
+- [ ] A fresh design reviewer worked through the evidence; its findings are fixed or answered here
+- [ ] Each item of the design checklist is answered with what showed it. Images are attached only where a reviewer needs to see a visual change

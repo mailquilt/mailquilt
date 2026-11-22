@@ -145,23 +145,69 @@ export const openPage = async ({ width, theme }) => {
 };
 
 /**
- * Clicks the element `target` names: a CSS selector, or `text=Label` for the
- * last button, link or menu item whose text is exactly that. Kumo menus open
- * on pointer down, so a pointer down comes first.
+ * Clicks the element `target` names with a real mouse click at its centre,
+ * as a person would, so focus moves as it does for them. `target` is a CSS
+ * selector, or `text=Label` for the last button, link or menu item whose
+ * text starts with that. Sign out and destructive actions are refused, so a
+ * screenshot run can't end the session or delete data.
  */
-export const clickTarget = (page, target) =>
-  page.evaluate(`(() => {
+export const clickTarget = async (page, target) => {
+  const found = await page.evaluate(`(() => {
     const target = ${JSON.stringify(target)};
     const element = target.startsWith("text=")
       ? [...document.querySelectorAll("button, a, [role=menuitem], [role=menuitemradio], [role=option], [role=tab]")]
-          .filter((candidate) => candidate.textContent.trim() === target.slice(5))
+          .filter((candidate) => candidate.textContent.trim().startsWith(target.slice(5)))
           .at(-1)
       : document.querySelector(target);
-    if (!element) return "missing";
-    element.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
-    element.click();
-    return "clicked";
+    if (!element) return null;
+    if (/^(sign out|delete|remove|revoke)/iu.test(element.textContent.trim())) return "refused";
+    element.scrollIntoView({ block: "center" });
+    const box = element.getBoundingClientRect();
+    return JSON.stringify({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
   })()`);
+
+  if (found === null || found === "refused") {
+    return found ?? "missing";
+  }
+
+  const { x, y } = JSON.parse(found);
+
+  for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+    await page.send("Input.dispatchMouseEvent", {
+      button: "left",
+      clickCount: 1,
+      type,
+      x,
+      y,
+    });
+  }
+
+  return "clicked";
+};
+
+/** Types into whatever has focus, as a keyboard would. */
+export const typeText = (page, text) => page.send("Input.insertText", { text });
+
+const KEYS = {
+  Enter: { code: "Enter", text: "\r", windowsVirtualKeyCode: 13 },
+  Escape: { code: "Escape", windowsVirtualKeyCode: 27 },
+  Tab: { code: "Tab", windowsVirtualKeyCode: 9 },
+};
+
+/**
+ * Presses a key as a keyboard would. Enter carries "\r" as its text, which
+ * Chrome needs before it submits a form.
+ */
+export const pressKey = async (page, key) => {
+  const details = KEYS[key];
+
+  if (!details) {
+    throw new Error(`Unknown key ${key}. Known: ${Object.keys(KEYS).join(", ")}`);
+  }
+
+  await page.send("Input.dispatchKeyEvent", { key, type: "keyDown", ...details });
+  await page.send("Input.dispatchKeyEvent", { key, type: "keyUp", ...details });
+};
 
 /** Renders an HTML contact sheet, all of it, to PNG bytes. */
 export const renderSheet = async (htmlPath, width) => {
