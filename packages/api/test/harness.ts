@@ -141,6 +141,12 @@ const setUpInstance = (
       })
     );
 
+    if (!signedIn.ok) {
+      return yield* Effect.die(
+        new Error("The test install's instance admin couldn't sign in")
+      );
+    }
+
     const cookie = signedIn.headers
       .getSetCookie()
       .map((value) => value.split(";")[0])

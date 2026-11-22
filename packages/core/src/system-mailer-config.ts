@@ -34,12 +34,6 @@ export class SystemMailerConfig extends Context.Service<
   Option.Option<SystemMailerSmtp>
 >()("@repo/core/SystemMailerConfig") {}
 
-/** No System Mailer in the environment; the instance settings decide. */
-export const NoSystemMailerConfig = Layer.succeed(
-  SystemMailerConfig,
-  Option.none()
-);
-
 const VARIABLES = {
   fromEmail: "SYSTEM_MAILER_FROM_EMAIL",
   fromName: "SYSTEM_MAILER_FROM_NAME",
@@ -51,8 +45,6 @@ const VARIABLES = {
 } as const;
 
 const decodeCredentials = Schema.decodeUnknownOption(SmtpCredentials);
-
-const optional = <T>(config: Config.Config<T>) => Config.option(config);
 
 const misconfigured = (problem: string) =>
   Effect.die(
@@ -71,13 +63,15 @@ export const SystemMailerConfigFromEnv = Layer.effect(
   SystemMailerConfig,
   Effect.gen(function* systemMailerConfigFromEnv() {
     const values = yield* Config.all({
-      fromEmail: optional(Config.schema(MailAddress, VARIABLES.fromEmail)),
-      fromName: optional(Config.schema(SenderName, VARIABLES.fromName)),
-      host: optional(Config.schema(SmtpHost, VARIABLES.host)),
-      password: optional(Config.Redacted(VARIABLES.password)),
-      port: optional(Config.schema(SmtpPort, VARIABLES.port)),
-      security: optional(Config.schema(SmtpSecuritySchema, VARIABLES.security)),
-      username: optional(Config.Redacted(VARIABLES.username)),
+      fromEmail: Config.option(Config.schema(MailAddress, VARIABLES.fromEmail)),
+      fromName: Config.option(Config.schema(SenderName, VARIABLES.fromName)),
+      host: Config.option(Config.schema(SmtpHost, VARIABLES.host)),
+      password: Config.option(Config.Redacted(VARIABLES.password)),
+      port: Config.option(Config.schema(SmtpPort, VARIABLES.port)),
+      security: Config.option(
+        Config.schema(SmtpSecuritySchema, VARIABLES.security)
+      ),
+      username: Config.option(Config.Redacted(VARIABLES.username)),
     }).pipe(Effect.orDie);
 
     if (

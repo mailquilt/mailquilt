@@ -91,14 +91,6 @@ export const instanceStatus = Effect.gen(function* instanceStatus() {
   return yield* instance.status;
 });
 
-/**
- * Whether a new account may be made through sign-up: only once setup has
- * made the instance admin, and only while sign-up is open.
- */
-export const signUpAllowed = instanceStatus.pipe(
-  Effect.map((status) => status.setUp && status.signUp === "open")
-);
-
 /** First-run setup: makes the instance admin, once. */
 export const setUpInstance = (admin: NewInstanceAdmin) =>
   Effect.gen(function* setUpInstanceAdmin() {

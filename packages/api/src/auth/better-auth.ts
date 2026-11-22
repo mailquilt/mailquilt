@@ -1,6 +1,10 @@
 import type { Instance, SystemMailer } from "@repo/core";
-import { RateLimiter, sendEmailVerification, signUpAllowed } from "@repo/core";
-import { MIN_PASSWORD_LENGTH, SIGN_UP_CLOSED } from "@repo/domain";
+import { instanceStatus, RateLimiter, sendEmailVerification } from "@repo/core";
+import {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  SIGN_UP_CLOSED,
+} from "@repo/domain";
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { Duration, Effect, Option, Redacted, Schema } from "effect";
@@ -84,16 +88,21 @@ export const makeAuth = Effect.gen(function* makeAuth() {
     disabledPaths: DISABLED_AUTH_PATHS,
     emailAndPassword: {
       enabled: true,
+      maxPasswordLength: MAX_PASSWORD_LENGTH,
       minPasswordLength: MIN_PASSWORD_LENGTH,
       requireEmailVerification: true,
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/sign-up/email") {
-          if (!(await runPromise(signUpAllowed))) {
+          const status = await runPromise(instanceStatus);
+
+          if (!status.setUp || status.signUp !== "open") {
             throw new APIError("FORBIDDEN", {
               code: SIGN_UP_CLOSED,
-              message: "Sign-up is invite-only on this Mailquilt.",
+              message: status.setUp
+                ? "Sign-up is invite-only on this Mailquilt."
+                : "This Mailquilt isn’t set up yet. Its first-run setup makes the first account.",
             });
           }
 

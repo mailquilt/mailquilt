@@ -1,5 +1,5 @@
 import { VERIFICATION_EMAIL_SUBJECT } from "@repo/domain";
-import { Context, Effect, Layer, Option } from "effect";
+import { Cause, Context, Effect, Layer, Option } from "effect";
 
 import { Instance } from "./instance.ts";
 import { SmtpProvider } from "./provider.ts";
@@ -24,9 +24,10 @@ export class SystemMailer extends Context.Service<
 /**
  * The System Mailer: sends through the SMTP server set by environment
  * variables, or else the one saved in the instance settings. With neither,
- * or when the server refuses, the email isn't sent and a warning is logged
- * with the subject only. The address and the server's reply, which often
- * quotes the address, never reach the log.
+ * when the saved one can't be read, or when the server refuses, the email
+ * isn't sent and a warning is logged; sending never fails. The log has the
+ * subject, never the address or the server's reply, which often quotes the
+ * address.
  */
 export const SystemMailerLive = Layer.effect(
   SystemMailer,
@@ -38,9 +39,22 @@ export const SystemMailerLive = Layer.effect(
     return {
       send: (email) =>
         Effect.gen(function* sendSystemEmail() {
-          const mailer = Option.isSome(fromEnvironment)
-            ? fromEnvironment
-            : yield* instance.systemMailerWithCredentials;
+          const mailer = yield* (
+            Option.isSome(fromEnvironment)
+              ? Effect.succeed(fromEnvironment)
+              : instance.systemMailerWithCredentials
+          ).pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning(
+                "System Mailer settings couldn't be read; an account email was not sent",
+                { cause: Cause.pretty(cause), subject: email.subject }
+              ).pipe(Effect.as(undefined))
+            )
+          );
+
+          if (mailer === undefined) {
+            return;
+          }
 
           if (Option.isNone(mailer)) {
             return yield* Effect.logWarning(
@@ -66,6 +80,26 @@ export const SystemMailerLive = Layer.effect(
               )
             );
         }),
+    };
+  })
+);
+
+/**
+ * Makes a System Mailer's `send` answer at once and send afterwards.
+ * Otherwise sign-up answers more slowly for a new address, which is sent a
+ * link, than for one that already has an account, which isn't, and the
+ * delay reveals who has an account. Only for a runtime whose process
+ * outlives the request, such as Node; a Worker's connections close with its
+ * response.
+ */
+export const SystemMailerAfterResponding = Layer.effect(
+  SystemMailer,
+  Effect.gen(function* systemMailerAfterResponding() {
+    const mailer = yield* SystemMailer;
+
+    return {
+      send: (email) =>
+        mailer.send(email).pipe(Effect.forkDetach, Effect.asVoid),
     };
   })
 );

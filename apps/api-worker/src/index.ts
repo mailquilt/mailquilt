@@ -55,6 +55,7 @@ const authConfigLive = (env: Env) =>
 const makeApp = (env: Env) =>
   HttpRouter.toWebHandler(
     ApiLive.pipe(
+      // WARNING: a Worker's connections close with its response, so account emails are sent before it; with SMTP here (#11), keep sign-up's answer from waiting on them.
       providePerRequest(
         SystemMailerLive.pipe(
           Layer.provideMerge(

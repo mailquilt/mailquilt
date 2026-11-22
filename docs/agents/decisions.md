@@ -37,8 +37,10 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - The instance admin's email is marked verified at setup, because a fresh install has no System Mailer yet (ADR 0011, #7).
 - Sign-up is invite-only by default, and refused before setup too, with 403 `SIGN_UP_CLOSED`. Until invitations (#34), invite-only means nobody can sign up (#7).
 - The System Mailer sends through SMTP, with the same adapter and outbound guard as Provider Connections. Its saved credentials are sealed and write-only, and only go to the server they were entered for, as a Provider Connection's do (#7).
-- `SYSTEM_MAILER_*` environment variables win over the System Mailer saved on the settings page, which then can't be changed (409 `SystemMailerFromEnvironment`). Some set but not all that are needed stops the app (#7).
-- An account email that can't be sent is logged with its subject and the failure's reason, never the address or the server's reply, which often quotes it. Sign-up still succeeds (#7).
+- `SYSTEM_MAILER_*` environment variables win over the System Mailer saved on the settings page, which then can't be changed (409 `SystemMailerFromEnvironment`). Some set but not all that are needed stops the app on Node; a Worker answers 500 to every request instead, saying why in its log (#7).
+- An account email that can't be sent, including when the saved System Mailer can't be read, is logged with its subject and the failure's reason, never the address or the server's reply, which often quotes it. Sign-up still succeeds (#7).
+- On Node the System Mailer answers at once and sends afterwards, so sign-up takes as long for a new address as for one with an account. On Workers it sends before answering, which is safe only while SMTP fails at once there; #11 must keep it so (#7).
+- A new password is 8 to 128 characters, the most Better Auth signs in with, so setup can't make an instance admin who can never sign in (#7).
 
 ## Data
 

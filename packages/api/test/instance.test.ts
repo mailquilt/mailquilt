@@ -1,6 +1,6 @@
 import { assert, layer } from "@effect/vitest";
 import { SmtpOutbox } from "@repo/core/testing";
-import { SIGN_UP_CLOSED } from "@repo/domain";
+import { MAX_PASSWORD_LENGTH, SIGN_UP_CLOSED } from "@repo/domain";
 import { Effect, Option, Redacted, Schema } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -100,6 +100,25 @@ layer(makeTestApp({ install: "fresh", systemMailer: "smtp" }), {
 
         assert.strictEqual(refused.status, 403);
         assert.strictEqual(yield* errorCode(refused), SIGN_UP_CLOSED);
+      })
+  );
+
+  test.effect(
+    "refuses a setup password longer than Better Auth signs in with",
+    () =>
+      Effect.gen(function* passwordTooLong() {
+        const client = yield* ApiClient;
+
+        const refused = yield* send("POST", "/api/instance/setup", {
+          body: {
+            email: uniqueEmail(),
+            name: "Ada",
+            password: "p".repeat(MAX_PASSWORD_LENGTH + 1),
+          },
+        });
+
+        assert.strictEqual(refused.status, 400);
+        assert.isFalse((yield* client.instance.status()).setUp);
       })
   );
 
@@ -328,6 +347,48 @@ layer(makeTestApp({ install: "invite-only", systemMailer: "smtp" }), {
           ),
           Option.some([USERNAME, PASSWORD])
         );
+      })
+  );
+
+  test.effect(
+    "still answers sign-up and a new verification link when the saved System Mailer can't be read",
+    () =>
+      Effect.gen(function* unreadableSystemMailer() {
+        const admin = yield* adminClient;
+        const sql = yield* SqlClient.SqlClient;
+
+        yield* admin.instance.updateSignUp({ payload: { signUp: "open" } });
+        yield* admin.instance.updateSystemMailer({
+          payload: {
+            credentials: {
+              password: Redacted.make(PASSWORD),
+              username: Redacted.make(USERNAME),
+            },
+            from: FROM,
+            smtp: SMTP,
+          },
+        });
+
+        yield* sql`update instance set system_mailer_credentials_key_version = 99`;
+
+        const email = uniqueEmail();
+
+        assert.strictEqual((yield* signUp(email)).status, 200);
+
+        const resent = yield* send(
+          "POST",
+          "/api/auth/send-verification-email",
+          {
+            body: { email },
+          }
+        );
+
+        assert.strictEqual(resent.status, 200);
+        assert.deepStrictEqual(yield* sentTo(email), []);
+
+        yield* admin.instance.updateSystemMailer({
+          payload: { credentials: null, from: FROM, smtp: SMTP },
+        });
       })
   );
 

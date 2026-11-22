@@ -76,11 +76,11 @@ export { CurrentUser } from "./current-user.ts";
 export {
   sendEmailVerification,
   SystemMailer,
+  SystemMailerAfterResponding,
   SystemMailerLive,
 } from "./system-mailer.ts";
 
 export {
-  NoSystemMailerConfig,
   SystemMailerConfig,
   SystemMailerConfigFromEnv,
 } from "./system-mailer-config.ts";
@@ -93,7 +93,6 @@ export {
   Instance,
   instanceStatus,
   setUpInstance,
-  signUpAllowed,
   updateSignUp,
   updateSystemMailer,
 } from "./instance.ts";
