@@ -68,7 +68,9 @@ export const AppFetch =
 
 /**
  * The whole API assembled as the entry apps assemble it, with a migrated,
- * real Postgres from Testcontainers and the System Mailer outbox. Requests go
+ * real Postgres from Testcontainers and the System Mailer outbox. Its
+ * `SqlClient` reaches that Postgres directly, to set up states no endpoint
+ * can make yet; tests still check results through the API. Requests go
  * through the same web handler the Worker uses, so routing, encoding and
  * decoding are the real ones.
  */
@@ -83,6 +85,10 @@ export const TestApp = Layer.effectContext(
     );
 
     const mailer = yield* Layer.build(SystemMailerOutboxLive);
+
+    const database = yield* Layer.build(
+      PgClient.layer({ url: Redacted.make(databaseUrl) })
+    );
 
     const app = yield* Effect.acquireRelease(
       Effect.sync(() =>
@@ -105,7 +111,8 @@ export const TestApp = Layer.effectContext(
 
     return Context.make(ApiClient, client).pipe(
       Context.add(AppFetch, fetchInProcess),
-      Context.merge(mailer)
+      Context.merge(mailer),
+      Context.merge(database)
     );
   })
 );

@@ -67,6 +67,42 @@ export const newMemberId = newId("mem").pipe(
   Effect.map((id) => MemberIdSchema.make(id))
 );
 
+/** A Contact's ID, `cnt_…`. */
+export const ContactIdSchema = Schema.String.check(hasPrefix("cnt")).pipe(
+  Schema.brand("ContactId")
+);
+
+export type ContactId = typeof ContactIdSchema.Type;
+
+/** A new Contact ID. IDs made later sort after earlier ones. */
+export const newContactId = newId("cnt").pipe(
+  Effect.map((id) => ContactIdSchema.make(id))
+);
+
+/** A List's ID, `lst_…`. */
+export const ListIdSchema = Schema.String.check(hasPrefix("lst")).pipe(
+  Schema.brand("ListId")
+);
+
+export type ListId = typeof ListIdSchema.Type;
+
+/** A new List ID. IDs made later sort after earlier ones. */
+export const newListId = newId("lst").pipe(
+  Effect.map((id) => ListIdSchema.make(id))
+);
+
+/** A Subscription's ID, `sub_…`. */
+export const SubscriptionIdSchema = Schema.String.check(hasPrefix("sub")).pipe(
+  Schema.brand("SubscriptionId")
+);
+
+export type SubscriptionId = typeof SubscriptionIdSchema.Type;
+
+/** A new Subscription ID. IDs made later sort after earlier ones. */
+export const newSubscriptionId = newId("sub").pipe(
+  Effect.map((id) => SubscriptionIdSchema.make(id))
+);
+
 /** A signed-in person. Better Auth makes these IDs, so they have no prefix. */
 export const UserIdSchema = Schema.String.pipe(Schema.brand("UserId"));
 
