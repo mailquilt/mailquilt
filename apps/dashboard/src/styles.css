@@ -77,6 +77,8 @@
   --mq-patch-ink: #111113;
   --mq-patch-grey: #71717a;
   --mq-patch-pale: #d4d4d8;
+  --mq-danger-button: #b91c1c;
+  --mq-danger-button-hover: #991b1b;
 
   --text-color-kumo-default: #27272a;
   --text-color-kumo-strong: #111113;
@@ -167,8 +169,7 @@
    * --color-kumo-brand with white text. Primary actions here are flat ink in
    * light mode and flat near-white with ink text in dark mode, so these
    * declarations must be !important to win over the inline style and Kumo's
-   * !text-white utility. Destructive buttons mix --color-kumo-danger instead
-   * and keep Kumo's look.
+   * !text-white utility.
    */
   [data-theme="mailquilt"]
     :is(
@@ -193,6 +194,38 @@
     ) !important;
     --kumo-button-emphasis-gradient-end: var(
       --color-kumo-brand-hover
+    ) !important;
+  }
+
+  /*
+   * WARNING: Kumo's destructive buttons are a gradient mixed from
+   * --color-kumo-danger, as light as red-400 at the top, where white text is
+   * about 3:1. They are flat --mq-danger-button instead (6.5:1 with white),
+   * in both modes, with the same !important as the primary override.
+   */
+  [data-theme="mailquilt"]
+    :is(
+      [data-kumo-component="Button"],
+      [data-kumo-component="LinkButton"]
+    )[style*="--color-kumo-danger"] {
+    --kumo-button-emphasis-bg: var(--mq-danger-button) !important;
+    --kumo-button-emphasis-ring: var(--mq-danger-button) !important;
+    --kumo-button-emphasis-gradient-start: var(--mq-danger-button) !important;
+    --kumo-button-emphasis-gradient-end: var(--mq-danger-button) !important;
+    color: #ffffff !important;
+  }
+
+  [data-theme="mailquilt"]
+    :is(
+      [data-kumo-component="Button"],
+      [data-kumo-component="LinkButton"]
+    )[style*="--color-kumo-danger"]:not(:disabled):hover {
+    --kumo-button-emphasis-bg: var(--mq-danger-button-hover) !important;
+    --kumo-button-emphasis-gradient-start: var(
+      --mq-danger-button-hover
+    ) !important;
+    --kumo-button-emphasis-gradient-end: var(
+      --mq-danger-button-hover
     ) !important;
   }
 

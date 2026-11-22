@@ -1,3 +1,5 @@
+import { PageFrame } from "./page-frame.tsx";
+
 /**
  * A signed-in page built around a table: its heading, what it holds and its
  * main actions above, and the table below at full width, beside the sidebar.
@@ -14,7 +16,7 @@ export const TablePage = ({
   description: string;
   title: string;
 }) => (
-  <div className="mx-auto w-full max-w-[80rem] px-4 pt-6 pb-12 sm:px-6 md:px-10 md:pt-10">
+  <PageFrame>
     <header className="mb-5 flex flex-col gap-4 sm:mb-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 flex-col gap-1.5">
         <h1 className="font-display text-display font-semibold text-kumo-strong">
@@ -31,5 +33,5 @@ export const TablePage = ({
       )}
     </header>
     {children}
-  </div>
+  </PageFrame>
 );

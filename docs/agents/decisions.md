@@ -2,7 +2,7 @@
 
 Accepted limits, and rules a review doesn't raise again unless something has changed since, such as a bug report or a new feature that depends on them. A pull request that changes one of these says so, gives the reason and updates this page.
 
-The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), tenant endpoints that name the Organization in the path (0007), and long collections paged by ID (0008). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
+The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), tenant endpoints that name the Organization in the path (0007), long collections paged by ID (0008), secrets sealed under versioned keys bound to their row (0009), and outbound connections going to the address the guard checked (0010). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
 
 ## Consent and sending
 
@@ -24,6 +24,12 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Cloudflare Email is labelled beta, because Cloudflare's docs describe it for transactional mail and haven't confirmed bulk sending.
 - SES is called through `aws4fetch` on both targets, so one adapter runs on Workers and Node.
 - Plain SMTP has no bounce handling beyond signed bounce addresses until bounce-mailbox polling in P2.
+- An SMTP Provider Connection's encryption is `tls` (from the start), `starttls` or `none`. `starttls` refuses a server that doesn't offer STARTTLS rather than sending unencrypted (#9).
+- Both the SMTP username and password are credentials: sealed, write-only, never returned. Some services, such as Postmark, use the same secret token for both (#9).
+- A test email goes to any address the member types, through the connection's default sender, at most 10 every 10 minutes per person across Organizations. When the Provider refuses it, the API answers 502 `SendFailed` with the Provider's own words, so the member can fix the settings (#9).
+- A Provider Connection can be edited and deleted. An edit that leaves credentials out keeps them; `null` removes them. Changing the host, port or encryption while keeping saved credentials is refused (`CredentialsRequired`), so a member can't send someone else's password to a server they control or unencrypted (#9).
+- A DNS lookup that fails (timeout, server failure) is reported as `unreachable` with the resolver's reason; only a name with no address is `host-not-found` (#9).
+- Until the Workers SMTP adapter (#11), an SMTP Provider Connection can be saved on Cloudflare, and sending through it fails with `SendFailed` reason `unavailable` (#9).
 
 ## Data
 
@@ -45,7 +51,8 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Better Auth sits behind our own allow list of endpoints. `disabledPaths` is only a second layer, and plugins we don't use aren't installed.
 - Better Auth's rate limiter uses our `RateLimiter` port in every environment. Its in-memory store is never used.
 - The client IP is read only from the configured header: `cf-connecting-ip` on Cloudflare, the proxy's header on Docker.
-- Every outbound request to a user-chosen address goes through the outbound guard. It's always on for hosted; self-hosted installs allow private networks by default.
+- Every outbound request to a user-chosen address goes through the outbound guard, and connects to the address it checked (ADR 0010). It's always on for hosted; self-hosted installs allow private networks and loopback by default. Cloud metadata, link-local and reserved addresses are always refused (#9).
+- Secrets at rest are sealed with AES-256-GCM under `ENCRYPTION_KEYS`, bound to their row; the app doesn't start without valid keys (ADR 0009, #9).
 - On the hosted service, public pages are served from a domain that never receives cookies, and open and click tracking requires the Organization's own tracking domain.
 - Redis isn't used. A Redis rate limiter is added only if several replicas or measured Postgres load need it.
 - Self-hosted installs send no usage telemetry, only an update check that can be turned off.

@@ -11,12 +11,16 @@ import { FormField } from "../forms/form-field.tsx";
  */
 export const PasswordField = ({
   autoComplete,
+  className,
   description,
   field,
+  size,
 }: {
   autoComplete: "current-password" | "new-password";
+  className?: string;
   description?: string;
   field: AnyFieldApi;
+  size?: React.ComponentProps<typeof FormField>["size"];
 }) => {
   const [visible, setVisible] = useState(false);
   const Icon = visible ? EyeSlashIcon : EyeIcon;
@@ -35,10 +39,12 @@ export const PasswordField = ({
         </InputGroup.Button>
       }
       autoComplete={autoComplete}
+      className={className}
       description={description}
       field={field}
       label="Password"
       required
+      size={size}
       type={visible ? "text" : "password"}
     />
   );

@@ -1,8 +1,13 @@
 import { assert, layer } from "@effect/vitest";
 import { MailquiltApi } from "@repo/contract";
 import { OrganizationIdSchema } from "@repo/domain";
-import type { ContactId, ListId, OrganizationId } from "@repo/domain";
-import { Effect } from "effect";
+import type {
+  ContactId,
+  ListId,
+  OrganizationId,
+  ProviderConnectionId,
+} from "@repo/domain";
+import { Effect, Redacted } from "effect";
 import { HttpApi } from "effect/http-api";
 
 import { signedInClient } from "./accounts.ts";
@@ -14,12 +19,23 @@ interface Target {
   readonly organizationId: OrganizationId;
   readonly listId: ListId;
   readonly contactId: ContactId;
+  readonly providerConnectionId: ProviderConnectionId;
 }
 
 type TenantCall = (
   client: Client,
   target: Target
 ) => Effect.Effect<unknown, { readonly _tag: string }>;
+
+const intruderConnection = {
+  credentials: {
+    password: Redacted.make("password"),
+    username: Redacted.make("intruder"),
+  },
+  from: { email: "intruder@example.com" },
+  name: "Intruder",
+  smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
+} as const;
 
 // WARNING: every endpoint under /organizations/:organizationId needs a case here; the first test fails until it has one.
 const TENANT_ENDPOINTS = {
@@ -67,6 +83,35 @@ const TENANT_ENDPOINTS = {
       params: { listId, organizationId },
       payload: { contactIds: [contactId] },
     }),
+  "GET /api/organizations/:organizationId/provider-connections": (
+    client: Client,
+    { organizationId }: Target
+  ) => client.providerConnections.list({ params: { organizationId } }),
+  "POST /api/organizations/:organizationId/provider-connections": (
+    client: Client,
+    { organizationId }: Target
+  ) =>
+    client.providerConnections.create({
+      params: { organizationId },
+      payload: intruderConnection,
+    }),
+  "PUT /api/organizations/:organizationId/provider-connections/:providerConnectionId":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.update({
+        params: { organizationId, providerConnectionId },
+        payload: { ...intruderConnection, credentials: null },
+      }),
+  "DELETE /api/organizations/:organizationId/provider-connections/:providerConnectionId":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.delete({
+        params: { organizationId, providerConnectionId },
+      }),
+  "POST /api/organizations/:organizationId/provider-connections/:providerConnectionId/test-emails":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.sendTestEmail({
+        params: { organizationId, providerConnectionId },
+        payload: { to: "intruder@example.com" },
+      }),
 } satisfies Record<string, TenantCall>;
 
 const NO_SUCH_ORGANIZATION = OrganizationIdSchema.make(
@@ -91,10 +136,20 @@ const ownedData = (owner: Client) =>
       payload: { email: "ada@example.com", listIds: [list.id] },
     });
 
+    const connection = yield* owner.providerConnections.create({
+      params,
+      payload: {
+        from: { email: "news@acme.example" },
+        name: "Postmark",
+        smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
+      },
+    });
+
     return {
       contactId: contact.id,
       listId: list.id,
       organizationId: organization.id,
+      providerConnectionId: connection.id,
     } satisfies Target;
   });
 
@@ -164,6 +219,62 @@ layer(TestApp, { timeout: "2 minutes" })(
 
         assert.deepStrictEqual(yield* outsider.organizations.list(), [own]);
       })
+    );
+
+    test.effect(
+      "never reaches another Organization's Provider Connections from its own",
+      () =>
+        Effect.gen(function* foreignConnection() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+          const params = { organizationId: own.organizationId };
+
+          const testEmail = yield* outsider.providerConnections
+            .sendTestEmail({
+              params: {
+                ...params,
+                providerConnectionId: target.providerConnectionId,
+              },
+              payload: { to: "intruder@example.com" },
+            })
+            .pipe(Effect.flip);
+
+          const foreign = {
+            ...params,
+            providerConnectionId: target.providerConnectionId,
+          };
+
+          const edit = yield* outsider.providerConnections
+            .update({
+              params: foreign,
+              payload: { ...intruderConnection, credentials: null },
+            })
+            .pipe(Effect.flip);
+
+          const removal = yield* outsider.providerConnections
+            .delete({ params: foreign })
+            .pipe(Effect.flip);
+
+          const connections = yield* outsider.providerConnections.list({
+            params,
+          });
+
+          assert.strictEqual(testEmail._tag, "ProviderConnectionNotFound");
+          assert.strictEqual(edit._tag, "ProviderConnectionNotFound");
+          assert.strictEqual(removal._tag, "ProviderConnectionNotFound");
+          assert.lengthOf(
+            yield* owner.providerConnections.list({
+              params: { organizationId: target.organizationId },
+            }),
+            1
+          );
+          assert.deepStrictEqual(
+            connections.map((connection) => connection.id),
+            [own.providerConnectionId]
+          );
+        })
     );
 
     test.effect(

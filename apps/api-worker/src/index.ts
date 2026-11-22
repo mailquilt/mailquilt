@@ -1,6 +1,10 @@
 import { ApiLive, authConfigLayer } from "@repo/api";
 import { SystemMailerNotConfigured } from "@repo/core";
-import { postgresPortsLive, providePerRequest } from "@repo/runtime-cloudflare";
+import {
+  postgresPortsLive,
+  providePerRequest,
+  SmtpProviderUnavailable,
+} from "@repo/runtime-cloudflare";
 import { Effect, Layer, Option, Redacted } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
@@ -10,6 +14,8 @@ interface Env {
   readonly APP_URL: string;
   /** A secret, set with `wrangler secret put AUTH_SECRET` (`.dev.vars` locally). */
   readonly AUTH_SECRET: string;
+  /** Keys that seal Provider Connection credentials, a secret like AUTH_SECRET (ADR 0009). Unset, every request fails saying so. */
+  readonly ENCRYPTION_KEYS?: string;
 }
 
 // WARNING: trust only `cf-connecting-ip`, which Cloudflare sets itself; a client can forge any other IP header.
@@ -23,9 +29,18 @@ const authConfigLive = (env: Env) =>
 const makeApp = (env: Env) =>
   HttpRouter.toWebHandler(
     ApiLive.pipe(
-      providePerRequest(postgresPortsLive(env.HYPERDRIVE)),
+      providePerRequest(
+        postgresPortsLive(
+          env.HYPERDRIVE,
+          Redacted.make(env.ENCRYPTION_KEYS ?? "")
+        )
+      ),
       HttpRouter.provideRequest(
-        Layer.mergeAll(authConfigLive(env), SystemMailerNotConfigured)
+        Layer.mergeAll(
+          authConfigLive(env),
+          SmtpProviderUnavailable,
+          SystemMailerNotConfigured
+        )
       ),
       Layer.provide(HttpServer.layerServices),
       Layer.provide(Layer.effectDiscard(Effect.logInfo("Runtime built")))

@@ -14,6 +14,57 @@ export {
   Organizations,
 } from "./organizations.ts";
 
+export {
+  CredentialCipher,
+  credentialCipherLayer,
+} from "./credential-cipher.ts";
+
+export { CredentialsUnreadable } from "./credentials-unreadable.ts";
+
+export type { SealedSecret } from "./credential-cipher.ts";
+
+export { HostLookupFailed } from "./host-lookup-failed.ts";
+
+export { HostNotFound } from "./host-not-found.ts";
+
+export { InvalidNotification } from "./invalid-notification.ts";
+
+export { OutboundBlocked } from "./outbound-blocked.ts";
+
+export {
+  classifyAddress,
+  OutboundGuard,
+  outboundGuardLayer,
+} from "./outbound-guard.ts";
+
+export type { AddressClass } from "./outbound-guard.ts";
+
+export { SmtpProvider } from "./provider.ts";
+
+export type {
+  DeliveryNotification,
+  NotificationRequest,
+  OutgoingEmail,
+  Provider,
+  SentEmail,
+  SmtpSettings,
+} from "./provider.ts";
+
+export {
+  createProviderConnection,
+  deleteProviderConnection,
+  listProviderConnections,
+  ProviderConnections,
+  sendTestEmail,
+  updateProviderConnection,
+} from "./provider-connections.ts";
+
+export type {
+  NewProviderConnection,
+  ProviderConnectionChanges,
+  ProviderConnectionWithCredentials,
+} from "./provider-connections.ts";
+
 export { RateLimiter } from "./rate-limiter.ts";
 
 export type { RateLimitDecision, RateLimitRule } from "./rate-limiter.ts";

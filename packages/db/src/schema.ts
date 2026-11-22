@@ -5,6 +5,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -221,6 +222,46 @@ export const subscriptions = pgTable(
     check(
       "subscriptions_status_check",
       sql`${table.status} in ('pending', 'subscribed', 'unsubscribed')`
+    ),
+  ]
+);
+
+/**
+ * An Organization's configured sending service (`pcn_…`). `settings` holds
+ * where it sends, such as an SMTP server's host, port and encryption, and
+ * never a secret. `credentials` is sealed with AES-256-GCM under the key
+ * numbered `credentials_key_version`, bound to this row's Organization and
+ * ID (ADR 0009); both are null for a server that needs no sign-in.
+ */
+export const providerConnections = pgTable(
+  "provider_connections",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    provider: text("provider").notNull(),
+    fromName: text("from_name"),
+    fromEmail: text("from_email").notNull(),
+    settings: jsonb("settings").notNull(),
+    credentials: text("credentials"),
+    credentialsKeyVersion: integer("credentials_key_version"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("provider_connections_organization_id_id_key").on(
+      table.organizationId,
+      table.id
+    ),
+    check(
+      "provider_connections_provider_check",
+      sql`${table.provider} in ('smtp')`
+    ),
+    check(
+      "provider_connections_credentials_check",
+      sql`(${table.credentials} is null) = (${table.credentialsKeyVersion} is null)`
     ),
   ]
 );

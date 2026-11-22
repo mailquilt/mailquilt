@@ -1,5 +1,10 @@
+import { LinkButton } from "@cloudflare/kumo";
+import { PlusIcon } from "@phosphor-icons/react";
+import { OrganizationIdSchema } from "@repo/domain";
+import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { TableLoadFailed } from "../audience/table-card.tsx";
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
@@ -9,6 +14,7 @@ import {
   useOrganizations,
 } from "../organizations/organizations.tsx";
 import { YOUR_ROLE } from "../organizations/roles.tsx";
+import { useProviderConnections } from "../providers/providers-api.ts";
 
 interface SetupStep {
   readonly title: string;
@@ -26,8 +32,7 @@ const SETUP_STEPS: readonly SetupStep[] = [
     about:
       "Mailquilt sends through your own account, at your provider’s price.",
     title: "Connect your sending provider",
-    youllNeed:
-      "Amazon SES keys allowed to send, or an SMTP host, port and login.",
+    youllNeed: "your SMTP server’s host, port and sign-in, from your provider.",
   },
   {
     about: "So inboxes trust that your email really comes from you.",
@@ -94,11 +99,22 @@ const NameOrganization = () => {
   );
 };
 
+const ProviderConnected = ({ name }: { name: string }) => (
+  <p className="max-w-[36rem] text-base text-(--mq-body)">
+    <span className="font-medium text-kumo-strong">{name}</span> is connected.{" "}
+    <Link className="font-medium text-kumo-strong underline" to="/providers">
+      Manage it in Providers
+    </Link>
+  </p>
+);
+
 const StepRow = ({
+  connectedProvider,
   index,
   state,
   step,
 }: {
+  connectedProvider?: string;
   index: number;
   state: StepState;
   step: SetupStep;
@@ -121,14 +137,27 @@ const StepRow = ({
           {step.title}
         </h2>
         <p className="max-w-[36rem] text-base text-(--mq-body)">{step.about}</p>
-        {step.youllNeed ? (
+        {step.youllNeed && state !== "done" ? (
           <p className="max-w-[36rem] text-base text-kumo-subtle">
             <span className="font-semibold text-kumo-default">You’ll need</span>{" "}
             {step.youllNeed}
           </p>
         ) : null}
         {index === 0 ? <NameOrganization /> : null}
-        {isNext && index > 0 ? (
+        {index === 1 && state === "done" && connectedProvider !== undefined ? (
+          <ProviderConnected name={connectedProvider} />
+        ) : null}
+        {isNext && index === 1 ? (
+          <LinkButton
+            className="mt-3 w-fit max-sm:w-full max-sm:justify-center"
+            href="/providers/new"
+            icon={PlusIcon}
+            variant="primary"
+          >
+            Connect SMTP server
+          </LinkButton>
+        ) : null}
+        {isNext && index > 1 ? (
           <p className="mt-3 w-fit rounded-md bg-kumo-tint px-3 py-2 text-base text-kumo-default">
             This step arrives in a later Mailquilt update.
           </p>
@@ -138,10 +167,66 @@ const StepRow = ({
   );
 };
 
+const NO_ORGANIZATION = OrganizationIdSchema.make(
+  "org_00000000000000000000000000"
+);
+
+/**
+ * How many setup steps are done, and the first connected provider's name, or
+ * `undefined` while that isn't known yet, so Home can wait instead of drawing
+ * a step as next and then as done. If the connections can't be loaded, the
+ * provider step stays next; its button still leads to Providers.
+ */
+export const useSetupProgress = () => {
+  const { active } = useOrganizations();
+
+  const connections = useProviderConnections(active?.id ?? NO_ORGANIZATION, {
+    enabled: active !== null,
+    retryWhenFailed: false,
+  });
+
+  if (!active) {
+    return { doneCount: 0 };
+  }
+
+  if (connections.isPending && connections.errorUpdatedAt === 0) {
+    return;
+  }
+
+  if (connections.data === undefined) {
+    return {
+      doneCount: 1,
+      failed: {
+        retry: () => connections.refetch(),
+        retrying: connections.isFetching,
+      },
+    };
+  }
+
+  const [first] = connections.data;
+
+  return first === undefined
+    ? { doneCount: 1 }
+    : { connectedProvider: first.name, doneCount: 2 };
+};
+
 /** The five steps from a new account to the first Campaign, in order. */
 export const SetupSteps = () => {
-  const { active } = useOrganizations();
-  const doneCount = active ? 1 : 0;
+  const { connectedProvider, doneCount, failed } = useSetupProgress() ?? {
+    doneCount: 1,
+  };
+
+  if (failed !== undefined) {
+    return (
+      <section className="rounded-xl border border-kumo-fill bg-kumo-base">
+        <TableLoadFailed
+          onRetry={() => failed.retry()}
+          retrying={failed.retrying}
+          title="Your setup didn’t load"
+        />
+      </section>
+    );
+  }
 
   return (
     <ol
@@ -150,6 +235,7 @@ export const SetupSteps = () => {
     >
       {SETUP_STEPS.map((step, index) => (
         <StepRow
+          connectedProvider={connectedProvider}
           index={index}
           key={step.title}
           state={stateOf(index, doneCount)}

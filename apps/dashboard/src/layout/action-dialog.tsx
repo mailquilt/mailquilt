@@ -34,19 +34,23 @@ interface ActionDialogProps {
   readonly description: React.ReactNode;
   /** The one thing the dialog does, such as "Create organization". */
   readonly actionLabel: string;
+  /** The button that closes it without acting. @default "Cancel" */
+  readonly dismissLabel?: string;
   /** The `id` of the form in `children` that the action submits. */
   readonly formId: string;
   /** While the action runs: the button shows progress and nothing closes the dialog. */
   readonly busy: boolean;
+  /** The action can't be undone, such as a delete: its button is drawn in the danger colour. */
+  readonly destructive?: boolean;
   /** On desktop, focused once the dialog has opened, such as its only field. */
   readonly initialFocus?: React.RefObject<HTMLElement | null>;
-  /** On phones, focused when the sheet closes, such as the control that opened it. */
+  /** Focused when it closes, such as the control that opened it, also when it opened by itself. */
   readonly finalFocus?: React.RefObject<HTMLElement | null>;
   readonly children: React.ReactNode;
 }
 
 /**
- * A dialog with one action and Cancel. From 640px wide, Kumo's own
+ * A dialog with one action and a button that closes it, Cancel unless told otherwise. From 640px wide, Kumo's own
  * breakpoint, it is Kumo's
  * `LayerDialog`: the content on a raised card and the actions on the frame
  * around it, centred. On phones it is a sheet from the bottom edge: one
@@ -61,6 +65,8 @@ export const ActionDialog = ({
   busy,
   children,
   description,
+  destructive = false,
+  dismissLabel = "Cancel",
   finalFocus,
   formId,
   initialFocus,
@@ -82,6 +88,8 @@ export const ActionDialog = ({
         onOpenChangeComplete={(isOpen) => {
           if (isOpen) {
             initialFocus?.current?.focus();
+          } else {
+            finalFocus?.current?.focus();
           }
         }}
         open={open}
@@ -94,8 +102,13 @@ export const ActionDialog = ({
           </LayerDialog.Title>
           <LayerDialog.Description>{description}</LayerDialog.Description>
           <LayerDialog.Body>{children}</LayerDialog.Body>
-          <LayerDialog.Actions dismissLabel="Cancel">
-            <LayerDialog.Action form={formId} loading={busy} type="submit">
+          <LayerDialog.Actions dismissLabel={dismissLabel}>
+            <LayerDialog.Action
+              form={formId}
+              loading={busy}
+              type="submit"
+              variant={destructive ? "destructive" : "primary"}
+            >
               {actionLabel}
             </LayerDialog.Action>
           </LayerDialog.Actions>
@@ -152,7 +165,7 @@ export const ActionDialog = ({
                   loading={busy}
                   size="lg"
                   type="submit"
-                  variant="primary"
+                  variant={destructive ? "destructive" : "primary"}
                 >
                   {actionLabel}
                 </Button>
@@ -166,7 +179,7 @@ export const ActionDialog = ({
                     />
                   }
                 >
-                  Cancel
+                  {dismissLabel}
                 </Drawer.Close>
               </div>
             </Drawer.Content>

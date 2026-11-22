@@ -10,9 +10,11 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@effect/platform-node": "catalog:",
     "@effect/sql-pg": "catalog:",
     "@repo/core": "workspace:*",
     "@repo/db": "workspace:*",
+    "@repo/providers": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

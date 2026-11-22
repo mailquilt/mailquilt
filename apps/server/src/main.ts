@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { ApiLive, AuthConfigFromEnv } from "@repo/api";
 import { SystemMailerNotConfigured } from "@repo/core";
-import { PostgresPortsLive } from "@repo/runtime-node";
+import { PostgresPortsLive, SmtpProviderLive } from "@repo/runtime-node";
 import { Config, Effect, Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
 
@@ -41,6 +41,7 @@ const ServerLive = HttpRouter.serve(
         Layer.mergeAll(
           PostgresPortsLive,
           AuthConfigFromEnv,
+          SmtpProviderLive,
           SystemMailerNotConfigured
         )
       )

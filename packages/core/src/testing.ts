@@ -19,3 +19,7 @@ export const SystemMailerOutboxLive = Layer.effectContext(
     }).pipe(Context.add(SystemMailerOutbox, { sent: Ref.get(sent) }));
   })
 );
+
+export { RecordingSmtpProviderLive, SmtpOutbox } from "./smtp-outbox.ts";
+
+export type { RecordedSend } from "./smtp-outbox.ts";

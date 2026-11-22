@@ -7,6 +7,7 @@ import { AuthRoutes } from "./auth/routes.ts";
 import { ContactsHandlers } from "./contacts.ts";
 import { ListsHandlers } from "./lists.ts";
 import { OrganizationsHandlers } from "./organizations.ts";
+import { ProviderConnectionsHandlers } from "./provider-connections.ts";
 import { SystemHandlers } from "./system.ts";
 
 const MAX_API_BODY_SIZE = ByteSize.kibibytes(64);
@@ -24,6 +25,7 @@ export const ApiLive = Layer.mergeAll(
         ContactsHandlers,
         ListsHandlers,
         OrganizationsHandlers,
+        ProviderConnectionsHandlers,
         SystemHandlers
       )
     ),

@@ -18,6 +18,9 @@ import { Route as AuthCheckYourInboxRouteImport } from './routes/_auth/check-you
 import { Route as AuthEmailVerifiedRouteImport } from './routes/_auth/email-verified'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
+import { Route as AppProvidersIndexRouteImport } from './routes/_app/providers/index'
+import { Route as AppProvidersNewRouteImport } from './routes/_app/providers/new'
+import { Route as AppProvidersProviderConnectionIdEditRouteImport } from './routes/_app/providers/$providerConnectionId/edit'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -62,6 +65,22 @@ const AuthSignUpRoute = AuthSignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppProvidersIndexRoute = AppProvidersIndexRouteImport.update({
+  id: '/providers/',
+  path: '/providers/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProvidersNewRoute = AppProvidersNewRouteImport.update({
+  id: '/providers/new',
+  path: '/providers/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProvidersProviderConnectionIdEditRoute =
+  AppProvidersProviderConnectionIdEditRouteImport.update({
+    id: '/providers/$providerConnectionId/edit',
+    path: '/providers/$providerConnectionId/edit',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -71,6 +90,9 @@ export interface FileRoutesByFullPath {
   '/email-verified': typeof AuthEmailVerifiedRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/providers/new': typeof AppProvidersNewRoute
+  '/providers/': typeof AppProvidersIndexRoute
+  '/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -80,6 +102,9 @@ export interface FileRoutesByTo {
   '/email-verified': typeof AuthEmailVerifiedRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/providers/new': typeof AppProvidersNewRoute
+  '/providers': typeof AppProvidersIndexRoute
+  '/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -92,6 +117,9 @@ export interface FileRoutesById {
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/providers/new': typeof AppProvidersNewRoute
+  '/_app/providers/': typeof AppProvidersIndexRoute
+  '/_app/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -103,6 +131,9 @@ export interface FileRouteTypes {
     | '/email-verified'
     | '/sign-in'
     | '/sign-up'
+    | '/providers/new'
+    | '/providers/'
+    | '/providers/$providerConnectionId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -112,6 +143,9 @@ export interface FileRouteTypes {
     | '/email-verified'
     | '/sign-in'
     | '/sign-up'
+    | '/providers/new'
+    | '/providers'
+    | '/providers/$providerConnectionId/edit'
   id:
     | '__root__'
     | '/_app'
@@ -123,6 +157,9 @@ export interface FileRouteTypes {
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_app/'
+    | '/_app/providers/new'
+    | '/_app/providers/'
+    | '/_app/providers/$providerConnectionId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -195,6 +232,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignUpRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/providers/': {
+      id: '/_app/providers/'
+      path: '/providers'
+      fullPath: '/providers/'
+      preLoaderRoute: typeof AppProvidersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/providers/new': {
+      id: '/_app/providers/new'
+      path: '/providers/new'
+      fullPath: '/providers/new'
+      preLoaderRoute: typeof AppProvidersNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/providers/$providerConnectionId/edit': {
+      id: '/_app/providers/$providerConnectionId/edit'
+      path: '/providers/$providerConnectionId/edit'
+      fullPath: '/providers/$providerConnectionId/edit'
+      preLoaderRoute: typeof AppProvidersProviderConnectionIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -202,12 +260,19 @@ interface AppRouteChildren {
   AppContactsRoute: typeof AppContactsRoute
   AppListsRoute: typeof AppListsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppProvidersNewRoute: typeof AppProvidersNewRoute
+  AppProvidersIndexRoute: typeof AppProvidersIndexRoute
+  AppProvidersProviderConnectionIdEditRoute: typeof AppProvidersProviderConnectionIdEditRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppContactsRoute: AppContactsRoute,
   AppListsRoute: AppListsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppProvidersNewRoute: AppProvidersNewRoute,
+  AppProvidersIndexRoute: AppProvidersIndexRoute,
+  AppProvidersProviderConnectionIdEditRoute:
+    AppProvidersProviderConnectionIdEditRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

@@ -66,6 +66,7 @@ catalog:
   happy-dom: 21.0.4
   kysely: 0.29.9
   msw: 3.0.5
+  nodemailer: 10.5.0
   oxfmt: 0.79.0
   oxlint: 1.94.0
   path-to-regexp: 6.3.0
@@ -73,6 +74,7 @@ catalog:
   react: 19.3.1
   react-dom: 19.3.1
   tailwindcss: 4.3.5
+  testcontainers: 12.2.1
   turbo: 2.11.13
   typescript: 7.0.2
   ultracite: 8.3.1

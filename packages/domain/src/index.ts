@@ -16,6 +16,8 @@ export { ContactPage, PAGE_SIZE } from "./contact-page.ts";
 
 export { Contact, ContactEmail } from "./contact.ts";
 
+export { CredentialsRequired } from "./credentials-required.ts";
+
 export { DatabaseUnreachable } from "./database-unreachable.ts";
 
 export { Health } from "./health.ts";
@@ -30,7 +32,9 @@ export {
   newMemberId,
   newOrganizationId,
   newSubscriptionId,
+  newProviderConnectionId,
   OrganizationIdSchema,
+  ProviderConnectionIdSchema,
   SubscriptionIdSchema,
   UserIdSchema,
 } from "./ids.ts";
@@ -40,6 +44,7 @@ export type {
   ListId,
   MemberId,
   OrganizationId,
+  ProviderConnectionId,
   SubscriptionId,
   UserId,
 } from "./ids.ts";
@@ -54,10 +59,40 @@ export { Organization, OrganizationName, RoleSchema } from "./organization.ts";
 
 export type { Role } from "./organization.ts";
 
+export { ProviderConnectionNotFound } from "./provider-connection-not-found.ts";
+
+export {
+  MailAddress,
+  MAX_CREDENTIAL_LENGTH,
+  ProviderConnection,
+  ProviderConnectionName,
+  Sender,
+  SenderName,
+  SmtpCredentials,
+  SmtpHost,
+  SmtpPort,
+  SmtpSecuritySchema,
+  SmtpServer,
+} from "./provider-connection.ts";
+
+export type { SmtpSecurity } from "./provider-connection.ts";
+
+export { RateLimited } from "./rate-limited.ts";
+
+export { SendFailed, SendFailureReasonSchema } from "./send-failed.ts";
+
+export type { SendFailureReason } from "./send-failed.ts";
+
+export { TestEmailSent } from "./test-email-sent.ts";
+
 export { Subscription, SubscriptionStatusSchema } from "./subscription.ts";
 
 export type { SubscriptionStatus } from "./subscription.ts";
 
 export { SignInRequired } from "./sign-in-required.ts";
 
-export { VERIFICATION_EMAIL_SUBJECT } from "./system-email.ts";
+export {
+  TEST_EMAIL_LIMIT,
+  TEST_EMAIL_SUBJECT,
+  VERIFICATION_EMAIL_SUBJECT,
+} from "./system-email.ts";
