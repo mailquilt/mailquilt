@@ -16,4 +16,3 @@ So a route that decodes its search also checks it in `beforeLoad`: it decodes th
 
 - The address bar always matches what the page shows; a cleaned address replaces the bad one.
 - A new route with a search in the address adds the same `beforeLoad` check. A test loads the real route tree at a bad address and checks what the page's search and the address become.
-- The email-verified page doesn't follow this yet: its search schema throws on an `error` that isn't text, such as `?error=1`, and shows the route's error component. Only a hand-edited link does that; bringing it under this rule is its own change.

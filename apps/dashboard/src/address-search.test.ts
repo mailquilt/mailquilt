@@ -34,6 +34,18 @@ describe("the address of a page that keeps its search in it", () => {
       `/providers?connected=${CONNECTION}`,
       { connected: CONNECTION },
     ],
+    [
+      "an error that isn't text",
+      "/email-verified?error=1",
+      "/email-verified",
+      {},
+    ],
+    [
+      "a valid email-verified search",
+      "/email-verified?error=TOKEN_EXPIRED",
+      "/email-verified?error=TOKEN_EXPIRED",
+      { error: "TOKEN_EXPIRED" },
+    ],
   ])(
     "an address with %s gives the page only what its search decodes to",
     async (_, address, shownAddress, search) => {
