@@ -1055,6 +1055,11 @@ aside.mq-frame {
   border-bottom: 0;
 }
 
+/* In the card, the header row takes the elevated fill, as in the approved mockup. */
+.mq-table-card .mq-table th {
+  background: var(--color-kumo-elevated);
+}
+
 .mq-table tr > :first-child {
   padding-left: var(--gutter) !important;
 }
