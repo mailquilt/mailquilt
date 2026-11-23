@@ -21,11 +21,10 @@ export const PageLoading = () => (
 /**
  * A signed-in page's area while what it needs is still loading. The sidebar
  * stays; the page draws once, in its real state. The loader is centred in the
- * window, where `PageLoading` drew it a moment before, so it doesn't jump when
- * the sidebar appears.
+ * light page block, as every page's content is, not in the window.
  */
 export const PageAreaLoading = ({ label }: { label: string }) => (
-  <output className="pointer-events-none fixed inset-0 flex items-center justify-center">
+  <output className="pointer-events-none absolute inset-0 flex items-center justify-center">
     <PatchLoader />
     <span className="sr-only">{label}</span>
   </output>
