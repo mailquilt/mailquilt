@@ -17,7 +17,6 @@ import { SignedInOnly } from "../layout/session-gates.tsx";
 import { ACME, renderWithOrganizations } from "./test-organizations.tsx";
 
 const api = setupServer(
-  http.get("*/health", () => HttpResponse.json({ database: "connected" })),
   http.get("*/api/organizations/:organizationId/contacts", () =>
     HttpResponse.json({
       contacts: [],

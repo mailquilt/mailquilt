@@ -123,7 +123,6 @@ const renderAt = (path: string, queryClient = new QueryClient()) => {
 
 const answerStatus = (status: { setUp: boolean; signUp: string }) =>
   api.use(
-    http.get("*/health", () => HttpResponse.json({ database: "connected" })),
     http.get("*/api/instance", () => HttpResponse.json(status)),
     http.get("*/api/auth/get-session", () => HttpResponse.json(null))
   );

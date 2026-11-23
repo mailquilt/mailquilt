@@ -1339,8 +1339,13 @@ aside.mq-frame {
   padding-bottom: 6rem;
 }
 
-/* Toasts rise above the bar while it's showing, never over it, and slide back as it leaves. */
+/*
+ * Toasts rise above the bar while it's showing, never over it, and slide back as it leaves.
+ * Kumo stacks them at z-index 1, under the sign-in block and the sticky bars; they sit above
+ * the page (the frame bar is 30) and under dialogs and sheets (the scrim is 60).
+ */
 [data-theme="mailquilt"] [role="region"][aria-label="Notifications"] {
+  z-index: 40;
   transition: bottom 240ms var(--ease-out-strong);
 }
 
@@ -1471,5 +1476,29 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
 
   .mq-form-end > p {
     flex-basis: 100%;
+  }
+}
+
+/*
+ * Tabbing never lands under a toast that stays, such as "Can't reach the Mailquilt API" (WCAG 2.4.11).
+ * Last in the file, so it wins over the selection bar's smaller padding; the toast stands above it.
+ */
+html[data-theme="mailquilt"]:has(.mq-lasting-toast) {
+  scroll-padding-bottom: 8rem;
+}
+
+html[data-theme="mailquilt"]:has(.mq-lasting-toast):has(
+    .mq-selbar:not([data-leaving])
+  ) {
+  scroll-padding-bottom: calc(var(--mq-selbar-reach) + 8rem);
+}
+
+/*
+ * A signed-out page below 1024px fits the window without scrolling, so a toast that stays would
+ * cover its footer link. The block grows by the toast's height, so the link can scroll clear of it.
+ */
+@media (max-width: 1023px) {
+  html[data-theme="mailquilt"]:has(.mq-lasting-toast) .mq-auth footer {
+    padding-bottom: 8rem;
   }
 }

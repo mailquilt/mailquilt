@@ -1,4 +1,4 @@
-import { LinkProvider } from "@cloudflare/kumo";
+import { LinkProvider, Toasty } from "@cloudflare/kumo";
 import instrumentSans from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
 import spaceGrotesk from "@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2?url";
 import { TanStackDevtools } from "@tanstack/react-devtools";
@@ -10,7 +10,9 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { useRef } from "react";
 
+import { HealthStatus } from "../health/health-status.tsx";
 import { NotFound } from "../layout/not-found.tsx";
 import { RouterLink } from "../layout/router-link.tsx";
 import { themeScript } from "../theme/theme.ts";
@@ -39,11 +41,20 @@ const RootDocument = ({ children }: { children: React.ReactNode }) => (
   </html>
 );
 
-const Root = () => (
-  <LinkProvider component={RouterLink}>
-    <Outlet />
-  </LinkProvider>
-);
+const Root = () => {
+  // WARNING: toasts portal into a layer after the page; in body they come before "Skip to content" in the Tab order.
+  const toastLayer = useRef<HTMLDivElement>(null);
+
+  return (
+    <LinkProvider component={RouterLink}>
+      <Toasty container={toastLayer}>
+        <Outlet />
+        <HealthStatus />
+      </Toasty>
+      <div ref={toastLayer} />
+    </LinkProvider>
+  );
+};
 
 export const Route = createRootRoute({
   component: Root,

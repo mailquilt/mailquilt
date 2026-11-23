@@ -7,7 +7,6 @@ import { useContactPage, useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
-import { HealthStatus } from "../health/health-status.tsx";
 import {
   GlobeHemisphereWestIcon,
   HardDrivesIcon,
@@ -359,7 +358,6 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <PageWrap>
         <FrameBar />
         <main className="mq-page" id="main" tabIndex={-1}>
-          <HealthStatus bannerClassName="mx-4 mt-4 sm:mx-7 lg:mx-10 lg:mt-6" />
           {status === "failed" ? <OrganizationsUnavailable /> : children}
         </main>
       </PageWrap>
