@@ -484,7 +484,13 @@ aside.mq-frame {
   transition: color 160ms var(--ease-out-strong);
 }
 
-.mq-frame [data-sidebar="menu-button"]:not(:disabled):hover .mq-nav-icon {
+.mq-frame
+  [data-sidebar="menu-button"]:not(
+    [data-active],
+    :disabled,
+    :focus-visible
+  ):hover
+  .mq-nav-icon {
   color: var(--mq-frame-default);
 }
 
