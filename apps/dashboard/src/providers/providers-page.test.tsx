@@ -310,11 +310,11 @@ describe("providers page", () => {
 
     await screen.findByText("The URL forgot the news.");
 
-    expect(
-      screen.getByText(
+    await expect(
+      screen.findByText(
         "Postmark is connected. Send yourself a test to check it works."
       )
-    ).toBeTruthy();
+    ).resolves.toBeDefined();
   });
 
   it("deletes a connection after asking", async () => {
