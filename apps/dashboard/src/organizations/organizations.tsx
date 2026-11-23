@@ -1,4 +1,4 @@
-import type { Organization } from "@repo/domain";
+import type { Organization, ProviderConnection } from "@repo/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -11,6 +11,7 @@ import {
 
 import { callApi } from "../api.ts";
 import { PageLoading } from "../layout/page-states.tsx";
+import { connectionsKey } from "../providers/providers-api.ts";
 
 const ORGANIZATIONS_QUERY_KEY = ["organizations"] as const;
 
@@ -178,6 +179,11 @@ export const useCreateOrganization = () => {
       queryClient.setQueryData<readonly Organization[]>(
         ORGANIZATIONS_QUERY_KEY,
         (organizations = []) => [...organizations, created]
+      );
+      // WARNING: record that the new Organization has no Provider Connections before choosing it, or Home swaps to its loader and loses the setup step's focus move.
+      queryClient.setQueryData<readonly ProviderConnection[]>(
+        connectionsKey(created.id),
+        []
       );
       choose(created.id);
       await queryClient.invalidateQueries({

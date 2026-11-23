@@ -1,17 +1,44 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
+import { SignedInOnly } from "../layout/session-gates.tsx";
 import {
   ACME,
   renderWithOrganizations,
 } from "../organizations/test-organizations.tsx";
+import { Route as HomeRoute } from "../routes/_app/index.tsx";
 import { SetupSteps } from "./setup-steps.tsx";
 
 const api = setupServer();
 
 const CONNECTIONS = "*/api/organizations/:organizationId/provider-connections";
+
+const SESSION = {
+  session: { expiresAt: "2026-12-01T00:00:00.000Z", id: "s", userId: "u" },
+  user: { email: "ada@example.com", emailVerified: true, id: "u", name: "Ada" },
+};
+
+const Home = HomeRoute.options.component;
+
+if (Home === undefined) {
+  throw new Error("The Home route has no component to render");
+}
+
+const SignedInHome = () => (
+  <SignedInOnly>
+    <Home />
+  </SignedInOnly>
+);
 
 const POSTMARK = {
   createdAt: "2026-11-22T09:00:00.000Z",
@@ -63,11 +90,54 @@ describe("setup steps", () => {
     expect(screen.queryByLabelText("Organization name")).toBeNull();
   });
 
-  it("moves focus to the news that the organization is ready, so it is read out", async () => {
-    let organizations: readonly (typeof ACME)[] = [];
+  it("waits on Home until it knows whether a provider is connected", async () => {
+    let answered = false;
     api.use(
-      http.get("*/api/organizations", () => HttpResponse.json(organizations)),
-      http.get(CONNECTIONS, () => HttpResponse.json([])),
+      http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, async () => {
+        await vi.waitUntil(() => answered, { timeout: 5000 });
+
+        return HttpResponse.json([]);
+      })
+    );
+
+    renderWithOrganizations(<SignedInHome />);
+
+    await expect(
+      screen.findByText("Loading your setup")
+    ).resolves.toBeDefined();
+    expect(screen.queryByRole("list")).toBeNull();
+
+    answered = true;
+
+    await expect(
+      screen.findByRole("list", {
+        name: "Steps to your first campaign, 1 of 5 done",
+      })
+    ).resolves.toBeDefined();
+  });
+
+  it("moves focus to the news that the organization is ready, so it is read out, without Home reloading", async () => {
+    let organizations: readonly (typeof ACME)[] = [];
+    let answered = false;
+    let served = false;
+    let relisted = false;
+    api.use(
+      http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
+      http.get("*/api/organizations", async () => {
+        if (organizations.length > 0) {
+          await vi.waitUntil(() => relisted, { timeout: 5000 });
+        }
+
+        return HttpResponse.json(organizations);
+      }),
+      http.get(CONNECTIONS, async () => {
+        await vi.waitUntil(() => answered, { timeout: 5000 });
+        served = true;
+
+        return HttpResponse.json([]);
+      }),
       http.post("*/api/organizations", () => {
         organizations = [ACME];
 
@@ -75,7 +145,7 @@ describe("setup steps", () => {
       })
     );
 
-    renderWithOrganizations(<SetupSteps />);
+    renderWithOrganizations(<SignedInHome />);
     fireEvent.change(await screen.findByLabelText("Organization name"), {
       target: { value: "Acme Newsletter" },
     });
@@ -83,9 +153,19 @@ describe("setup steps", () => {
       screen.getByRole("button", { name: "Create organization" })
     );
 
+    await expect(
+      screen.findByText("is ready, and you’re its owner.", { exact: false })
+    ).resolves.toBeDefined();
+    expect(screen.queryByText("Loading your setup")).toBeNull();
+
+    relisted = true;
+
     await expect
       .poll(() => document.activeElement?.textContent)
       .toBe("Acme Newsletter is ready, and you’re its owner.");
+
+    answered = true;
+    await vi.waitUntil(() => served);
   });
 
   it("leads to connecting a provider, and marks it done once one exists", async () => {
