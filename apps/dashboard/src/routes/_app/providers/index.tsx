@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, deepEqual, redirect } from "@tanstack/react-router";
 
 import { NeedsOrganization } from "../../../audience/needs-organization.tsx";
 import { useAccount } from "../../../layout/session-gates.tsx";
@@ -44,7 +44,15 @@ const Providers = () => {
 };
 
 export const Route = createFileRoute("/_app/providers/")({
+  // WARNING: the router keeps every key validateSearch leaves out, so an address with a part it drops is replaced with the cleaned one (ADR 0012).
+  beforeLoad: ({ search }) => {
+    const cleaned = decodeProvidersSearch(search);
+
+    if (!deepEqual(cleaned, search)) {
+      throw redirect({ search: cleaned, to: "/providers" });
+    }
+  },
   component: Providers,
   head: () => ({ meta: [{ title: "Providers – Mailquilt" }] }),
-  validateSearch: (search) => decodeProvidersSearch(search),
+  validateSearch: decodeProvidersSearch,
 });
