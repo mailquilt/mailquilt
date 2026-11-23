@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 
 import { FlyingGeeseQuilt } from "../brand/flying-geese-quilt.tsx";
 import { MailquiltLogo } from "../brand/logo.tsx";
+import { CrashPlaceContext } from "./crash-place.ts";
 
 const REPOSITORY_URL = "https://github.com/mailquilt/mailquilt";
 
@@ -46,7 +47,9 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => (
           </Link>
         </header>
         <main className="flex flex-1 items-start pt-12 pb-12 lg:items-center">
-          <div className="w-full">{children}</div>
+          <div className="w-full">
+            <CrashPlaceContext value="auth">{children}</CrashPlaceContext>
+          </div>
         </main>
         <footer className="text-base text-kumo-subtle">
           Mailquilt is open source.{" "}
