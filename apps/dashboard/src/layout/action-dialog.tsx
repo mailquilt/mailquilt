@@ -129,11 +129,25 @@ export const ActionDialog = ({
   open,
   title,
 }: ActionDialogProps) => {
-  const isDesktop = useSyncExternalStore(
+  const isDesktopWidth = useSyncExternalStore(
     subscribeToDesktop,
     isDesktopNow,
     isDesktopWhilePrerendering
   );
+
+  const [openedOnDesktop, setOpenedOnDesktop] = useState<boolean | null>(null);
+
+  // WARNING: switching between the dialog and the sheet re-creates the form, losing what was typed, so a dialog keeps the layout it opened in until it has closed, even if the screen turns.
+  if (open && openedOnDesktop === null) {
+    setOpenedOnDesktop(isDesktopWidth);
+  }
+
+  const isDesktop = openedOnDesktop ?? isDesktopWidth;
+
+  const finishClosing = () => {
+    setOpenedOnDesktop(null);
+    onExited?.();
+  };
 
   const insideDialog = useRef<HTMLDivElement>(null);
 
@@ -168,7 +182,7 @@ export const ActionDialog = ({
       (isOpen ? initialFocus : finalFocus)?.current?.focus();
 
       if (!isOpen) {
-        onExited?.();
+        finishClosing();
       }
     };
 
@@ -228,7 +242,7 @@ export const ActionDialog = ({
       }}
       onOpenChangeComplete={(isOpen) => {
         if (!isOpen) {
-          onExited?.();
+          finishClosing();
         }
       }}
       open={open}
