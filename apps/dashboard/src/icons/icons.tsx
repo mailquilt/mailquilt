@@ -14,10 +14,13 @@ import {
   Copy01Icon,
   Delete02Icon,
   Globe02Icon,
+  Home03Icon,
   InformationCircleIcon,
+  LeftToRightListBulletIcon,
   LinkSquare02Icon,
   Logout03Icon,
   Mail01Icon,
+  Megaphone01Icon,
   Menu01Icon,
   MinusSignIcon,
   Moon02Icon,
@@ -26,6 +29,7 @@ import {
   Refresh01Icon,
   Search01Icon,
   SentIcon,
+  ServerStack01Icon,
   Settings02Icon,
   SidebarLeftIcon,
   SquareLock02Icon,
@@ -33,8 +37,10 @@ import {
   Sun03Icon,
   Tick02Icon,
   UnfoldMoreIcon,
+  UserMultipleIcon,
   ViewIcon,
   ViewOffIcon,
+  WebDesign01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { IconSvgElement } from "@hugeicons/react";
@@ -157,6 +163,15 @@ export const X = XIcon;
 export const DotsThreeIcon = hugeicon(MoreHorizontalIcon, "DotsThreeIcon");
 export const EnvelopeSimpleIcon = hugeicon(Mail01Icon, "EnvelopeSimpleIcon");
 export const GearSixIcon = hugeicon(Settings02Icon, "GearSixIcon");
+export const HardDrivesIcon = hugeicon(ServerStack01Icon, "HardDrivesIcon");
+export const HouseIcon = hugeicon(Home03Icon, "HouseIcon");
+export const LayoutIcon = hugeicon(WebDesign01Icon, "LayoutIcon");
+
+export const ListBulletsIcon = hugeicon(
+  LeftToRightListBulletIcon,
+  "ListBulletsIcon"
+);
+
 export const ListIcon = hugeicon(Menu01Icon, "ListIcon");
 export const LockSimpleIcon = hugeicon(SquareLock02Icon, "LockSimpleIcon");
 
@@ -164,6 +179,8 @@ export const LockSimpleOpenIcon = hugeicon(
   SquareUnlock02Icon,
   "LockSimpleOpenIcon"
 );
+
+export const MegaphoneIcon = hugeicon(Megaphone01Icon, "MegaphoneIcon");
 
 export const MonitorIcon = hugeicon(ComputerIcon, "MonitorIcon");
 export const MoonIcon = hugeicon(Moon02Icon, "MoonIcon");
@@ -174,4 +191,5 @@ export const SidebarSimpleIcon = hugeicon(SidebarLeftIcon, "SidebarSimpleIcon");
 export const SignOutIcon = hugeicon(Logout03Icon, "SignOutIcon");
 export const SunIcon = hugeicon(Sun03Icon, "SunIcon");
 export const TrashIcon = hugeicon(Delete02Icon, "TrashIcon");
+export const UsersIcon = hugeicon(UserMultipleIcon, "UsersIcon");
 export const WarningIcon = hugeicon(Alert02Icon, "WarningIcon");

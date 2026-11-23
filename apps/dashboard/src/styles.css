@@ -285,7 +285,7 @@
   }
 }
 
-/* ---------- The Inset frame: the page is one light block set into the ink quilt ---------- */
+/* ---------- The Inset frame: the page is one light block set into the ink frame ---------- */
 
 /*
  * WARNING: unlayered, like the token overrides above, so they win over
@@ -301,8 +301,7 @@
   --mq-frame-subtle: #8b949e;
   --mq-frame-line: #26262b;
   --mq-frame-hairline: #222226;
-  --mq-frame-block: #4b4b53;
-  --mq-frame-slot: #5b5b63;
+  --mq-frame-dimmed: #5b5b63;
   --mq-frame-avatar: #3a3a41;
   --mq-frame-focus: #f0f6fc;
   --mq-page-ring: transparent;
@@ -358,9 +357,6 @@ html[data-theme="mailquilt"]:has(.mq-frame-wrapper) {
   --mq-patch-ink: #e4e4e7;
   --mq-patch-grey: #8b949e;
   --mq-patch-pale: #3f3f46;
-  --mq-quilt-sky: #151518;
-  --mq-quilt-goose: #1c1c20;
-  --mq-quilt-goose-alt: #18181c;
 
   --text-color-kumo-default: var(--mq-frame-default);
   --text-color-kumo-strong: var(--mq-frame-text);
@@ -406,7 +402,7 @@ aside.mq-frame {
   flex: 1;
 }
 
-/* Collapsed to icons on desktop: the header, footer and quilt step aside. */
+/* Collapsed to icons on desktop: the header and footer step aside. */
 .mq-frame[data-state="collapsed"] .mq-frame-head {
   justify-content: center;
   padding-inline: 0;
@@ -414,10 +410,6 @@ aside.mq-frame {
 
 .mq-frame[data-state="collapsed"] .mq-frame-foot {
   padding-inline: 0.5rem;
-}
-
-.mq-frame[data-state="collapsed"] .mq-rail-quilt {
-  display: none;
 }
 
 /* The organization switcher and the account button: rows of the frame. */
@@ -483,41 +475,41 @@ aside.mq-frame {
   outline-offset: 2px;
 }
 
-/* Navigation blocks: a built page is a quiet block, the current page is lifted off its dashed slot, an unbuilt page is only the slot. */
-.mq-nav-block {
-  position: relative;
-  display: block;
-  width: 0.625rem;
-  height: 0.625rem;
+/* Navigation icons: quiet beside their label, full strength on the current page and under the pointer, dimmed for a page that isn't built. */
+.mq-nav-icon {
+  width: 1.125rem;
+  height: 1.125rem;
   flex-shrink: 0;
+  color: var(--mq-frame-subtle);
+  transition: color 160ms var(--ease-out-strong);
 }
 
-.mq-nav-block::before,
-.mq-nav-block::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 2.5px;
+.mq-frame
+  [data-sidebar="menu-button"]:not(
+    [data-active],
+    :disabled,
+    :focus-visible
+  ):hover
+  .mq-nav-icon {
+  color: var(--mq-frame-default);
 }
 
-.mq-nav-block::after {
-  background: var(--mq-frame-block);
+.mq-frame [data-sidebar="menu-button"]:focus-visible .mq-nav-icon,
+.mq-frame [data-sidebar="menu-button"][data-active] .mq-nav-icon {
+  color: var(--mq-frame-text);
 }
 
-.mq-nav-block[data-state="current"]::before {
-  border: 1.25px dashed var(--mq-frame-subtle);
-  border-radius: 2px;
+/* Under the pointer a page is a shade lighter than the current page, so the current one still stands out (Kumo uses one fill for both). */
+.mq-frame [data-sidebar="menu-button"]:not([data-active], :disabled):hover {
+  background: var(--mq-frame-hover);
 }
 
-.mq-nav-block[data-state="current"]::after {
-  background: var(--mq-frame-text);
-  transform: translate(2px, -2px);
+.mq-frame [data-sidebar="menu-button"][data-active] {
+  color: var(--mq-frame-text);
 }
 
-.mq-nav-block[data-state="soon"]::after {
-  border: 1.25px dashed var(--mq-frame-slot);
-  border-radius: 2px;
-  background: none;
+.mq-frame .mq-nav-soon .mq-nav-icon {
+  color: var(--mq-frame-dimmed);
 }
 
 /* A page that isn't built: quiet but readable (not Kumo's 45% opacity). */
@@ -547,22 +539,6 @@ aside.mq-frame {
   font-size: 0.75rem;
 }
 
-/* Faint geese at the foot of the rail: the sign-in quilt, stepped back. */
-.mq-rail-quilt {
-  display: block;
-  width: 100%;
-  min-height: 0;
-  flex: 1;
-  max-height: 11rem;
-  mask-image: linear-gradient(to bottom, transparent, #000 75%);
-}
-
-@media (max-height: 760px) {
-  .mq-rail-quilt {
-    display: none;
-  }
-}
-
 /* Every signed-out page: the quilt's sashing shows through the seam around the light block. */
 .mq-auth {
   background: var(--mq-quilt-sashing);
@@ -572,11 +548,6 @@ aside.mq-frame {
 .mq-frame-loading {
   --color-kumo-brand: var(--mq-frame-text);
   background: var(--mq-frame);
-}
-
-/* Collapsed to icons, a page that isn't built would be a bare dashed square with no label: it steps aside until the rail opens. */
-.mq-frame[data-state="collapsed"] .mq-nav-soon {
-  display: none !important;
 }
 
 /* The page block, set into the frame with the logo's 8-unit seam. */
@@ -651,11 +622,7 @@ aside.mq-frame {
   background: var(--mq-frame-hover);
 }
 
-/* The full-screen navigation: no quilt, the account at its foot, and its top edge is the bar's, so the logo doesn't move as it opens. */
-.mq-frame[data-mobile] .mq-rail-quilt {
-  display: none;
-}
-
+/* The full-screen navigation: the account at its foot, and its top edge is the bar's, so the logo doesn't move as it opens. */
 .mq-frame[data-mobile] .mq-frame-head {
   align-items: center;
   padding: 0 0.25rem 0 1rem;
@@ -684,6 +651,11 @@ aside.mq-frame {
 .mq-frame[data-mobile] [data-sidebar="menu-button"] {
   min-height: 2.75rem;
   font-size: 1rem;
+}
+
+.mq-frame[data-mobile] .mq-nav-icon {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .mq-frame[data-mobile] [data-sidebar="menu-button"] .text-xs,
