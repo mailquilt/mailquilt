@@ -253,12 +253,10 @@ describe("Instance settings", () => {
     });
     renderPage();
 
-    await expect(
-      screen.findByText("Set on the server.")
-    ).resolves.toBeDefined();
-    expect(
-      screen.getByText("smtp.example.com, port 587, STARTTLS")
-    ).toBeDefined();
+    await expect(screen.findByText("SYSTEM_MAILER_*")).resolves.toBeDefined();
+    expect(document.querySelector("dl")?.textContent).toContain(
+      "Serversmtp.example.com:587EncryptionSTARTTLS"
+    );
     expect(screen.queryByLabelText("Host")).toBeNull();
   });
 });

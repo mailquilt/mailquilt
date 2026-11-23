@@ -1,5 +1,5 @@
 import { Banner, Button, Link, Radio } from "@cloudflare/kumo";
-import { CheckIcon } from "@phosphor-icons/react";
+import { WarningIcon } from "@phosphor-icons/react";
 import { SignUpPolicySchema } from "@repo/domain";
 import type {
   InstanceSettings,
@@ -10,9 +10,13 @@ import { useLocation } from "@tanstack/react-router";
 import { Predicate, Schema } from "effect";
 import { useId, useState } from "react";
 
+import { Breakable } from "../layout/breakable.tsx";
 import { LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
+import { PageHeader } from "../layout/page-header.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
+import { SettingsSection } from "../layout/settings-section.tsx";
+import { TableRegion } from "../layout/table-region.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
 import {
   ConnectionForm,
@@ -24,63 +28,31 @@ import {
   useUpdateSystemMailer,
 } from "./instance-api.ts";
 
-const SECURITY_LABEL = {
-  none: "no encryption",
-  starttls: "STARTTLS",
-  tls: "TLS",
-};
-
-const PageSection = ({
-  children,
-  description,
-  title,
-}: {
-  children: React.ReactNode;
-  description: string;
-  title: string;
-}) => {
-  const headingId = useId();
-
-  return (
-    <section
-      aria-labelledby={headingId}
-      className="flex flex-col gap-4 border-t border-kumo-hairline py-8"
-    >
-      <div className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-kumo-strong" id={headingId}>
-          {title}
-        </h2>
-        <p className="max-w-[36rem] text-base text-(--mq-body)">
-          {description}
-        </p>
-      </div>
-      {children}
-    </section>
-  );
-};
-
-const DoneBlock = () => (
-  <span
-    aria-hidden="true"
-    className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
-  >
-    <CheckIcon className="size-3" weight="bold" />
-  </span>
-);
-
 const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
   const update = useUpdateSignUp();
   const toasts = useConfirmationToast();
   const [edited, setEdited] = useState<SignUpPolicy | null>(null);
   const chosen = edited ?? current;
+  const formId = useId();
 
   return (
-    <PageSection
-      description="Anyone can sign in once they have an account. This decides who can make one."
+    <SettingsSection
+      about="Anyone can sign in once they have an account. This decides who can make one."
+      footer={
+        <Button
+          aria-busy={update.isPending}
+          form={formId}
+          type="submit"
+          variant="primary"
+        >
+          {update.isPending ? "Saving…" : "Save changes"}
+        </Button>
+      }
       title="Who can sign up"
     >
       <form
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-5"
+        id={formId}
         onSubmit={(event) => {
           event.preventDefault();
 
@@ -96,7 +68,6 @@ const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
       >
         <Radio.Group
           appearance="card"
-          controlPosition="start"
           onValueChange={(value) => {
             if (update.isError) {
               update.reset();
@@ -125,42 +96,62 @@ const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
             variant="error"
           />
         ) : null}
-        <div className="flex items-center justify-end gap-4 max-sm:flex-col-reverse max-sm:items-stretch max-sm:*:h-11 max-sm:*:w-full max-sm:*:justify-center">
-          <Button aria-busy={update.isPending} type="submit" variant="primary">
-            {update.isPending ? "Saving…" : "Save changes"}
-          </Button>
-        </div>
       </form>
-    </PageSection>
+    </SettingsSection>
   );
 };
 
+const SECURITY_NAME = {
+  none: "None",
+  starttls: "STARTTLS",
+  tls: "TLS",
+};
+
+const Setting = ({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) => (
+  <>
+    <dt className="text-sm leading-5.25 text-kumo-subtle">{label}</dt>
+    <dd className="min-w-0 text-kumo-strong">{children}</dd>
+  </>
+);
+
 const SetByEnvironment = ({ mailer }: { mailer: SystemMailerSettings }) => (
-  <div className="flex flex-col gap-4 rounded-xl border border-kumo-hairline bg-kumo-elevated px-5 py-4">
-    <p className="text-base text-(--mq-body)">
-      <span className="font-semibold text-kumo-strong">Set on the server.</span>{" "}
-      The <code className="font-mono text-sm">SYSTEM_MAILER_</code> environment
-      variables choose this server. To change it, edit them where Mailquilt runs
-      and restart it.
+  <>
+    <div className="rounded-lg bg-kumo-elevated px-4 py-3.5 ring ring-kumo-hairline">
+      <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-base sm:grid-cols-[6.5rem_minmax(0,1fr)]">
+        <Setting label="Server">
+          <Breakable value={`${mailer.smtp.host}:${mailer.smtp.port}`} />
+        </Setting>
+        <Setting label="Encryption">
+          {SECURITY_NAME[mailer.smtp.security]}
+        </Setting>
+        <Setting label="Sign-in">
+          {mailer.signsIn ? "Username and password" : "None"}
+        </Setting>
+        <Setting label="From">
+          {mailer.from.name === undefined ? (
+            <Breakable value={mailer.from.email} />
+          ) : (
+            <>
+              {mailer.from.name}
+              <span className="block text-sm text-kumo-subtle">
+                <Breakable value={mailer.from.email} />
+              </span>
+            </>
+          )}
+        </Setting>
+      </dl>
+    </div>
+    <p className="-mt-2 text-sm leading-5 text-pretty text-kumo-subtle">
+      Set by <code className="font-mono">SYSTEM_MAILER_*</code> environment
+      variables on the server. Change them there and restart Mailquilt.
     </p>
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-base sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-y-2">
-      <dt className="text-kumo-subtle">Server</dt>
-      <dd className="mb-2 wrap-anywhere text-kumo-strong sm:mb-0">
-        {mailer.smtp.host}, port {mailer.smtp.port},{" "}
-        {SECURITY_LABEL[mailer.smtp.security]}
-      </dd>
-      <dt className="text-kumo-subtle">Sign-in</dt>
-      <dd className="mb-2 text-kumo-strong sm:mb-0">
-        {mailer.signsIn ? "Username and password" : "None"}
-      </dd>
-      <dt className="text-kumo-subtle">Sends as</dt>
-      <dd className="wrap-anywhere text-kumo-strong">
-        {mailer.from.name === undefined
-          ? mailer.from.email
-          : `${mailer.from.name} <${mailer.from.email}>`}
-      </dd>
-    </dl>
-  </div>
+  </>
 );
 
 const mailerFailureMessage = (failure: Error | null) =>
@@ -178,22 +169,23 @@ const SystemMailerSection = ({
   const update = useUpdateSystemMailer();
   const toasts = useConfirmationToast();
 
-  const description =
+  const about =
     "Mailquilt sends its own emails through this server, such as the link that confirms a new account’s address. Campaigns never use it.";
 
   if (mailer?.source === "environment") {
     return (
-      <PageSection description={description} title="Account emails">
+      <SettingsSection about={about} title="Account emails">
         <SetByEnvironment mailer={mailer} />
-      </PageSection>
+      </SettingsSection>
     );
   }
 
   return (
-    <PageSection description={description} title="Account emails">
+    <SettingsSection about={about} title="Account emails">
       {mailer === null ? (
         <Banner
           description="People who sign up can’t confirm their address until you add a server."
+          icon={<WarningIcon />}
           title="Account emails aren’t being sent."
           variant="alert"
         />
@@ -217,11 +209,11 @@ const SystemMailerSection = ({
             }
           )
         }
-        senderDescription="Who account emails come from. Use an address on a domain your server may send for."
+        senderDescription="Use an address on a domain your server may send for."
         senderExample={{ email: "accounts@example.com", name: "Acme" }}
         submitLabel={mailer === null ? "Save server" : "Save changes"}
       />
-    </PageSection>
+    </SettingsSection>
   );
 };
 
@@ -232,7 +224,7 @@ const Settings = ({ settings }: { settings: InstanceSettings }) => {
     <>
       {state.justSetUp ? (
         <div className="mb-8 flex gap-3 rounded-xl bg-kumo-tint px-4 py-3.5 text-base text-(--mq-body)">
-          <DoneBlock />
+          <span aria-hidden="true" className="mq-done-block" />
           <p>
             <span className="font-semibold text-kumo-strong">
               Your admin account is ready.
@@ -246,8 +238,10 @@ const Settings = ({ settings }: { settings: InstanceSettings }) => {
           </p>
         </div>
       ) : null}
-      <SignUpSection current={settings.signUp} />
-      <SystemMailerSection mailer={settings.systemMailer} />
+      <div>
+        <SignUpSection current={settings.signUp} />
+        <SystemMailerSection mailer={settings.systemMailer} />
+      </div>
     </>
   );
 };
@@ -270,25 +264,32 @@ export const InstanceSettingsPage = () => {
 
   return (
     <PageFrame>
-      <div className="mx-auto max-w-[44rem]">
-        <h1 className="font-display text-display font-semibold text-kumo-strong">
-          Instance settings
-        </h1>
-        <p className="mt-1.5 mb-8 text-base text-(--mq-body)">
-          {notAdmin
-            ? "Only the person who runs this Mailquilt can see or change its settings."
-            : "These apply to everyone on this Mailquilt. Only you can see them, as its admin."}
-        </p>
+      <div className="max-w-[60rem]">
+        <PageHeader
+          description={
+            notAdmin
+              ? "Only the person who runs this Mailquilt can see or change its settings."
+              : "These apply to everyone on this Mailquilt. Only you can see them, as its admin."
+          }
+          title="Instance settings"
+          titleDetail={
+            settings.data ? (
+              <Breakable value={window.location.host} />
+            ) : undefined
+          }
+        />
         {(settings.isError || retrying) && !notAdmin ? (
-          <LoadFailed
-            onRetry={async () => {
-              setRetrying(true);
-              await settings.refetch();
-              setRetrying(false);
-            }}
-            retrying={retrying || settings.isFetching}
-            title="Instance settings didn’t load"
-          />
+          <TableRegion label="Instance settings">
+            <LoadFailed
+              onRetry={async () => {
+                setRetrying(true);
+                await settings.refetch();
+                setRetrying(false);
+              }}
+              retrying={retrying || settings.isFetching}
+              title="Instance settings didn’t load"
+            />
+          </TableRegion>
         ) : null}
         {settings.data ? <Settings settings={settings.data} /> : null}
       </div>

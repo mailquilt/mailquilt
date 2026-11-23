@@ -5,6 +5,7 @@ import {
   cleanup,
   fireEvent,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { Deferred, Effect, Schema } from "effect";
@@ -107,10 +108,26 @@ describe("providers page", () => {
     const relay = screen.getByRole("article", { name: "Office relay" });
 
     expect(within(postmark).getByText("Acme News")).toBeTruthy();
-    expect(within(postmark).getByText("news@acme.example")).toBeTruthy();
+    expect(postmark.textContent).toContain("news@acme.example");
     expect(postmark.textContent).toContain("smtp.postmarkapp.com:587");
-    expect(postmark.textContent).toContain("STARTTLS, signs in");
-    expect(relay.textContent).toContain("Not encrypted, no sign-in");
+    expect(postmark.textContent).toContain("STARTTLS, with sign-in");
+    expect(relay.textContent).toContain("Not encrypted, without sign-in");
+  });
+
+  it("opens a connection's Edit page without reloading the app", async () => {
+    withConnections([POSTMARK]);
+    const router = renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for Postmark" })
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit" }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/providers/${POSTMARK.id}/edit`
+      )
+    );
   });
 
   it("sends a test email to the person's own address and says it was accepted", async () => {
@@ -131,7 +148,7 @@ describe("providers page", () => {
 
     const sent = await screen.findByRole("status");
 
-    expect(sent.textContent).toContain("Sent. Postmark accepted it.");
+    expect(sent.textContent).toContain("Postmark accepted the email");
     expect(sentTo).toBe("ada@acme.example");
     fireEvent.click(screen.getByRole("button", { name: "Message ID" }));
     await expect(screen.findByText("<abc@acme.example>")).resolves.toBeTruthy();
@@ -200,7 +217,7 @@ describe("providers page", () => {
       )
     );
 
-    expect(screen.getByText("Sent. Postmark accepted it.")).toBeTruthy();
+    expect(screen.getByText("Postmark accepted the email")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
     Deferred.doneUnsafe(answerSecond, Effect.succeed(true));
   });
@@ -325,6 +342,32 @@ describe("providers page", () => {
       screen.findByText("No provider connected yet")
     ).resolves.toBeTruthy();
     expect(document.activeElement?.textContent).toBe("Deleted Postmark.");
+  });
+
+  it("says the connection wasn't deleted when the server can't be reached", async () => {
+    withConnections([POSTMARK]);
+    api.use(
+      http.delete(`${CONNECTIONS}/:providerConnectionId`, () =>
+        HttpResponse.error()
+      )
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for Postmark" })
+    );
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delete connection" })
+    );
+
+    await expect(screen.findByRole("alert")).resolves.toHaveProperty(
+      "textContent",
+      "Mailquilt couldn’t reach its server, so Postmark wasn’t deleted. Try again."
+    );
+    expect(
+      screen.getByRole("article", { hidden: true, name: "Postmark" })
+    ).toBeTruthy();
   });
 
   it("counts a connection someone else already deleted as deleted", async () => {
