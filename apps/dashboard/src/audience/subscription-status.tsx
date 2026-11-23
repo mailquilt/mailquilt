@@ -7,8 +7,7 @@ export const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   unsubscribed: "Unsubscribed",
 };
 
-const BLOCKS: Record<SubscriptionStatus, string> = {
-  pending: "border-2 border-dashed border-(--mq-logo-slot)",
+const FILLED: Record<Exclude<SubscriptionStatus, "pending">, string> = {
   subscribed: "bg-(--mq-block-ink)",
   unsubscribed: "bg-(--mq-patch-pale)",
 };
@@ -16,14 +15,36 @@ const BLOCKS: Record<SubscriptionStatus, string> = {
 /**
  * A Subscription's status as one of the logo's blocks: ink when subscribed,
  * the dashed slot of a piece not there yet when pending, pale when
- * unsubscribed. Decorative: the status is always written beside it.
+ * unsubscribed. Decorative: the status is always written beside it. The
+ * slot is an SVG dash, because at 12px a CSS dashed border draws as a solid
+ * outline and reads as an empty checkbox.
  */
-export const StatusBlock = ({ status }: { status: SubscriptionStatus }) => (
-  <span
-    aria-hidden="true"
-    className={`inline-block size-3 shrink-0 rounded-quilt ${BLOCKS[status]}`}
-  />
-);
+export const StatusBlock = ({ status }: { status: SubscriptionStatus }) =>
+  status === "pending" ? (
+    <svg
+      aria-hidden="true"
+      className="size-3 shrink-0"
+      focusable="false"
+      viewBox="0 0 12 12"
+    >
+      <rect
+        className="stroke-(--mq-logo-slot)"
+        fill="none"
+        height="10.5"
+        rx="1.5"
+        strokeDasharray="2.25 1.5"
+        strokeWidth="1.5"
+        width="10.5"
+        x="0.75"
+        y="0.75"
+      />
+    </svg>
+  ) : (
+    <span
+      aria-hidden="true"
+      className={`inline-block size-3 shrink-0 rounded-quilt ${FILLED[status]}`}
+    />
+  );
 
 /** A Subscription's status, as a block and its name. */
 export const SubscriptionStatusLabel = ({
@@ -52,7 +73,7 @@ export const ListChip = ({
   status: SubscriptionStatus;
 }) => (
   <span
-    className={`inline-flex h-6 max-w-48 items-center gap-1.5 rounded-md px-2 text-sm ring ring-kumo-fill ring-inset ${status === "unsubscribed" ? "text-kumo-subtle" : "bg-kumo-elevated text-kumo-default"}`}
+    className={`inline-flex h-6 max-w-48 min-w-0 items-center gap-1.5 rounded-md px-2 text-sm ring ring-kumo-fill ring-inset ${status === "unsubscribed" ? "text-kumo-subtle" : "bg-kumo-elevated text-kumo-default"}`}
   >
     <StatusBlock status={status} />
     <span className="truncate">{name}</span>

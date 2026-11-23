@@ -1,10 +1,5 @@
 import { Button, Checkbox, Select } from "@cloudflare/kumo";
-import {
-  CaretLeftIcon,
-  CaretRightIcon,
-  PlusIcon,
-  XIcon,
-} from "@phosphor-icons/react";
+import { CaretLeftIcon, CaretRightIcon, PlusIcon } from "@phosphor-icons/react";
 import type {
   Contact,
   ContactId,
@@ -29,18 +24,19 @@ import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
+import { SelectionBar, TableRegion, Toolbar } from "../layout/table-region.tsx";
 import { AddContactDialog } from "./add-contact-dialog.tsx";
 import { AddToListDialog } from "./add-to-list-dialog.tsx";
 import { useContactPage, useLists } from "./audience-api.ts";
 import type { ContactSearch } from "./contact-search.ts";
 import { DataTable } from "./data-table.tsx";
+import type { StackedArea } from "./data-table.tsx";
 import { formatCount, formatDay } from "./format.ts";
 import {
   ListChip,
   STATUS_LABELS,
   SubscriptionStatusLabel,
 } from "./subscription-status.tsx";
-import { TableCard } from "./table-card.tsx";
 
 const ALL_CONTACTS = "all";
 
@@ -61,21 +57,23 @@ const totalOf = (list: List) =>
   list.subscriptions.pending +
   list.subscriptions.unsubscribed;
 
-const PINNED_ON_PHONES = {
-  email:
-    "max-w-[13rem] truncate max-sm:sticky max-sm:left-10 max-sm:z-1 max-sm:bg-(--kumo-table-row-bg) max-sm:shadow-pinned-column sm:max-w-[26rem] md:max-xl:max-w-[15rem]",
-  select:
-    "w-10 max-sm:sticky max-sm:left-0 max-sm:z-1 max-sm:bg-(--kumo-table-row-bg)",
+const COLUMN_CLASSES = {
+  added: "whitespace-nowrap",
+  email: "max-w-[26rem] truncate whitespace-nowrap md:max-xl:max-w-[16rem]",
+  joined: "whitespace-nowrap",
+  lists: "whitespace-nowrap",
+  select: "w-9",
+  status: "whitespace-nowrap",
 };
 
-const COLUMN_CLASSES = {
-  added: "md:max-xl:hidden",
-  email: PINNED_ON_PHONES.email,
-  joined: "",
-  lists: "",
-  select: PINNED_ON_PHONES.select,
-  status: "",
-};
+const AREAS = {
+  added: "side",
+  email: "main",
+  joined: "side",
+  lists: "sub",
+  select: "check",
+  status: "sub",
+} satisfies Record<string, StackedArea>;
 
 const CHECKBOX_TARGET_LIKE_KUMO_TABLE =
   "relative flex leading-none before:absolute before:-inset-3 before:content-['']";
@@ -105,13 +103,17 @@ const selectColumn = helper.display({
 
 const emailColumn = helper.accessor("email", {
   cell: ({ getValue }) => (
-    <span className="font-medium text-kumo-strong">{getValue()}</span>
+    <span className="font-medium text-kumo-strong" title={getValue()}>
+      {getValue()}
+    </span>
   ),
   header: "Email",
 });
 
 const quietDate = (date: DateTime.Utc) => (
-  <span className="text-sm text-kumo-subtle">{formatDay(date)}</span>
+  <span className="text-sm text-kumo-subtle tabular-nums">
+    {formatDay(date)}
+  </span>
 );
 
 const allContactsColumns = (lists: readonly List[]) => {
@@ -143,7 +145,7 @@ const allContactsColumns = (lists: readonly List[]) => {
             </span>
             <span
               aria-hidden="true"
-              className="flex items-center gap-1.5"
+              className="flex min-w-0 items-center gap-1.5"
               title={subscriptions
                 .map((subscription) => nameOf(subscription.listId))
                 .join(", ")}
@@ -229,7 +231,7 @@ const ListFilter = ({
 }) => (
   <Select
     aria-label="List"
-    className="max-sm:w-full sm:min-w-48"
+    className="max-sm:w-full"
     onValueChange={(value) => onChange(String(value))}
     renderValue={() => (
       <span>
@@ -239,13 +241,15 @@ const ListFilter = ({
     )}
     value={list?.id ?? ALL_CONTACTS}
   >
-    <Select.Option value={ALL_CONTACTS}>All contacts</Select.Option>
+    <Select.Option className="mq-count-option" value={ALL_CONTACTS}>
+      All contacts
+    </Select.Option>
     {lists.length === 0 ? null : (
       <Select.Group>
         <Select.GroupLabel>Lists</Select.GroupLabel>
         {lists.map((candidate) => (
           <Select.Option
-            className="*:first:flex-1"
+            className="mq-count-option *:first:flex-1"
             key={candidate.id}
             value={candidate.id}
           >
@@ -283,7 +287,10 @@ const StatusFilter = ({
     )}
     value={status ?? ALL_STATUSES}
   >
-    <Select.Option className="*:first:flex-1" value={ALL_STATUSES}>
+    <Select.Option
+      className="mq-count-option *:first:flex-1"
+      value={ALL_STATUSES}
+    >
       <span className="flex w-full justify-between gap-6">
         All
         <span className="text-kumo-subtle tabular-nums">
@@ -293,7 +300,7 @@ const StatusFilter = ({
     </Select.Option>
     {STATUSES.map((candidate) => (
       <Select.Option
-        className="*:first:flex-1"
+        className="mq-count-option *:first:flex-1"
         key={candidate}
         value={candidate}
       >
@@ -322,7 +329,7 @@ const Pager = ({
   return (
     <nav
       aria-label="Pages of contacts"
-      className="flex w-full items-center justify-between gap-3"
+      className="flex items-center justify-between gap-3 pt-4 text-sm text-kumo-subtle"
     >
       <span className="tabular-nums">
         {formatCount(page.start + 1)}–
@@ -338,7 +345,6 @@ const Pager = ({
               onPage({ before: previous });
             }
           }}
-          size="sm"
           variant="secondary"
         >
           Previous
@@ -350,7 +356,6 @@ const Pager = ({
               onPage({ after: next });
             }
           }}
-          size="sm"
           variant="secondary"
         >
           Next
@@ -478,105 +483,91 @@ const ContactsTable = ({
     (id): id is ContactId => rowSelection[id] === true
   );
 
-  const filters =
-    selected.length > 0 ? (
-      <>
-        <span className="px-1.5 font-semibold text-kumo-strong tabular-nums">
-          {formatCount(selected.length)} selected
-        </span>
-        <Button
-          disabled={lists.length === 0}
-          onClick={() => addingToList.setOpen(true)}
-          ref={addToListButton}
-          variant="secondary"
-        >
-          Add to list
-        </Button>
-        <span className="flex-1" />
-        <Button
-          aria-label="Clear selection"
-          className="max-sm:px-2"
-          onClick={() => setRowSelection({})}
-          variant="ghost"
-        >
-          <XIcon aria-hidden="true" className="size-4 sm:hidden" />
-          <span className="max-sm:hidden">Clear selection</span>
-        </Button>
-      </>
-    ) : (
-      <>
-        <ListFilter
+  const filters = (
+    <>
+      <ListFilter
+        list={list}
+        lists={lists}
+        onChange={(value) =>
+          onSearch(
+            value === ALL_CONTACTS
+              ? {}
+              : { list: lists.find((l) => l.id === value)?.id }
+          )
+        }
+      />
+      {list === undefined ? null : (
+        <StatusFilter
           list={list}
-          lists={lists}
           onChange={(value) =>
-            onSearch(
-              value === ALL_CONTACTS
-                ? {}
-                : { list: lists.find((l) => l.id === value)?.id }
-            )
+            onSearch({
+              list: list.id,
+              status: STATUSES.find((status) => status === value),
+            })
           }
+          status={search.status}
         />
-        {list === undefined ? null : (
-          <StatusFilter
-            list={list}
-            onChange={(value) =>
-              onSearch({
-                list: list.id,
-                status: STATUSES.find((status) => status === value),
-              })
-            }
-            status={search.status}
-          />
-        )}
-      </>
-    );
+      )}
+    </>
+  );
 
   const showAll = () =>
     onSearch(search.status === undefined ? {} : { list: list?.id });
 
   return (
-    <TableCard
-      busy={query.isPlaceholderData}
-      footer={
-        page.total === 0 ? undefined : (
-          <Pager
-            loading={query.isPlaceholderData}
-            onPage={(cursor) =>
-              onSearch({ list: search.list, status: search.status, ...cursor })
-            }
-            page={page}
+    <>
+      {page.total === 0 && search.list === undefined ? null : (
+        <Toolbar>{filters}</Toolbar>
+      )}
+      <TableRegion busy={query.isPlaceholderData} label="Contacts">
+        {page.total === 0 ? (
+          <NoContacts
+            addButton={addContactButton}
+            list={shownList}
+            onAdd={onAddContact}
+            onShowAll={showAll}
+            status={search.status}
           />
-        )
-      }
-      toolbarTinted={selected.length > 0}
-      toolbar={
-        page.total === 0 && search.list === undefined ? undefined : (
-          <div className="flex w-full flex-wrap items-center gap-2">
-            {filters}
-          </div>
-        )
-      }
-    >
-      {page.total === 0 ? (
-        <NoContacts
-          addButton={addContactButton}
-          list={shownList}
-          onAdd={onAddContact}
-          onShowAll={showAll}
-          status={search.status}
-        />
-      ) : (
-        <DataTable
-          columnClassNames={COLUMN_CLASSES}
-          isSelected={(id) => rowSelection[id] === true}
-          label={
-            shownList === undefined
-              ? "Contacts"
-              : `Contacts on ${shownList.name}`
+        ) : (
+          <DataTable
+            areas={AREAS}
+            columnClassNames={COLUMN_CLASSES}
+            isSelected={(id) => rowSelection[id] === true}
+            label={
+              shownList === undefined
+                ? "Contacts"
+                : `Contacts on ${shownList.name}`
+            }
+            table={table}
+          />
+        )}
+      </TableRegion>
+      {page.total === 0 ? null : (
+        <Pager
+          loading={query.isPlaceholderData}
+          onPage={(cursor) =>
+            onSearch({ list: search.list, status: search.status, ...cursor })
           }
-          table={table}
+          page={page}
         />
       )}
+      <SelectionBar
+        actions={
+          <button
+            className="mq-selbar-button"
+            data-strong=""
+            disabled={lists.length === 0}
+            onClick={() => addingToList.setOpen(true)}
+            ref={addToListButton}
+            type="button"
+          >
+            Add to list
+          </button>
+        }
+        count={selected.length}
+        label="Selected contacts"
+        onClear={() => setRowSelection({})}
+      />
       {Arr.isReadonlyArrayNonEmpty(selected) ? (
         <AddToListDialog
           contactIds={selected}
@@ -589,8 +580,35 @@ const ContactsTable = ({
           organization={organization}
         />
       ) : null}
-    </TableCard>
+    </>
   );
+};
+
+const headerAddsContact = (
+  lists: readonly List[] | undefined,
+  page: ContactPage | null | undefined,
+  search: ContactSearch
+) => {
+  if (lists === undefined || page === undefined || page === null) {
+    return false;
+  }
+
+  const emptyStateOffersAdd = page.total === 0 && search.status === undefined;
+
+  return !emptyStateOffersAdd;
+};
+
+const countOf = (
+  page: ContactPage | null | undefined,
+  shownList: List | undefined
+) => {
+  if (page === undefined || page === null || page.total === 0) {
+    return;
+  }
+
+  const count = formatCount(page.total);
+
+  return shownList === undefined ? count : `${count} on this list`;
 };
 
 /**
@@ -650,7 +668,7 @@ export const ContactsPage = ({
   const body = () => {
     if (page.data === null) {
       return (
-        <TableCard>
+        <TableRegion label="Contacts">
           <EmptyState
             actions={
               <Button onClick={() => onSearch({})} variant="secondary">
@@ -660,19 +678,19 @@ export const ContactsPage = ({
             description="It may belong to another organization, or the link is out of date."
             title={`That list isn’t in ${organization.name}`}
           />
-        </TableCard>
+        </TableRegion>
       );
     }
 
     if (lists.data === undefined || page.data === undefined) {
       return (
-        <TableCard>
+        <TableRegion label="Contacts">
           <LoadFailed
             onRetry={retry}
             retrying={lists.isFetching || page.isFetching}
             title="Your contacts didn’t load"
           />
-        </TableCard>
+        </TableRegion>
       );
     }
 
@@ -693,13 +711,10 @@ export const ContactsPage = ({
     );
   };
 
-  const hasNoContactsAtAll =
-    page.data?.total === 0 && search.list === undefined;
-
   return (
     <TablePage
       actions={
-        hasNoContactsAtAll ? undefined : (
+        headerAddsContact(lists.data, page.data, search) ? (
           <Button
             icon={PlusIcon}
             onClick={startAdding}
@@ -708,10 +723,11 @@ export const ContactsPage = ({
           >
             Add contact
           </Button>
-        )
+        ) : undefined
       }
       description={`Everyone in ${organization.name}’s audience. Each address appears once.`}
       title="Contacts"
+      titleDetail={countOf(page.data, shownList)}
     >
       {body()}
       <AddContactDialog

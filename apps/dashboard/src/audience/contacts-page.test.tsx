@@ -241,7 +241,9 @@ describe("contacts page", () => {
     );
 
     await expect(
-      screen.findByText("Added ada@example.com")
+      screen.findByText("Added ada@example.com", {
+        normalizer: (text) => text.replaceAll("\u200B", ""),
+      })
     ).resolves.toBeTruthy();
     expect(created).toStrictEqual({
       email: "grace@example.com",
@@ -274,6 +276,57 @@ describe("contacts page", () => {
 
     await expect(screen.findByText("No contacts yet")).resolves.toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("offers one Add contact on a list with no one on it, in its empty state", async () => {
+    api.use(...audience({ contacts: page([]) }));
+
+    renderPage({ list: ListIdSchema.make(NEWS.id) });
+
+    await expect(
+      screen.findByText("No one is on Weekly news yet")
+    ).resolves.toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Add contact" })).toHaveLength(
+      1
+    );
+  });
+
+  it("doesn't offer Add contact beside contacts that didn't load", async () => {
+    api.use(
+      http.get("*/api/organizations/:organizationId/contacts", () =>
+        HttpResponse.error()
+      ),
+      ...audience()
+    );
+
+    renderPage();
+
+    await screen.findByRole("button", { name: "Try again" });
+
+    expect(screen.queryByRole("button", { name: "Add contact" })).toBeNull();
+  });
+
+  it("keeps the list filter in place and shows the selection in its own bar", async () => {
+    api.use(...audience());
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select ada@example.com" })
+    );
+
+    const bar = screen.getByRole("region", { name: "Selected contacts" });
+
+    expect(bar.textContent).toContain("1 selected");
+    expect(screen.getByRole("combobox", { name: "List" })).toBeTruthy();
+
+    fireEvent.click(
+      within(bar).getByRole("button", { name: "Clear selection" })
+    );
+
+    await expect
+      .poll(() => screen.queryByRole("region", { name: "Selected contacts" }))
+      .toBeNull();
   });
 
   it("offers Try again when contacts don't load, and shows them once they do", async () => {

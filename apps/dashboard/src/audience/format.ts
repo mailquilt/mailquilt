@@ -15,3 +15,26 @@ export const formatDay = (date: DateTime.Utc) => {
         year: "numeric",
       });
 };
+
+const WRAP_POINT = "​";
+
+/**
+ * An email address that a line can break only after its "@" or a dot,
+ * never mid-word or before its ending: "wholesale@" / "fernhillcoffee.com".
+ * For text that wraps, such as a toast's title.
+ */
+export const wrappableAddress = (address: string) => {
+  const parts = address.split(/(?<=[@.])/u);
+  const ending = parts.at(-1);
+  const beforeEnding = parts.at(-2);
+
+  if (
+    ending !== undefined &&
+    beforeEnding !== undefined &&
+    beforeEnding.endsWith(".")
+  ) {
+    parts.splice(-2, 2, `${beforeEnding}${ending}`);
+  }
+
+  return parts.join(WRAP_POINT);
+};

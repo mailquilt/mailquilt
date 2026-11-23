@@ -47,9 +47,6 @@
   /* A sheet's edge against the page it rises over. */
   --shadow-sheet: 0 0 0 1px var(--mq-pop-ring), var(--mq-sheet-shadow);
 
-  /* The edge of a table column pinned while the rest scrolls sideways. */
-  --shadow-pinned-column: inset -1px 0 0 var(--color-kumo-fill);
-
   /* Every signed-out page lines its logo, form and footer up on this width. */
   --container-auth-form: 23.75rem;
 
@@ -939,5 +936,399 @@ aside.mq-frame {
 
   .mq-done-block::after {
     transition: none;
+  }
+}
+
+/* ---------- Tables: edge to edge on the page, two-line rows on phones ---------- */
+
+/* A table's place on the page: full width inside the page block, its first and last columns on the page's gutter. */
+.mq-bleed {
+  margin-inline: calc(var(--gutter) * -1);
+}
+
+/* An empty, didn't-load or loading state sits where the rows would be, under the same line. */
+.mq-region-state > .mq-state {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+/* Paging: the rows stay, dimmed, under a moving line. */
+.mq-busy-line {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  z-index: 2;
+  height: 2px;
+  overflow: hidden;
+}
+
+.mq-busy-line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 30%;
+  background: var(--color-kumo-brand);
+  animation: mq-busy 1100ms linear infinite;
+}
+
+@keyframes mq-busy {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
+/*
+ * Kumo's Table, drawn quietly: a plain header in subtle text over one
+ * hairline (not Kumo's elevated header fill), 48px hairline rows, and the
+ * first and last columns inset to the page's gutter.
+ */
+.mq-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.mq-table th {
+  height: 2.25rem;
+  border-bottom: 1px solid var(--color-kumo-hairline) !important;
+  background: var(--color-kumo-base) !important;
+  padding-block: 0 !important;
+  color: var(--text-color-kumo-subtle);
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  white-space: nowrap;
+}
+
+.mq-table td {
+  height: 3rem;
+  border-bottom: 1px solid var(--color-kumo-hairline);
+  padding-block: 0 !important;
+}
+
+.mq-table tr > :first-child {
+  padding-left: var(--gutter) !important;
+}
+
+.mq-table tr > :last-child {
+  padding-right: var(--gutter) !important;
+}
+
+.mq-table tbody tr {
+  --kumo-table-row-bg: var(--color-kumo-base);
+  background: var(--color-kumo-base);
+}
+
+.mq-table tbody tr[data-selected] {
+  --kumo-table-row-bg: var(--color-kumo-tint);
+  background: var(--color-kumo-tint);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mq-table tbody tr:hover {
+    --kumo-table-row-bg: var(--color-kumo-elevated);
+    background: var(--color-kumo-elevated);
+  }
+
+  .mq-table tbody tr[data-selected]:hover {
+    background: var(--color-kumo-tint);
+  }
+}
+
+/*
+ * Phones: rows restack into two-line items instead of scrolling sideways.
+ * The rows keep role="row" and "cell", since changing display drops table
+ * semantics in some browsers.
+ */
+@media (max-width: 639px) {
+  .mq-stack thead {
+    display: none;
+  }
+
+  .mq-stack tbody tr {
+    display: grid;
+    grid-template-columns: 2.25rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "check main side"
+      "check sub sub";
+    align-items: center;
+    row-gap: 0.25rem;
+    border-bottom: 1px solid var(--color-kumo-hairline);
+    padding: 0.75rem var(--gutter);
+  }
+
+  .mq-table.mq-stack tbody tr > td {
+    height: auto;
+    border: 0;
+    padding: 0 !important;
+  }
+
+  /* The box lines up with the address, not the middle of the row. */
+  .mq-stack [data-area="check"] {
+    grid-area: check;
+    align-self: start;
+    padding-top: 0.1875rem !important;
+  }
+
+  .mq-stack [data-area="main"] {
+    grid-area: main;
+    font-size: 0.9375rem;
+  }
+
+  .mq-stack [data-area="side"] {
+    grid-area: side;
+  }
+
+  .mq-table.mq-stack tbody tr > [data-area="side"] {
+    padding-left: 0.75rem !important;
+  }
+
+  .mq-stack [data-area="sub"] {
+    grid-area: sub;
+  }
+
+  .mq-stack [data-area="hide"] {
+    display: none;
+  }
+
+  .mq-stack.mq-no-check tbody tr {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "main side"
+      "sub sub";
+  }
+}
+
+/* The smallest phones: the address gets the whole first line, and the date moves beside the Lists. */
+@media (max-width: 359px) {
+  .mq-stack:not(.mq-no-check) tbody tr {
+    grid-template-areas:
+      "check main main"
+      "check sub side";
+  }
+
+  .mq-stack:not(.mq-no-check) [data-area="sub"] {
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
+/* Above a table, its filters. They stay put while rows are selected. */
+@media (max-width: 639px) {
+  .mq-toolbar > * {
+    flex: 1;
+  }
+}
+
+/*
+ * A List's make-up in the status blocks' own language: ink subscribed,
+ * dashed pending, pale unsubscribed, each part as wide as its share of the
+ * biggest List, so the bars also compare Lists with each other.
+ */
+.mq-makeup {
+  display: flex;
+  width: 100%;
+  max-width: 20rem;
+  height: 0.75rem;
+  gap: 3px;
+}
+
+.mq-makeup > i {
+  display: block;
+  width: var(--mq-share);
+  min-width: 0.5rem;
+  border-radius: 2.5px;
+}
+
+.mq-makeup > [data-status="subscribed"] {
+  background: var(--mq-block-ink);
+}
+
+.mq-makeup > [data-status="pending"] {
+  border: 1.5px dashed var(--mq-logo-slot);
+}
+
+.mq-makeup > [data-status="unsubscribed"] {
+  background: var(--mq-patch-pale);
+}
+
+/* Select options keep room for the tick, so every count lines up in one column. */
+.mq-count-option:not([data-selected]) > :first-child {
+  margin-right: 1.5rem;
+}
+
+/* ---------- The selection bar: ink, floating at the foot of the page area ---------- */
+
+:root[data-theme="mailquilt"] {
+  --mq-selbar-bg: #111113;
+  --mq-selbar-text: #ffffff;
+  --mq-selbar-hover: rgb(255 255 255 / 0.12);
+  --mq-selbar-strong: rgb(255 255 255 / 0.14);
+  /* How far the bar reaches up from the window's bottom edge, so toasts and focus clear it. */
+  --mq-selbar-reach: 4.75rem;
+}
+
+:root[data-theme="mailquilt"][data-mode="dark"] {
+  --mq-selbar-bg: #f0f6fc;
+  --mq-selbar-text: #111113;
+  --mq-selbar-hover: rgb(17 17 19 / 0.08);
+  --mq-selbar-strong: rgb(17 17 19 / 0.1);
+}
+
+.mq-selbar {
+  position: fixed;
+  bottom: 1.5rem;
+  left: calc(var(--sidebar-width) + (100vw - var(--sidebar-width)) / 2);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.75rem;
+  background: var(--mq-selbar-bg);
+  padding: 0.375rem 0.375rem 0.375rem 0.875rem;
+  box-shadow: var(--mq-sheet-shadow);
+  color: var(--mq-selbar-text);
+  transform: translateX(-50%);
+  transition:
+    opacity 180ms ease,
+    transform 240ms var(--ease-out-strong);
+}
+
+@starting-style {
+  .mq-selbar {
+    opacity: 0;
+    transform: translate(-50%, 1rem);
+  }
+}
+
+/* It drops away as it rose, a little faster, inert while it goes. */
+.mq-selbar[data-leaving] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 1rem);
+  transition-duration: 160ms;
+}
+
+.mq-selbar-count {
+  min-width: 5.25rem;
+  margin-right: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.mq-selbar-button {
+  height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out-strong);
+}
+
+.mq-selbar-button[data-strong] {
+  background: var(--mq-selbar-strong);
+}
+
+.mq-selbar-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.mq-selbar-button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+.mq-selbar-button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mq-selbar-button:not(:disabled):hover {
+    background: var(--mq-selbar-hover);
+  }
+}
+
+.mq-selbar-sep {
+  width: 1px;
+  height: 1.125rem;
+  margin: 0 0.125rem;
+  background: currentColor;
+  opacity: 0.2;
+}
+
+@media (min-width: 1024px) {
+  .mq-frame-wrapper:has(.mq-frame[data-state="collapsed"]) .mq-selbar {
+    left: calc(
+      var(--sidebar-width-icon) + (100vw - var(--sidebar-width-icon)) / 2
+    );
+  }
+}
+
+@media (max-width: 1023px) {
+  .mq-selbar {
+    left: 50%;
+  }
+}
+
+@media (max-width: 639px) {
+  .mq-selbar {
+    right: 0.75rem;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    left: 0.75rem;
+    transform: none;
+  }
+
+  @starting-style {
+    .mq-selbar {
+      transform: translateY(1rem);
+    }
+  }
+
+  .mq-selbar[data-leaving] {
+    transform: translateY(1rem);
+  }
+
+  .mq-selbar-count {
+    flex: 1;
+  }
+
+  .mq-selbar-button {
+    height: 2.25rem;
+  }
+}
+
+/* Room under the last row, so the bar never covers it. */
+.mq-page-body:has(.mq-selbar) {
+  padding-bottom: 6rem;
+}
+
+/* Toasts rise above the bar while it's showing, never over it, and slide back as it leaves. */
+[data-theme="mailquilt"] [role="region"][aria-label="Notifications"] {
+  transition: bottom 240ms var(--ease-out-strong);
+}
+
+:root[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving]))
+  [role="region"][aria-label="Notifications"] {
+  bottom: calc(var(--mq-selbar-reach) + 0.5rem);
+}
+
+/* Tabbing to a row never lands under the bar (WCAG 2.4.11). */
+html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
+  scroll-padding-bottom: calc(var(--mq-selbar-reach) + 1rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mq-selbar,
+  .mq-selbar-button {
+    transition: none;
+  }
+
+  .mq-busy-line::after {
+    animation: none;
+    opacity: 0.6;
   }
 }

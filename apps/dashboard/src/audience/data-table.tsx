@@ -1,72 +1,77 @@
+/* oxlint-disable jsx-a11y/prefer-tag-over-role -- WARNING: on phones the rows restack with display: grid, which drops table semantics in Safari, so each tr and td keeps its role explicitly. */
 import { Table } from "@cloudflare/kumo";
 import type { ReactTable, RowData, TableFeatures } from "@tanstack/react-table";
 
-const ROW_HAIRLINE =
-  "[&>td]:border-b [&>td]:border-kumo-hairline last:[&>td]:border-b-0";
-
-const ROW_WITHOUT_STRIPES = `${ROW_HAIRLINE} even:bg-kumo-base even:[--kumo-table-row-bg:var(--color-kumo-base)]`;
+/**
+ * Where a column goes when rows stack into two lines on phones: the
+ * checkbox, the main line, the second line, beside the main line, or not
+ * shown.
+ */
+export type StackedArea = "check" | "main" | "sub" | "side" | "hide";
 
 /**
- * A TanStack table drawn with Kumo's `Table`: a compact header, hairline
- * rows, and selected rows tinted. `columnClassNames` lays out a column's
- * header and cells by its id, such as pinning it on phones; how a value looks
- * belongs to its cell. It scrolls sideways when the columns don't fit.
+ * A TanStack table drawn with Kumo's `Table`, edge to edge on the page: a
+ * quiet header over one hairline, 48px hairline rows, and selected rows
+ * tinted. On phones each row restacks into two lines, its columns placed by
+ * `areas`, instead of the table scrolling sideways. `columnClassNames` lays
+ * out a column's header and cells by its id; how a value looks belongs to
+ * its cell.
  */
 export const DataTable = <
   TFeatures extends TableFeatures,
   TData extends RowData,
 >({
+  areas,
   columnClassNames,
   isSelected,
   label,
   table,
 }: {
+  areas: Readonly<Record<string, StackedArea>>;
   columnClassNames: Readonly<Record<string, string>>;
   isSelected?: (rowId: string) => boolean;
   label: string;
   table: ReactTable<TFeatures, TData>;
 }) => (
-  <div className="overflow-x-auto">
-    <Table
-      aria-label={label}
-      className="[&_td]:h-13 [&_td]:py-0 [&_th]:text-sm"
-    >
-      <Table.Header variant="compact">
-        {table.getHeaderGroups().map((group) => (
-          <Table.Row className={ROW_HAIRLINE} key={group.id}>
-            {group.headers.map((header) => (
-              <Table.Head
-                className={`whitespace-nowrap ${columnClassNames[header.column.id] ?? ""}`}
-                key={header.id}
-              >
-                {header.isPlaceholder ? null : (
-                  <table.FlexRender header={header} />
-                )}
-              </Table.Head>
-            ))}
-          </Table.Row>
-        ))}
-      </Table.Header>
-      <Table.Body>
-        {table.getRowModel().rows.map((row) => (
-          <Table.Row
-            className={
-              isSelected?.(row.id) ? ROW_HAIRLINE : ROW_WITHOUT_STRIPES
-            }
-            key={row.id}
-            variant={isSelected?.(row.id) ? "selected" : "default"}
-          >
-            {row.getAllCells().map((cell) => (
-              <Table.Cell
-                className={`whitespace-nowrap ${columnClassNames[cell.column.id] ?? ""}`}
-                key={cell.id}
-              >
-                <table.FlexRender cell={cell} />
-              </Table.Cell>
-            ))}
-          </Table.Row>
-        ))}
-      </Table.Body>
-    </Table>
-  </div>
+  <Table
+    aria-label={label}
+    className={`mq-table mq-stack ${Object.values(areas).includes("check") ? "" : "mq-no-check"}`}
+  >
+    <Table.Header>
+      {table.getHeaderGroups().map((group) => (
+        <Table.Row key={group.id}>
+          {group.headers.map((header) => (
+            <Table.Head
+              className={columnClassNames[header.column.id]}
+              key={header.id}
+            >
+              {header.isPlaceholder ? null : (
+                <table.FlexRender header={header} />
+              )}
+            </Table.Head>
+          ))}
+        </Table.Row>
+      ))}
+    </Table.Header>
+    <Table.Body>
+      {table.getRowModel().rows.map((row) => (
+        <Table.Row
+          data-selected={isSelected?.(row.id) ? "" : undefined}
+          key={row.id}
+          role="row"
+        >
+          {row.getAllCells().map((cell) => (
+            <Table.Cell
+              className={columnClassNames[cell.column.id]}
+              data-area={areas[cell.column.id]}
+              key={cell.id}
+              role="cell"
+            >
+              <table.FlexRender cell={cell} />
+            </Table.Cell>
+          ))}
+        </Table.Row>
+      ))}
+    </Table.Body>
+  </Table>
 );
