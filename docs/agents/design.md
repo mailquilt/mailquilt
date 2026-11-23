@@ -26,14 +26,17 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
    - A loading `Button`'s accessible name includes its spinner's label.
    - Kumo bundles its own copy of Base UI, so importing `@base-ui/react` ships a second one.
 4. **Build** with the dashboard's tokens and building blocks (`apps/dashboard/README.md`, "Design"). Use the `frontend-design` skill for visual direction and the `kumo-design` skill for the rules of the component system.
+   - The picked mockup is the visual spec. The build, or a later move onto Kumo, matches it screen by screen, and any visible difference fails unless it's named as better. Don't redesign while porting.
+   - Use Kumo where it serves the design, at its default sizes, with the smallest override that works. Never wrap content in a Kumo container, such as `LayerCard`, just because it's there.
 5. **Review** against the `kumo-design` rules and the checklist below. Where a rule is deliberately broken, the code or this page says why. A correctness review (`code-review`) is not a design review.
 6. **Make the evidence and look at it, to find faults.** Before calling UI done, produce and inspect:
    - screenshots at 320, 390, 768, 1024 and 1440 px wide, plus one wider screen, in light and dark, for every state, including errors. The 768–1279 px range is the one most often missed;
    - every dialog, sheet and menu open, on a phone and on desktop;
    - a frame-by-frame recording of the screen loading with 120 ms of network latency, in which nothing already drawn moves or changes;
-   - focus and keyboard paths checked in a real browser with real clicks and keys. Component tests run in happy-dom, where a scripted click doesn't move focus as a person's does.
+   - focus and keyboard paths checked in a real browser with real clicks and keys. Component tests run in happy-dom, where a scripted click doesn't move focus as a person's does;
+   - motion, such as every open and close animation and scrim fade, checked frame by frame in the working build.
 
-   The `dashboard-screens` skill makes all of these. Tests passing is not evidence of design.
+   The `dashboard-screens` skill makes all of these. Tests passing is not evidence of design, and neither are screenshots alone: on the redesign (#69) several bugs passed in screenshots and showed only in the working build.
 
 7. **Get a fresh design review.** Give a reviewer agent that hasn't seen your work this page, the brand docs, the `kumo-design` and `frontend-design` skills, the code and the evidence, but not your conclusions. Fix each finding or say why it stays. On #6 this found seven defects the author's own review had passed.
 8. **Say what was checked in the pull request:** each checklist item with what showed it, what the design review found and what changed. Images go in only when a human reviewer needs to see a visual change, such as a before and after; attach them by hand. The value is in making and inspecting them, not in attaching them.
@@ -58,6 +61,7 @@ Run this on every UI change, and explain each finding in plain words: what a use
    - One `<main>` per page and a sensible heading order.
    - Every control has a name and a label. Errors are tied to their fields and announced.
    - Keyboard focus is visible, and everything works with keys alone.
+   - When the focused element becomes inert or unmounts, such as the phone navigation or a menu closing, or Try again swapping for a loader, focus moves somewhere on purpose. Otherwise it drops to the page, and a keyboard user starts again from the top. Review caught this four times on the redesign (#69).
    - Text contrast is at least 4.5:1; icons and borders at least 3:1.
    - Targets are at least 24 px.
    - Motion respects reduced motion. Decorative graphics are hidden from screen readers.
