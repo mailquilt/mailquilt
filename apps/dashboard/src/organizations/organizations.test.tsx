@@ -131,7 +131,9 @@ describe("organizations", () => {
       screen.findByRole("heading", { name: "Your organizations didn’t load" })
     ).resolves.toBeDefined();
     expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Account: Ada" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "Account: Ada, ada@example.com" })
+    ).toBeDefined();
     expect(
       screen.queryByRole("list", { name: /Steps to your first campaign/u })
     ).toBeNull();

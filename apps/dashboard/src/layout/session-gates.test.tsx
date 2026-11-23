@@ -191,7 +191,9 @@ describe("session gates", () => {
 
     renderAt("/");
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 

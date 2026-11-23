@@ -6,6 +6,10 @@ import type { Account } from "../layout/session-gates.tsx";
 import { ThemePicker } from "../theme/theme-picker.tsx";
 import { authClient } from "./auth-client.ts";
 
+const COLLAPSED_FOOT_PADDING = 8;
+
+const GAP_FROM_SIDEBAR = 8;
+
 const initialsOf = (account: Account) => {
   const words = account.name.trim().split(/\s+/u).filter(Boolean);
   const first = words.at(0)?.charAt(0) ?? account.email.charAt(0);
@@ -65,7 +69,7 @@ export const AccountMenu = ({ account }: { account: Account }) => {
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger
-        aria-label={`Account: ${account.name}`}
+        aria-label={`Account: ${account.name}, ${account.email}`}
         className="mq-frame-button"
       >
         <AccountAvatar account={account} />
@@ -83,6 +87,11 @@ export const AccountMenu = ({ account }: { account: Account }) => {
             : "w-(--anchor-width) rounded-xl"
         }
         side={besideCollapsedSidebar ? "right" : "top"}
+        sideOffset={
+          besideCollapsedSidebar
+            ? COLLAPSED_FOOT_PADDING + GAP_FROM_SIDEBAR
+            : GAP_FROM_SIDEBAR
+        }
       >
         {besideCollapsedSidebar ? (
           <>
