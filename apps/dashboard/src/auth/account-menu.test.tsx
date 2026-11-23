@@ -68,7 +68,9 @@ describe("account menu", () => {
   it("offers Instance settings to the instance admin only, without reloading the app", async () => {
     renderAccountMenu();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
 
     expect(
@@ -78,7 +80,9 @@ describe("account menu", () => {
     cleanup();
     const router = renderAccountMenu({ instanceAdmin: true });
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
     fireEvent.click(
       await screen.findByRole("menuitem", { name: "Instance settings" })
@@ -102,7 +106,9 @@ describe("account menu", () => {
 
     renderAccountMenu();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 
@@ -112,7 +118,9 @@ describe("account menu", () => {
   it("names who is signed in only when the collapsed sidebar hides it", async () => {
     renderAccountMenu();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
 
     expect(
@@ -122,7 +130,9 @@ describe("account menu", () => {
     cleanup();
     renderAccountMenu({ sidebarOpen: false });
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
 
     expect(
@@ -139,7 +149,9 @@ describe("account menu", () => {
 
     renderAccountMenu();
     fireEvent.click(
-      await screen.findByRole("button", { name: "Account: Ada" })
+      await screen.findByRole("button", {
+        name: "Account: Ada, ada@example.com",
+      })
     );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 
