@@ -100,6 +100,31 @@ const renderPage = (search: ContactSearch = {}) => {
   return onSearch;
 };
 
+const NavigatedContacts = ({
+  back,
+  start,
+}: {
+  back: ContactSearch;
+  start: ContactSearch;
+}) => {
+  const [search, setSearch] = useState<ContactSearch>(start);
+
+  return (
+    <>
+      <button onClick={() => setSearch(back)} type="button">
+        Go back
+      </button>
+      <ContactsPage
+        onSearch={(next) => setSearch(consistentSearch(next))}
+        organization={organization}
+        search={search}
+      />
+    </>
+  );
+};
+
+const goBack = () => fireEvent.click(screen.getByText("Go back"));
+
 const PagingContacts = () => {
   const [search, setSearch] = useState<ContactSearch>({});
 
@@ -377,6 +402,72 @@ describe("contacts page", () => {
     const title = await screen.findByRole("heading", { level: 1 });
 
     await expect.poll(() => title.textContent).toContain("3 on this list");
+  });
+
+  it("doesn't bring Add to list back by itself after the page moves on while it was open", async () => {
+    api.use(...audience());
+
+    renderWithOrganizations(
+      <NavigatedContacts
+        back={{ list: ListIdSchema.make(NEWS.id) }}
+        start={{}}
+      />
+    );
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select ada@example.com" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add to list" }));
+    await screen.findByRole("dialog");
+
+    goBack();
+    await expect.poll(() => screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select ada@example.com" })
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps the list filter in place while the next rows load", async () => {
+    let answer = false;
+    api.use(
+      http.get(
+        "*/api/organizations/:organizationId/contacts",
+        async ({ request }) => {
+          if (new URL(request.url).searchParams.has("list")) {
+            return HttpResponse.json(page([]));
+          }
+
+          await vi.waitUntil(() => answer, { timeout: 5000 });
+
+          return HttpResponse.json(page([ADA]));
+        }
+      ),
+      ...audience()
+    );
+
+    renderWithOrganizations(
+      <NavigatedContacts
+        back={{}}
+        start={{ list: ListIdSchema.make(NEWS.id) }}
+      />
+    );
+
+    const filter = await screen.findByRole("combobox", { name: "List" });
+
+    goBack();
+    await delay(50);
+
+    expect(filter.isConnected).toBeTruthy();
+
+    answer = true;
+
+    await expect(
+      screen.findByRole("table", { name: "Contacts" })
+    ).resolves.toBeTruthy();
+    expect(filter.isConnected).toBeTruthy();
   });
 
   it("offers Try again when contacts don't load, and shows them once they do", async () => {

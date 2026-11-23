@@ -484,13 +484,14 @@ const ContactsTable = ({
 }) => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [selectionFor, setSelectionFor] = useState(shownSearchKey);
+  const addingToList = useDialog();
 
   if (selectionFor !== shownSearchKey) {
     setSelectionFor(shownSearchKey);
     setRowSelection({});
+    addingToList.setOpen(false);
   }
 
-  const addingToList = useDialog();
   const addToListButton = useRef<HTMLButtonElement>(null);
 
   const columns = useMemo(
@@ -549,7 +550,7 @@ const ContactsTable = ({
 
   return (
     <>
-      {page.total === 0 && search.list === undefined ? null : (
+      {page.total === 0 && shownList === undefined ? null : (
         <Toolbar>{filters}</Toolbar>
       )}
       <SelectionBar
