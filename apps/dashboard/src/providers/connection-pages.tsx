@@ -31,7 +31,7 @@ const FormPage = ({
   description: string;
   title: string;
 }) => (
-  <PageFrame fullWidth>
+  <PageFrame>
     <div className="mq-capped">
       <PageHeader
         crumbs={[{ href: "/providers", label: "Providers" }]}
