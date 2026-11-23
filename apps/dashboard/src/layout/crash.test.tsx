@@ -59,6 +59,19 @@ describe("crash", () => {
     expect(screen.queryByRole("link", { name: "Go to Mailquilt" })).toBeNull();
   });
 
+  it("copies the error and says so", async () => {
+    renderCrashIn("page");
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Error details" })
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Copy error" }));
+
+    await expect(
+      screen.findByRole("button", { name: "Copied" })
+    ).resolves.toBeDefined();
+  });
+
   it("draws the whole page, with a way home, when no layout is left to draw in", async () => {
     renderCrashIn("bare");
 

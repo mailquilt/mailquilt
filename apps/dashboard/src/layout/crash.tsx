@@ -17,21 +17,32 @@ const reload = () => location.reload();
 
 const COPIED_FOR_MS = 2000;
 
+const COPY_LABELS = {
+  copied: "Copied",
+  failed: "Couldn’t copy. Select the text above.",
+  idle: "Copy error",
+} as const;
+
 const CopyMessage = ({ message }: { message: string }) => {
-  const [copied, setCopied] = useState(false);
+  const [result, setResult] = useState<keyof typeof COPY_LABELS>("idle");
 
   return (
     <Button
       icon={CopyIcon}
       onClick={async () => {
-        await navigator.clipboard.writeText(message);
-        setCopied(true);
-        setTimeout(() => setCopied(false), COPIED_FOR_MS);
+        try {
+          await navigator.clipboard.writeText(message);
+          setResult("copied");
+        } catch {
+          setResult("failed");
+        }
+
+        setTimeout(() => setResult("idle"), COPIED_FOR_MS);
       }}
       size="sm"
       variant="secondary"
     >
-      <span aria-live="polite">{copied ? "Copied" : "Copy error"}</span>
+      <span aria-live="polite">{COPY_LABELS[result]}</span>
     </Button>
   );
 };
