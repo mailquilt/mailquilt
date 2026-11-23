@@ -102,7 +102,7 @@ const NameOrganization = () => {
   }
 
   return (
-    <div className="mt-3 max-w-[30rem]">
+    <div className="mt-3 max-w-120">
       <CreateOrganizationForm
         create={create}
         layout="step"

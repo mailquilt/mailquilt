@@ -84,7 +84,7 @@
   --mq-quilt-goose-alt: #232327;
   --mq-patch-ink: #111113;
   --mq-patch-grey: #71717a;
-  --mq-patch-pale: #d4d4d8;
+  --mq-patch-pale: #adadb5;
   --mq-danger-button: #b91c1c;
   --mq-danger-button-hover: #991b1b;
 
@@ -125,7 +125,7 @@
   --mq-quilt-goose-alt: #1f1f23;
   --mq-patch-ink: #e4e4e7;
   --mq-patch-grey: #8b949e;
-  --mq-patch-pale: #3f3f46;
+  --mq-patch-pale: #57575f;
 
   --text-color-kumo-default: #e4e4e7;
   --text-color-kumo-strong: #f0f6fc;
@@ -169,6 +169,23 @@
 [data-theme="mailquilt"] :is([role="checkbox"], [role="radio"]):focus-visible {
   outline: 2px solid var(--color-kumo-focus);
   outline-offset: 2px;
+}
+
+/*
+ * WARNING: Kumo outlines text fields, grouped fields (such as a password with
+ * its show button) and select boxes in --color-kumo-line, about 1.3:1 in light
+ * mode and 1.7:1 in dark, under the 3:1 WCAG 2.2 asks of a control's boundary.
+ * They take the same grey as unchecked checkboxes. Set on the element that
+ * draws the outline, so tables, cards and menus keep their lighter lines.
+ */
+[data-theme="mailquilt"]
+  :is(
+    input:not([type="checkbox"], [type="radio"]),
+    textarea,
+    :has(> input:not([type="checkbox"], [type="radio"])),
+    [data-kumo-component="Select"][data-kumo-part="trigger"]
+  ) {
+  --color-kumo-line: var(--mq-patch-grey);
 }
 
 @layer base {
@@ -356,7 +373,7 @@ html[data-theme="mailquilt"]:has(.mq-frame-wrapper) {
   --mq-logo-slot: #6e7681;
   --mq-patch-ink: #e4e4e7;
   --mq-patch-grey: #8b949e;
-  --mq-patch-pale: #3f3f46;
+  --mq-patch-pale: #57575f;
 
   --text-color-kumo-default: var(--mq-frame-default);
   --text-color-kumo-strong: var(--mq-frame-text);
