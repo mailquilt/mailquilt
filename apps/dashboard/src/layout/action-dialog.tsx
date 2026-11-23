@@ -33,11 +33,24 @@ const SHEET_MOTION =
  * empty, that is still closed when it mounts and so animates in. Moving the
  * key in the same render that opens it would mount the dialog already open,
  * and it would appear without its entrance; keying it by `open` would
- * unmount it as it closes, without its exit.
+ * unmount it as it closes, without its exit. `openOnMount` opens it by
+ * itself, just after the page draws, with its entrance.
  */
-export const useDialog = (initiallyOpen = false) => {
-  const [open, setOpen] = useState(initiallyOpen);
+export const useDialog = (openOnMount = false) => {
+  const [open, setOpen] = useState(false);
   const [key, setKey] = useState(0);
+  const opensItself = useRef(openOnMount);
+
+  // WARNING: a dialog that is open when it first mounts appears without its entrance, so one that opens by itself opens just after.
+  useEffect(() => {
+    if (!opensItself.current) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setOpen(true));
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return {
     handleExited: () => setKey((current) => current + 1),

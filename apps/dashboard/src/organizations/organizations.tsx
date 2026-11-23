@@ -142,7 +142,7 @@ export const OrganizationsProvider = ({
   const neverAnswered = query.isPending && query.errorUpdatedAt === 0;
 
   if (neverAnswered) {
-    return <PageLoading />;
+    return <PageLoading onFrame />;
   }
 
   return <OrganizationsContext value={state}>{children}</OrganizationsContext>;

@@ -1,13 +1,23 @@
-import { cleanup, screen } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { LinkProvider } from "@cloudflare/kumo";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { delay, http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import {
   ACME,
   renderWithOrganizations,
 } from "../organizations/test-organizations.tsx";
 import { AppShell } from "./app-shell.tsx";
+import { RouterLink } from "./router-link.tsx";
 import { SignedInOnly } from "./session-gates.tsx";
 
 const api = setupServer();
@@ -24,61 +34,101 @@ const ADA = {
   subscriptions: [],
 };
 
-const POSTMARK = {
-  createdAt: "2026-11-22T09:00:00.000Z",
-  from: { email: "news@acme.example", name: "Acme News" },
-  id: "pcn_01h455vb4pex5vsknk084sn02q",
-  name: "Postmark",
-  provider: "smtp",
-  signsIn: true,
-  smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },
-};
-
 const ORGANIZATION = "*/api/organizations/:organizationId";
+
+const signedIn = [
+  http.get("*/health", () => HttpResponse.json({ database: "connected" })),
+  http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
+  http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+];
+
+const contactsPage = (total: number) => ({
+  contacts: [ADA],
+  next: ADA.id,
+  previous: null,
+  start: 0,
+  total,
+});
+
+const renderShell = () =>
+  renderWithOrganizations(
+    <LinkProvider component={RouterLink}>
+      <SignedInOnly>
+        <AppShell>
+          <p>Page</p>
+        </AppShell>
+      </SignedInOnly>
+    </LinkProvider>
+  );
 
 describe("app shell", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
     cleanup();
     api.resetHandlers();
+    window.happyDOM?.setViewport({ height: 768, width: 1024 });
   });
 
   afterAll(() => api.close());
 
-  it("counts what each built page holds beside it, and leaves out a count that couldn't load", async () => {
+  it("counts what a built page holds beside it, and leaves out a count that's none or couldn't load", async () => {
+    let listsAnswered = false;
+    let providersAnswered = false;
     api.use(
-      http.get("*/health", () => HttpResponse.json({ database: "connected" })),
-      http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
-      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
-      http.get(`${ORGANIZATION}/contacts`, () =>
-        HttpResponse.json({
-          contacts: [ADA],
-          next: ADA.id,
-          previous: null,
-          start: 0,
-          total: 12_480,
-        })
-      ),
-      http.get(`${ORGANIZATION}/provider-connections`, () =>
-        HttpResponse.json([POSTMARK])
-      ),
-      http.get(`${ORGANIZATION}/lists`, () => HttpResponse.error())
+      ...signedIn,
+      http.get(`${ORGANIZATION}/lists`, () => {
+        listsAnswered = true;
+
+        return HttpResponse.error();
+      }),
+      http.get(`${ORGANIZATION}/provider-connections`, () => {
+        providersAnswered = true;
+
+        return HttpResponse.json([]);
+      }),
+      http.get(`${ORGANIZATION}/contacts`, async () => {
+        await vi.waitUntil(() => listsAnswered && providersAnswered);
+        await delay(50);
+
+        return HttpResponse.json(contactsPage(12_480));
+      })
     );
 
-    renderWithOrganizations(
-      <SignedInOnly>
-        <AppShell>
-          <p>Page</p>
-        </AppShell>
-      </SignedInOnly>
-    );
+    renderShell();
 
     await expect(
       screen.findByRole("link", { name: "Contacts, 12,480" }, { timeout: 3000 })
     ).resolves.toBeDefined();
-    await expect(
-      screen.findByRole("link", { name: "Providers, 1" }, { timeout: 3000 })
-    ).resolves.toBeDefined();
     expect(screen.getByRole("link", { name: "Lists" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Providers" })).toBeDefined();
+  });
+
+  it("closes the full-screen navigation once a page is chosen", async () => {
+    window.happyDOM?.setViewport({ height: 844, width: 390 });
+    api.use(
+      ...signedIn,
+      http.get(`${ORGANIZATION}/lists`, () => HttpResponse.json([])),
+      http.get(`${ORGANIZATION}/provider-connections`, () =>
+        HttpResponse.json([])
+      ),
+      http.get(`${ORGANIZATION}/contacts`, () =>
+        HttpResponse.json(contactsPage(1))
+      )
+    );
+
+    renderShell();
+
+    const menu = await screen.findByRole(
+      "button",
+      { name: "Open navigation" },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(menu);
+    expect(menu.getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(screen.getByRole("link", { name: "Lists" }));
+
+    await expect.poll(() => menu.getAttribute("aria-expanded")).toBe("false");
   });
 });

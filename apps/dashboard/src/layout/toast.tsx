@@ -1,9 +1,6 @@
 import { Toast, useKumoToastManager } from "@cloudflare/kumo";
 
-/** The "done" mark: the logo's block settling onto its dashed slot (`.mq-done-block` in styles.css). */
-export const DoneBlock = () => (
-  <span aria-hidden="true" className="mq-done-block" />
-);
+const DoneBlock = () => <span aria-hidden="true" className="mq-done-block" />;
 
 const ConfirmationBody = () => (
   <div className="flex gap-3">

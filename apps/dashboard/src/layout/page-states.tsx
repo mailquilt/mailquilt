@@ -5,10 +5,14 @@ import { PatchLoader } from "./empty-state.tsx";
 
 /**
  * The whole page while what it needs is still loading. Pages wait here
- * rather than drawing a guess and changing it a moment later.
+ * rather than drawing a guess and changing it a moment later. `onFrame`
+ * draws it on the frame's ink, for a wait that only ever leads to the
+ * signed-in frame, so the frame's arrival changes nothing on screen.
  */
-export const PageLoading = () => (
-  <div className="flex min-h-svh items-center justify-center bg-kumo-base">
+export const PageLoading = ({ onFrame = false }: { onFrame?: boolean }) => (
+  <div
+    className={`flex min-h-svh items-center justify-center ${onFrame ? "mq-frame-loading" : "bg-kumo-base"}`}
+  >
     <output aria-label="Loading">
       <PatchLoader />
     </output>

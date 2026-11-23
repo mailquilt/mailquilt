@@ -296,7 +296,6 @@
   --mq-frame-active: #26262b;
   --mq-frame-text: #f4f4f5;
   --mq-frame-default: #c4c4cc;
-  --mq-frame-muted: #a1a1aa;
   --mq-frame-subtle: #8b949e;
   --mq-frame-line: #26262b;
   --mq-frame-hairline: #222226;
@@ -378,7 +377,6 @@ html[data-theme="mailquilt"]:has(.mq-frame-wrapper) {
 
 .mq-frame-wrapper {
   --sidebar-bg: var(--mq-frame);
-  --sidebar-width: 15.5rem;
   background: var(--mq-frame) !important;
 }
 
@@ -561,6 +559,17 @@ aside.mq-frame {
   .mq-rail-quilt {
     display: none;
   }
+}
+
+/* Waiting for what the frame needs: already on its ink, with a light loader. */
+.mq-frame-loading {
+  --color-kumo-brand: var(--mq-frame-text);
+  background: var(--mq-frame);
+}
+
+/* Collapsed to icons, a page that isn't built would be a bare dashed square with no label: it steps aside until the rail opens. */
+.mq-frame[data-state="collapsed"] .mq-nav-soon {
+  display: none !important;
 }
 
 /* The page block, set into the frame with the logo's 8-unit seam. */

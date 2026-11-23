@@ -96,7 +96,7 @@ const ConnectionCard = ({
 }) => {
   const navigate = useNavigate();
   const headingId = useId();
-  const [deleting, setDeleting] = useState(false);
+  const deleting = useDialog();
   const menuButton = useRef<HTMLButtonElement>(null);
   const testButton = useRef<HTMLButtonElement>(null);
 
@@ -169,7 +169,7 @@ const ConnectionCard = ({
             </DropdownMenu.Item>
             <DropdownMenu.Item
               icon={TrashIcon}
-              onClick={() => setDeleting(true)}
+              onClick={() => deleting.setOpen(true)}
               variant="danger"
             >
               Delete
@@ -216,8 +216,10 @@ const ConnectionCard = ({
         connection={connection}
         finalFocus={menuButton}
         onDeleted={onDeleted}
-        onOpenChange={setDeleting}
-        open={deleting}
+        key={deleting.key}
+        onExited={deleting.handleExited}
+        onOpenChange={deleting.handleOpenChange}
+        open={deleting.open}
         organization={organization}
       />
     </article>

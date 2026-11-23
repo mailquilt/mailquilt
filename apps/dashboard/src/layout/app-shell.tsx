@@ -1,7 +1,8 @@
 import { Sidebar, useSidebar } from "@cloudflare/kumo";
 import { ListIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
 import type { OrganizationId } from "@repo/domain";
-import { Link, useLocation } from "@tanstack/react-router";
+import { Link, useLocation, useRouter } from "@tanstack/react-router";
+import { useEffect } from "react";
 
 import { useContactPage, useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
@@ -264,6 +265,38 @@ const FrameBar = () => {
   );
 };
 
+const PageWrap = ({ children }: { children: React.ReactNode }) => {
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const router = useRouter();
+
+  // WARNING: with the full-screen navigation there is no backdrop left to tap, so going to any page has to close it, and focus moves to the page (once it's no longer inert), since the link that had it is gone.
+  useEffect(
+    () =>
+      router.subscribe("onResolved", () => {
+        const fromNavigation = document.activeElement?.closest(
+          '[data-sidebar="sidebar"][data-mobile]'
+        );
+
+        setOpenMobile(false);
+
+        if (fromNavigation) {
+          requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLElement>("#main")
+              ?.focus({ preventScroll: true })
+          );
+        }
+      }),
+    [router, setOpenMobile]
+  );
+
+  return (
+    <div className="mq-page-wrap" inert={isMobile && openMobile}>
+      {children}
+    </div>
+  );
+};
+
 /**
  * Everything a signed-in person sees: the page set as one light block into
  * the ink quilt frame, the same quilt they signed in through. The frame
@@ -294,7 +327,10 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
             <OrganizationSwitcher />
           </div>
           {active ? (
-            <OrganizationNavigation organizationId={active.id} />
+            <OrganizationNavigation
+              key={active.id}
+              organizationId={active.id}
+            />
           ) : (
             <Navigation counts={{}} />
           )}
@@ -304,13 +340,13 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
           <AccountMenu account={account} />
         </Sidebar.Footer>
       </Sidebar>
-      <div className="mq-page-wrap">
+      <PageWrap>
         <FrameBar />
         <main className="mq-page" id="main" tabIndex={-1}>
           <HealthStatus bannerClassName="mx-4 mt-4 sm:mx-7 lg:mx-10 lg:mt-6" />
           {status === "failed" ? <OrganizationsUnavailable /> : children}
         </main>
-      </div>
+      </PageWrap>
     </Sidebar.Provider>
   );
 };

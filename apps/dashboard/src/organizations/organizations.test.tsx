@@ -16,7 +16,24 @@ import { AppShell } from "../layout/app-shell.tsx";
 import { SignedInOnly } from "../layout/session-gates.tsx";
 import { ACME, renderWithOrganizations } from "./test-organizations.tsx";
 
-const api = setupServer();
+const api = setupServer(
+  http.get("*/health", () => HttpResponse.json({ database: "connected" })),
+  http.get("*/api/organizations/:organizationId/contacts", () =>
+    HttpResponse.json({
+      contacts: [],
+      next: null,
+      previous: null,
+      start: 0,
+      total: 0,
+    })
+  ),
+  http.get("*/api/organizations/:organizationId/lists", () =>
+    HttpResponse.json([])
+  ),
+  http.get("*/api/organizations/:organizationId/provider-connections", () =>
+    HttpResponse.json([])
+  )
+);
 
 const SESSION = {
   session: { expiresAt: "2026-12-01T00:00:00.000Z", id: "s", userId: "u" },

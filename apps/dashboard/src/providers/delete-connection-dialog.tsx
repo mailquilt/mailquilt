@@ -14,6 +14,7 @@ export const DeleteConnectionDialog = ({
   connection,
   finalFocus,
   onDeleted,
+  onExited,
   onOpenChange,
   open,
   organization,
@@ -22,6 +23,8 @@ export const DeleteConnectionDialog = ({
   finalFocus?: React.RefObject<HTMLElement | null>;
   /** Called once the connection is gone, while its card and this dialog go with it. */
   onDeleted: (name: string) => void;
+  /** `useDialog`'s `handleExited`, so it starts fresh after each close. */
+  onExited?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organization: Organization;
@@ -52,6 +55,7 @@ export const DeleteConnectionDialog = ({
       destructive
       finalFocus={finalFocus}
       formId={formId}
+      onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
       title={`Delete ${connection.name}?`}

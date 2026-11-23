@@ -19,7 +19,7 @@ const MENU_ROW = "gap-2.5 py-1";
  */
 export const OrganizationSwitcher = () => {
   const { active, organizations, switchTo } = useOrganizations();
-  const { isMobile, state } = useSidebar();
+  const { isMobile, setOpenMobile, state } = useSidebar();
   const toasts = useConfirmationToast();
   const creating = useDialog();
   const create = useCreateOrganization();
@@ -73,7 +73,10 @@ export const OrganizationSwitcher = () => {
                   closeOnClick
                   className={MENU_ROW}
                   key={organization.id}
-                  onClick={() => switchTo(organization.id)}
+                  onClick={() => {
+                    switchTo(organization.id);
+                    setOpenMobile(false);
+                  }}
                   value={organization.id}
                 >
                   <OrganizationPatch
