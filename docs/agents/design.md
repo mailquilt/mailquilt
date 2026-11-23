@@ -47,7 +47,7 @@ The official logo kit is in `docs/brand/` (see its README). Copies of the files 
 
 - **Colours:** ink `#111113`, accent `#D4380F`, quilt grey `#71717A`. The dashboard's light and dark values for each live in `apps/dashboard/src/styles.css`.
 - **Type:** Space Grotesk for display headings, Instrument Sans for everything else.
-- **The frame:** every signed-in page is one light block set into the ink quilt, the same quilt people sign in through. Page titles use the wordmark's two tones ("Contacts **12,480**"), and the navigation uses the logo's blocks: a built page is a block, the current page is lifted off its dashed slot, an unbuilt page is only the slot.
+- **The frame:** every signed-in page is one light block set into the plain ink frame; the quilt is kept for the sign-in pages. Page titles use the wordmark's two tones ("Contacts **12,480**"). The navigation uses one icon per page from `apps/dashboard/src/icons/icons.tsx`: the current page is highlighted, and an unbuilt page has a dimmed icon and "Soon".
 - **Primary actions are ink.** The accent is close to error red, so it is kept for brand moments (the logo, the quilt, a cost) and the single next step.
 - **Destructive confirmations are danger red.** The button that confirms something that can't be undone, such as deleting a connection, is danger red (`ActionDialog`'s `destructive`), so the final step is the strongest warning, as the red menu item before it was. It is flat `--mq-danger-button` (`#b91c1c`, 6.5:1 with white), not Kumo's lighter gradient, and not the accent.
 - **Quilting stays in the pictures; the words stay plain.** No sewing puns in the copy.

@@ -118,6 +118,22 @@ describe("app shell", () => {
     expect(screen.getByRole("link", { name: "Providers" })).toBeDefined();
   });
 
+  it("marks a page that isn't built as Soon, and doesn't link it", async () => {
+    api.use(...signedIn, ...quietOrganization);
+
+    renderShell();
+
+    const campaigns = await screen.findByRole(
+      "button",
+      { name: "Campaigns Soon" },
+      { timeout: 3000 }
+    );
+
+    expect(campaigns.hasAttribute("disabled")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Campaigns/u })).toBeNull();
+    expect(screen.getByRole("link", { name: "Home" })).toBeDefined();
+  });
+
   it("closes the full-screen navigation once a page is chosen", async () => {
     window.happyDOM?.setViewport({ height: 844, width: 390 });
     api.use(

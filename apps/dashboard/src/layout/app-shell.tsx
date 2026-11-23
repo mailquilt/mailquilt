@@ -8,7 +8,17 @@ import { formatCount } from "../audience/format.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
-import { ListIcon, SidebarSimpleIcon } from "../icons/icons.tsx";
+import {
+  GlobeHemisphereWestIcon,
+  HardDrivesIcon,
+  HouseIcon,
+  LayoutIcon,
+  ListBulletsIcon,
+  ListIcon,
+  MegaphoneIcon,
+  SidebarSimpleIcon,
+  UsersIcon,
+} from "../icons/icons.tsx";
 import { OrganizationPatch } from "../organizations/organization-patch.tsx";
 import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
 import { OrganizationsUnavailable } from "../organizations/organizations-unavailable.tsx";
@@ -19,14 +29,11 @@ import {
 import { useProviderConnections } from "../providers/providers-api.ts";
 import { useAccount } from "./session-gates.tsx";
 
-const NavBlock = ({ state }: { state: "page" | "current" | "soon" }) => (
-  <span aria-hidden="true" className="mq-nav-block" data-state={state} />
-);
-
 type CountedPage = "contacts" | "lists" | "providers";
 
 interface NavItem {
   readonly label: string;
+  readonly icon: typeof HouseIcon;
   readonly href?: string;
   readonly counted?: CountedPage;
 }
@@ -35,19 +42,40 @@ const NAV: readonly {
   readonly label?: string;
   readonly items: readonly NavItem[];
 }[] = [
-  { items: [{ href: "/", label: "Home" }] },
+  { items: [{ href: "/", icon: HouseIcon, label: "Home" }] },
   {
     items: [
-      { counted: "contacts", href: "/contacts", label: "Contacts" },
-      { counted: "lists", href: "/lists", label: "Lists" },
+      {
+        counted: "contacts",
+        href: "/contacts",
+        icon: UsersIcon,
+        label: "Contacts",
+      },
+      {
+        counted: "lists",
+        href: "/lists",
+        icon: ListBulletsIcon,
+        label: "Lists",
+      },
     ],
     label: "Audience",
   },
-  { items: [{ label: "Campaigns" }, { label: "Templates" }], label: "Send" },
   {
     items: [
-      { counted: "providers", href: "/providers", label: "Providers" },
-      { label: "Domains" },
+      { icon: MegaphoneIcon, label: "Campaigns" },
+      { icon: LayoutIcon, label: "Templates" },
+    ],
+    label: "Send",
+  },
+  {
+    items: [
+      {
+        counted: "providers",
+        href: "/providers",
+        icon: HardDrivesIcon,
+        label: "Providers",
+      },
+      { icon: GlobeHemisphereWestIcon, label: "Domains" },
     ],
     label: "Deliverability",
   },
@@ -75,8 +103,9 @@ const Navigation = ({ counts }: { counts: NavCounts }) => {
                   <Sidebar.MenuButton
                     className="mq-nav-soon"
                     disabled
-                    icon={<NavBlock state="soon" />}
+                    icon={<item.icon className="mq-nav-icon" />}
                     key={item.label}
+                    tooltip={`${item.label}, soon`}
                   >
                     <span className="flex flex-1 items-center justify-between gap-2">
                       {item.label}
@@ -105,7 +134,7 @@ const Navigation = ({ counts }: { counts: NavCounts }) => {
                       : `${item.label}, ${shownCount}`
                   }
                   href={item.href}
-                  icon={<NavBlock state={current ? "current" : "page"} />}
+                  icon={<item.icon className="mq-nav-icon" />}
                   key={item.label}
                   tooltip={item.label}
                 >
@@ -188,50 +217,6 @@ const FrameHeader = () => {
         />
       </Sidebar.Trigger>
     </>
-  );
-};
-
-const RailQuilt = () => {
-  const width = 152;
-  const height = 76;
-  const sashing = 56;
-  const left = (column: number) => sashing * (column + 1) + width * column;
-
-  return (
-    <svg
-      aria-hidden="true"
-      className="mq-rail-quilt"
-      focusable="false"
-      preserveAspectRatio="xMidYMax slice"
-      viewBox="0 0 480 560"
-    >
-      {[0, 1].map((column) => (
-        <g key={column}>
-          <rect
-            className="fill-(--mq-quilt-sky)"
-            height="560"
-            width={width}
-            x={left(column)}
-            y="0"
-          />
-          {Array.from({ length: 8 }, (_, row) => {
-            const top = row * height - height / 2;
-
-            return (
-              <polygon
-                className={
-                  row % 2
-                    ? "fill-(--mq-quilt-goose)"
-                    : "fill-(--mq-quilt-goose-alt)"
-                }
-                key={row}
-                points={`${left(column)},${top + height} ${left(column) + width / 2},${top} ${left(column) + width},${top + height}`}
-              />
-            );
-          })}
-        </g>
-      ))}
-    </svg>
   );
 };
 
@@ -331,10 +316,10 @@ const PageWrap = ({ children }: { children: React.ReactNode }) => {
 
 /**
  * Everything a signed-in person sees: the page set as one light block into
- * the ink quilt frame, the same quilt they signed in through. The frame
- * holds the logo, the Organization, the navigation and their account; it
- * collapses to icons on desktop. Below 1024px it becomes the bar at the top,
- * and the navigation opens full screen. Pages own their own layout.
+ * the plain ink frame. The frame holds the logo, the Organization, the
+ * navigation and their account; it collapses to icons on desktop. Below
+ * 1024px it becomes the bar at the top, and the navigation opens full
+ * screen. Pages own their own layout.
  */
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const account = useAccount();
@@ -367,7 +352,6 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
             <Navigation counts={{}} />
           )}
         </Sidebar.Content>
-        <RailQuilt />
         <Sidebar.Footer className="mq-frame-foot">
           <AccountMenu account={account} />
         </Sidebar.Footer>
