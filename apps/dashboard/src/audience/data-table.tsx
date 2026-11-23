@@ -10,9 +10,8 @@ import type { ReactTable, RowData, TableFeatures } from "@tanstack/react-table";
 export type StackedArea = "check" | "main" | "sub" | "side" | "hide";
 
 /**
- * A TanStack table drawn with Kumo's `Table`, edge to edge on the page: a
- * quiet header over one hairline, 48px hairline rows, and selected rows
- * tinted. On phones each row restacks into two lines, its columns placed by
+ * A TanStack table drawn with Kumo's `Table` and its default header, with
+ * 48px hairline rows and selected rows tinted. On phones each row restacks into two lines, its columns placed by
  * `areas`, instead of the table scrolling sideways. `columnClassNames` lays
  * out a column's header and cells by its id; how a value looks belongs to
  * its cell.

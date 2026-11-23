@@ -972,16 +972,27 @@ aside.mq-frame {
   }
 }
 
-/* ---------- Tables: edge to edge on the page, two-line rows on phones ---------- */
+/* ---------- Tables: in one bordered card, two-line rows on phones ---------- */
 
-/* A table's place on the page: full width inside the page block, its first and last columns on the page's gutter. */
+/* An open region (a one-column page's states): full width inside the page block. */
 .mq-bleed {
   margin-inline: calc(var(--gutter) * -1);
 }
 
-/* An empty, didn't-load or loading state sits where the rows would be, under the same line. */
-.mq-region-state .mq-state {
+/* A bordered table: its cells inset to the card, not the page's gutter. */
+.mq-table-card {
+  --gutter: 1rem;
+}
+
+/* An empty or didn't-load state in the card needs less room than one open on the page. */
+.mq-table-card .mq-state {
+  padding-block: 3.5rem;
+}
+
+/* The pager, at the card's foot under a hairline. */
+.mq-table-foot {
   border-top: 1px solid var(--color-kumo-hairline);
+  padding: 0.625rem var(--gutter);
 }
 
 /* Paging: the rows stay, dimmed, under a moving line. */
@@ -1014,9 +1025,9 @@ aside.mq-frame {
 }
 
 /*
- * Kumo's Table, drawn quietly: a plain header in subtle text over one
- * hairline (not Kumo's elevated header fill), 48px hairline rows, and the
- * first and last columns inset to the page's gutter.
+ * Kumo's Table with its own header, 48px hairline rows, and the first and
+ * last columns inset to the gutter. The last row has no line of its own
+ * against the card's edge.
  */
 .mq-table {
   border-collapse: separate;
@@ -1024,13 +1035,6 @@ aside.mq-frame {
 }
 
 .mq-table th {
-  height: 2.25rem;
-  border-bottom: 1px solid var(--color-kumo-hairline) !important;
-  background: var(--color-kumo-base) !important;
-  padding-block: 0 !important;
-  color: var(--text-color-kumo-subtle);
-  font-size: var(--text-sm) !important;
-  font-weight: 500 !important;
   white-space: nowrap;
 }
 
@@ -1045,6 +1049,10 @@ aside.mq-frame {
   height: 3rem;
   border-bottom: 1px solid var(--color-kumo-hairline);
   padding-block: 0 !important;
+}
+
+.mq-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 
 .mq-table tr > :first-child {
@@ -1117,6 +1125,10 @@ aside.mq-frame {
     row-gap: 0.25rem;
     border-bottom: 1px solid var(--color-kumo-hairline);
     padding: 0.75rem var(--gutter);
+  }
+
+  .mq-stack tbody tr:last-child {
+    border-bottom: 0;
   }
 
   .mq-table.mq-stack tbody tr > td {

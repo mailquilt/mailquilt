@@ -201,7 +201,7 @@ describe("contacts page", () => {
 
     const onSearch = renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Next page" }));
 
     expect(onSearch).toHaveBeenCalledWith({ after: ADA.id });
   });
@@ -213,24 +213,28 @@ describe("contacts page", () => {
 
     const onSearch = renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Previous" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Previous page" })
+    );
 
     expect(onSearch).toHaveBeenCalledWith({ before: ADA.id });
   });
 
-  it("keeps Previous and Next off, and focusable, until the asked-for page arrives", async () => {
+  it("ignores the pager, and keeps it focusable, until the asked-for page arrives", async () => {
     let pagesAsked = 0;
     api.use(
       http.get(
         "*/api/organizations/:organizationId/contacts",
         async ({ request }) => {
-          if (new URL(request.url).searchParams.has("after")) {
+          const params = new URL(request.url).searchParams;
+
+          if (params.has("after") || params.has("before")) {
             pagesAsked += 1;
             await delay("infinite");
           }
 
           return HttpResponse.json(
-            page([ADA, ALAN], { next: ALAN.id, total: 3 })
+            page([ADA, ALAN], { next: ALAN.id, previous: ADA.id, total: 3 })
           );
         }
       ),
@@ -239,21 +243,17 @@ describe("contacts page", () => {
 
     renderWithOrganizations(<PagingContacts />);
 
-    const next = await screen.findByRole("button", { name: "Next" });
+    const next = await screen.findByRole("button", { name: "Next page" });
 
     fireEvent.click(next);
 
-    await expect.poll(() => next.getAttribute("aria-disabled")).toBe("true");
-    expect(next.hasAttribute("disabled")).toBeFalsy();
     await expect.poll(() => pagesAsked).toBe(1);
+    expect(next.hasAttribute("disabled")).toBeFalsy();
 
-    fireEvent.click(next);
+    fireEvent.click(screen.getByRole("button", { name: "Previous page" }));
     await delay(50);
 
     expect(pagesAsked).toBe(1);
-    expect(
-      screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")
-    ).toBeTruthy();
   });
 
   it("starts a new contact on the list the table is filtered by", async () => {

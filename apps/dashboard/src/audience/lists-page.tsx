@@ -224,7 +224,7 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
   const body = () => {
     if (lists.data === undefined) {
       return (
-        <TableRegion label="Lists">
+        <TableRegion bordered label="Lists">
           <LoadFailed
             onRetry={() => lists.refetch()}
             retrying={lists.isFetching}
@@ -236,7 +236,7 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
 
     if (lists.data.length === 0) {
       return (
-        <TableRegion label="Lists">
+        <TableRegion bordered label="Lists">
           <EmptyState
             actions={
               <Button
@@ -268,7 +268,7 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
             </li>
           ))}
         </ul>
-        <TableRegion label="Lists">
+        <TableRegion bordered label="Lists">
           <ListsTable lists={lists.data} />
         </TableRegion>
       </>
