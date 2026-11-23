@@ -347,6 +347,8 @@ const Pager = ({
   const current = previous === null ? 1 : 2;
   const pager = useRef<HTMLDivElement>(null);
   const pressed = useRef(false);
+  const atFirst = previous === null;
+  const atLast = next === null;
 
   // WARNING: Kumo's arrows are plain disabled buttons. Reaching the first or last page turns off the arrow just pressed, and the browser drops focus to the page, so focus moves to the other arrow.
   useEffect(() => {
@@ -358,14 +360,14 @@ const Pager = ({
         focused.disabled &&
         pager.current?.contains(focused) === true);
 
-    if (pressed.current && lostFocus) {
+    if (pressed.current && (atFirst || atLast) && lostFocus) {
       pager.current
         ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
         ?.focus();
     }
 
     pressed.current = false;
-  }, [page]);
+  }, [atFirst, atLast]);
 
   return (
     <div ref={pager}>
