@@ -1,5 +1,4 @@
 import { Button } from "@cloudflare/kumo";
-import { CaretRightIcon, PlusIcon } from "@phosphor-icons/react";
 import type { List, Organization } from "@repo/domain";
 import { Link } from "@tanstack/react-router";
 import {
@@ -9,6 +8,7 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, useRef } from "react";
 
+import { CaretRightIcon, PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";

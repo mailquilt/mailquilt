@@ -1,5 +1,4 @@
 import { Banner, Button, Link, Radio } from "@cloudflare/kumo";
-import { WarningIcon } from "@phosphor-icons/react";
 import { SignUpPolicySchema } from "@repo/domain";
 import type {
   InstanceSettings,
@@ -10,6 +9,7 @@ import { useLocation } from "@tanstack/react-router";
 import { Predicate, Schema } from "effect";
 import { useId, useState } from "react";
 
+import { WarningIcon } from "../icons/icons.tsx";
 import { Breakable } from "../layout/breakable.tsx";
 import { LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";

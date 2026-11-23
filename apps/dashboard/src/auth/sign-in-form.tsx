@@ -1,5 +1,4 @@
 import { Banner, Button } from "@cloudflare/kumo";
-import { WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
 import { EmailAddress, Password } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
@@ -7,6 +6,7 @@ import { Schema } from "effect";
 
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
+import { WarningCircleIcon, WarningIcon } from "../icons/icons.tsx";
 import {
   authClient,
   authErrorMessage,

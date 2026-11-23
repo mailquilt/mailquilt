@@ -1,7 +1,7 @@
 import { DropdownMenu, useSidebar } from "@cloudflare/kumo";
-import { CaretUpDownIcon } from "@phosphor-icons/react";
 import { useId, useRef } from "react";
 
+import { CaretUpDownIcon } from "../icons/icons.tsx";
 import { ActionDialog, useDialog } from "../layout/action-dialog.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
 import { CreateOrganizationForm } from "./create-organization-form.tsx";

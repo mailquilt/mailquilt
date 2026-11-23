@@ -1,7 +1,7 @@
 import { DropdownMenu } from "@cloudflare/kumo";
-import { MonitorIcon, MoonIcon, SunIcon } from "@phosphor-icons/react";
 import { useSyncExternalStore } from "react";
 
+import { MonitorIcon, MoonIcon, SunIcon } from "../icons/icons.tsx";
 import {
   DEFAULT_THEME_PREFERENCE,
   readThemePreference,

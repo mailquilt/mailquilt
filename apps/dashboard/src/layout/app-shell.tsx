@@ -1,5 +1,4 @@
 import { Sidebar, useSidebar } from "@cloudflare/kumo";
-import { ListIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
 import type { OrganizationId } from "@repo/domain";
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
@@ -9,6 +8,7 @@ import { formatCount } from "../audience/format.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
+import { ListIcon, SidebarSimpleIcon } from "../icons/icons.tsx";
 import { OrganizationPatch } from "../organizations/organization-patch.tsx";
 import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
 import { OrganizationsUnavailable } from "../organizations/organizations-unavailable.tsx";

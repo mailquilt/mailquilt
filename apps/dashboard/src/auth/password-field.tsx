@@ -1,9 +1,9 @@
 import { InputGroup } from "@cloudflare/kumo";
-import { EyeIcon, EyeSlashIcon } from "@phosphor-icons/react";
 import type { AnyFieldApi } from "@tanstack/react-form";
 import { useState } from "react";
 
 import { FormField } from "../forms/form-field.tsx";
+import { EyeIcon, EyeSlashIcon } from "../icons/icons.tsx";
 
 /**
  * A password field with a toggle to show what was typed. The toggle keeps

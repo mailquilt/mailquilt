@@ -4,10 +4,12 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
+import { iconAlias } from "./icon-alias.ts";
+
 const DEV_API_URL = "http://localhost:3000";
 
 const config = defineConfig({
-  resolve: { tsconfigPaths: true },
+  resolve: { alias: [iconAlias], tsconfigPaths: true },
   plugins: [
     devtools(),
     tailwindcss(),

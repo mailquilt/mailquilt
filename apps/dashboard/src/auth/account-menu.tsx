@@ -1,11 +1,7 @@
 import { DropdownMenu, useSidebar } from "@cloudflare/kumo";
-import {
-  CaretUpDownIcon,
-  GearSixIcon,
-  SignOutIcon,
-} from "@phosphor-icons/react";
 import { useMutation } from "@tanstack/react-query";
 
+import { CaretUpDownIcon, GearSixIcon, SignOutIcon } from "../icons/icons.tsx";
 import type { Account } from "../layout/session-gates.tsx";
 import { ThemePicker } from "../theme/theme-picker.tsx";
 import { authClient } from "./auth-client.ts";

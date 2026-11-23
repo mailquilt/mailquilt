@@ -1,11 +1,11 @@
 import { LinkButton } from "@cloudflare/kumo";
-import { PlusIcon } from "@phosphor-icons/react";
 import { OrganizationIdSchema } from "@repo/domain";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
+import { PlusIcon } from "../icons/icons.tsx";
 import { LoadFailed } from "../layout/empty-state.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
 import { OrganizationPatch } from "../organizations/organization-patch.tsx";
