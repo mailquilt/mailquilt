@@ -99,6 +99,23 @@ describe("Instance settings", () => {
     expect(screen.queryByText("Who can sign up")).toBeNull();
   });
 
+  it("asks for the settings once when the session has ended", async () => {
+    let asked = 0;
+    api.use(
+      http.get(SETTINGS, () => {
+        asked += 1;
+
+        return HttpResponse.json({ _tag: "SignInRequired" }, { status: 401 });
+      })
+    );
+    renderPage();
+
+    await expect(
+      screen.findByRole("button", { name: "Try again" })
+    ).resolves.toBeDefined();
+    expect(asked).toBe(1);
+  });
+
   it("keeps Try again in place, and focused, while it tries again", async () => {
     let failing = true;
     let answer = false;

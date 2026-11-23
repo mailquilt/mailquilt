@@ -90,6 +90,24 @@ describe("providers page", () => {
     ).toBe("/providers/new");
   });
 
+  it("asks for the connections once when the session has ended", async () => {
+    let asked = 0;
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => {
+        asked += 1;
+
+        return HttpResponse.json({ _tag: "SignInRequired" }, { status: 401 });
+      })
+    );
+    renderPage();
+
+    await expect(
+      screen.findByRole("heading", { name: "Your providers didn’t load" })
+    ).resolves.toBeDefined();
+    expect(asked).toBe(1);
+  });
+
   it("shows who each connection sends as, through which server, and how securely", async () => {
     withConnections([
       POSTMARK,

@@ -72,6 +72,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 
 - The dashboard is a static SPA. Public pages are rendered on the server by the same deployed app.
 - A dashboard dialog is Kumo's `LayerDialog` on desktop, centred over the dark scrim: the title and content on a card inside a frame, with Cancel at the frame's far left and the action at its far right. Phones keep the bottom sheet built on Base UI's Drawer, because `LayerDialog`'s own phone layout puts the desktop card inside its drawer. #70 had replaced `LayerDialog` with Kumo's one-card `Dialog`; the maintainer compared both and chose `LayerDialog` (2026-11-23).
+- A dashboard request the API refuses with `SignInRequired` isn't retried. The query client checks the session again, and when it has ended, `SignedInOnly` sends the person to sign in. Pages and forms don't handle `SignInRequired` themselves, and whatever was typed into an open form is lost (#58).
 - On Node, pg-boss is both the Queue and the Scheduler.
 - Persistence is never tested with in-memory fakes (see `testing.md`).
 - `@cloudflare/vitest-pool-workers` isn't used while it needs Vitest 4 and `@effect/vitest` needs Vitest 5. The Cloudflare runtime is covered by the smoke test on `wrangler dev`.

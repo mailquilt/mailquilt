@@ -7,7 +7,7 @@ import type {
   SmtpServer,
 } from "@repo/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 
 import { callApi } from "../api.ts";
 
@@ -34,7 +34,10 @@ export const useProviderConnections = (
 ) =>
   useQuery({
     enabled,
-    retry: retryWhenFailed ? DEFAULT_RETRIES : false,
+    retry: (failures, error) =>
+      retryWhenFailed &&
+      !Predicate.isTagged(error, "SignInRequired") &&
+      failures < DEFAULT_RETRIES,
     queryFn: ({ signal }) =>
       callApi(
         (client) =>
