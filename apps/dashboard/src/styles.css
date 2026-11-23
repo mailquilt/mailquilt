@@ -177,15 +177,32 @@
  * mode and 1.7:1 in dark, under the 3:1 WCAG 2.2 asks of a control's boundary.
  * They take the same grey as unchecked checkboxes. Set on the element that
  * draws the outline, so tables, cards and menus keep their lighter lines.
+ * Kumo shows a field's focus only as a paler ring, which the grey outline
+ * hides, so a focused field gets the outline every other control has: around
+ * the whole group when the field is in one.
  */
 [data-theme="mailquilt"]
   :is(
     input:not([type="checkbox"], [type="radio"]),
     textarea,
-    :has(> input:not([type="checkbox"], [type="radio"])),
+    [data-slot^="input-group"],
     [data-kumo-component="Select"][data-kumo-part="trigger"]
   ) {
   --color-kumo-line: var(--mq-patch-grey);
+}
+
+[data-theme="mailquilt"]
+  :is(
+    :is(input:not([type="checkbox"], [type="radio"]), textarea):focus-visible,
+    [data-slot="input-group"]:has(input:focus-visible),
+    [data-kumo-component="Select"][data-kumo-part="trigger"]:focus-visible
+  ) {
+  outline: 2px solid var(--color-kumo-focus);
+  outline-offset: 2px;
+}
+
+[data-theme="mailquilt"] [data-slot="input-group"] input:focus-visible {
+  outline: none;
 }
 
 @layer base {
