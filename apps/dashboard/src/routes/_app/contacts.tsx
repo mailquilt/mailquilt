@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, deepEqual, redirect } from "@tanstack/react-router";
+import { flow } from "effect";
 import { useEffect, useRef } from "react";
 
 import {
@@ -38,8 +39,18 @@ const Contacts = () => {
   );
 };
 
+const readSearch = flow(decodeContactSearch, consistentSearch);
+
 export const Route = createFileRoute("/_app/contacts")({
+  // WARNING: the router keeps every key validateSearch leaves out, so an address with a part it drops is replaced with the cleaned one (ADR 0012).
+  beforeLoad: ({ search }) => {
+    const cleaned = readSearch(search);
+
+    if (!deepEqual(cleaned, search)) {
+      throw redirect({ search: cleaned, to: "/contacts" });
+    }
+  },
   component: Contacts,
   head: () => ({ meta: [{ title: "Contacts – Mailquilt" }] }),
-  validateSearch: (search) => consistentSearch(decodeContactSearch(search)),
+  validateSearch: readSearch,
 });
