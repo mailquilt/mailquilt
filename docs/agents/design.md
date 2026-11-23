@@ -30,7 +30,7 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
    - Use Kumo where it serves the design, at its default sizes, with the smallest override that works. Never wrap content in a Kumo container, such as `LayerCard`, just because it's there.
 5. **Review** against the `kumo-design` rules and the checklist below. Where a rule is deliberately broken, the code or this page says why. A correctness review (`code-review`) is not a design review.
 6. **Make the evidence and look at it, to find faults.** Before calling UI done, produce and inspect:
-   - screenshots at 320, 390, 768, 1024 and 1440 px wide, plus one wider screen, in light and dark, for every state, including errors. The 768–1279 px range is the one most often missed;
+   - screenshots at 320, 390, 768, 1024, 1440, 1920 and 2560 px wide, in light and dark, for every state, including errors. The 768–1279 px range is the one most often missed. The wide screens matter too: a layout that looks right at 1440 can stretch badly on a wide monitor, as Providers did, and nobody saw it because nothing was checked above 1920;
    - every dialog, sheet and menu open, on a phone and on desktop;
    - a frame-by-frame recording of the screen loading with 120 ms of network latency, in which nothing already drawn moves or changes;
    - focus and keyboard paths checked in a real browser with real clicks and keys. Component tests run in happy-dom, where a scripted click doesn't move focus as a person's does;

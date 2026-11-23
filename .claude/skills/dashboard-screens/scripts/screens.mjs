@@ -15,7 +15,7 @@ import {
 } from "./chrome.mjs";
 
 const USAGE =
-  "Usage: node screens.mjs --out <dir> [--path /] [--name screen] [--widths 320,390,768,1024,1440,1920] [--themes light,dark] [--step click=<selector or text=Label> | type=<text> | press=<Enter|Escape|Tab>]... [--block <url pattern>]... [--wait 2500]";
+  "Usage: node screens.mjs --out <dir> [--path /] [--name screen] [--widths 320,390,768,1024,1440,1920,2560] [--themes light,dark] [--step click=<selector or text=Label> | type=<text> | press=<Enter|Escape|Tab>]... [--block <url pattern>]... [--wait 2500]";
 
 const args = readArgs(process.argv.slice(2));
 
@@ -27,7 +27,7 @@ if (!args.out) {
 const out = path.resolve(args.out);
 const name = args.name ?? "screen";
 
-const widths = (args.widths ?? "320,390,768,1024,1440,1920")
+const widths = (args.widths ?? "320,390,768,1024,1440,1920,2560")
   .split(",")
   .map(Number);
 
