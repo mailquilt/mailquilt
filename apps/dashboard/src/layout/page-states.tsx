@@ -1,5 +1,6 @@
 import { Button } from "@cloudflare/kumo";
 
+import { QuiltSlot } from "../brand/quilt-block.tsx";
 import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
 import { PatchLoader } from "./empty-state.tsx";
 
@@ -30,7 +31,7 @@ export const PageAreaLoading = ({ label }: { label: string }) => (
   </output>
 );
 
-/** The whole page when something it can't work without failed to load. */
+/** The whole page when something it can't work without failed to load: the empty slot, as on Not found. */
 export const PageLoadFailed = ({
   description,
   onRetry,
@@ -41,6 +42,7 @@ export const PageLoadFailed = ({
   title: string;
 }) => (
   <AuthLayout>
+    <QuiltSlot className="mb-7 size-12" />
     <AuthHeading description={description}>{title}</AuthHeading>
     <Button
       className="w-full justify-center"
