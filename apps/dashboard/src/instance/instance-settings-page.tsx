@@ -116,7 +116,7 @@ const Setting = ({
 }) => (
   <>
     <dt className="text-sm leading-5.25 text-kumo-subtle">{label}</dt>
-    <dd className="min-w-0 text-kumo-strong">{children}</dd>
+    <dd className="min-w-0 break-words text-kumo-strong">{children}</dd>
   </>
 );
 

@@ -74,7 +74,7 @@ export const DeleteConnectionDialog = ({
         {remove.isError ? (
           <Banner
             role="alert"
-            title={`Mailquilt couldn’t reach its server, so ${connection.name} wasn’t deleted. Try again.`}
+            title={`Mailquilt couldn’t confirm that ${connection.name} was deleted. Try again.`}
             variant="error"
           />
         ) : null}

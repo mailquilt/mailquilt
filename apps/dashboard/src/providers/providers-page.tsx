@@ -65,7 +65,7 @@ const Detail = ({
 }) => (
   <div className="min-w-0 max-sm:contents">
     <dt className="text-sm text-kumo-subtle max-sm:pt-px">{label}</dt>
-    <dd className="mt-0.5 min-w-0 text-base text-kumo-strong max-sm:mt-0">
+    <dd className="mt-0.5 min-w-0 text-base break-words text-kumo-strong max-sm:mt-0">
       {children}
     </dd>
   </div>

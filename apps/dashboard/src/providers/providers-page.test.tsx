@@ -344,7 +344,7 @@ describe("providers page", () => {
     expect(document.activeElement?.textContent).toBe("Deleted Postmark.");
   });
 
-  it("says the connection wasn't deleted when the server can't be reached", async () => {
+  it("says the deletion couldn't be confirmed when the server can't be reached", async () => {
     withConnections([POSTMARK]);
     api.use(
       http.delete(`${CONNECTIONS}/:providerConnectionId`, () =>
@@ -363,7 +363,7 @@ describe("providers page", () => {
 
     await expect(screen.findByRole("alert")).resolves.toHaveProperty(
       "textContent",
-      "Mailquilt couldn’t reach its server, so Postmark wasn’t deleted. Try again."
+      "Mailquilt couldn’t confirm that Postmark was deleted. Try again."
     );
     expect(
       screen.getByRole("article", { hidden: true, name: "Postmark" })
