@@ -11,9 +11,11 @@ import {
 
 import { callApi } from "../api.ts";
 import { PageLoading } from "../layout/page-states.tsx";
+import { useAccount } from "../layout/session-gates.tsx";
 import { connectionsKey } from "../providers/providers-api.ts";
 
-const ORGANIZATIONS_QUERY_KEY = ["organizations"] as const;
+const organizationsQueryKey = (accountId: string) =>
+  ["organizations", accountId] as const;
 
 const STORAGE_KEY = "mailquilt.organization";
 
@@ -92,11 +94,12 @@ export const OrganizationsProvider = ({
   children: React.ReactNode;
 }) => {
   const [chosenId, setChosenId] = useState(readRemembered);
+  const account = useAccount();
 
   const query = useQuery({
     queryFn: ({ signal }) =>
       callApi((client) => client.organizations.list(), signal),
-    queryKey: ORGANIZATIONS_QUERY_KEY,
+    queryKey: organizationsQueryKey(account.id),
   });
 
   const choose = useCallback((organizationId: string) => {
@@ -171,13 +174,14 @@ export const useOrganizationsStatus = () => {
 export const useCreateOrganization = () => {
   const queryClient = useQueryClient();
   const { choose } = useOrganizationsState();
+  const queryKey = organizationsQueryKey(useAccount().id);
 
   return useMutation({
     mutationFn: (name: string) =>
       callApi((client) => client.organizations.create({ payload: { name } })),
     onSuccess: async (created) => {
       queryClient.setQueryData<readonly Organization[]>(
-        ORGANIZATIONS_QUERY_KEY,
+        queryKey,
         (organizations = []) => [...organizations, created]
       );
       // WARNING: record that the new Organization has no Provider Connections before choosing it, or Home swaps to its loader and loses the setup step's focus move.
@@ -186,9 +190,7 @@ export const useCreateOrganization = () => {
         []
       );
       choose(created.id);
-      await queryClient.invalidateQueries({
-        queryKey: ORGANIZATIONS_QUERY_KEY,
-      });
+      await queryClient.invalidateQueries({ queryKey });
     },
   });
 };
