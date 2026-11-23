@@ -57,7 +57,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # Testcontainers starts Postgres through the runner's Docker.
-      - run: pnpm test
+      - run: pnpm exec turbo run test --ui=stream --filter='!dashboard'
+      # The dashboard's tests wait on rendering with real-time timeouts, so
+      # they run after the others rather than competing with Postgres and the
+      # API tests for the runner's CPUs (#99).
+      - run: pnpm exec turbo run test --ui=stream --filter=dashboard
 
   audit:
     name: Audit
