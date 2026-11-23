@@ -34,7 +34,7 @@ import {
   Tick02Icon,
   UnfoldMoreIcon,
   ViewIcon,
-  ViewOffSlashIcon,
+  ViewOffIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import type { IconSvgElement } from "@hugeicons/react";
@@ -53,6 +53,9 @@ const STROKE: Record<IconWeight, number> = {
   thin: 1,
 };
 
+// WARNING: a fill closes Hugeicons' open strokes into solid shapes; Kumo's Select arrow asks for one.
+const STROKE_ONLY = /\bfill-current\b/gu;
+
 const hugeicon = (icon: IconSvgElement, name: string) => {
   const Drawn = forwardRef<SVGSVGElement, IconProps>(
     (
@@ -68,7 +71,9 @@ const hugeicon = (icon: IconSvgElement, name: string) => {
         ...contextProps
       } = useContext(IconContext);
 
-      const classes = className ?? contextClassName;
+      const classes = (className ?? contextClassName)
+        ?.replaceAll(STROKE_ONLY, "")
+        .trim();
 
       return (
         <HugeiconsIcon
@@ -126,7 +131,7 @@ export const CheckIcon = hugeicon(Tick02Icon, "CheckIcon");
 export const CopyIcon = hugeicon(Copy01Icon, "CopyIcon");
 export const CopySimpleIcon = hugeicon(Copy01Icon, "CopySimpleIcon");
 export const EyeIcon = hugeicon(ViewIcon, "EyeIcon");
-export const EyeSlashIcon = hugeicon(ViewOffSlashIcon, "EyeSlashIcon");
+export const EyeSlashIcon = hugeicon(ViewOffIcon, "EyeSlashIcon");
 
 export const GlobeHemisphereWestIcon = hugeicon(
   Globe02Icon,
