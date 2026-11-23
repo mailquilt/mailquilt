@@ -18,8 +18,10 @@ import {
   ACME,
   renderWithOrganizations,
 } from "../organizations/test-organizations.tsx";
+import { consistentSearch } from "./contact-search.ts";
 import type { ContactSearch } from "./contact-search.ts";
 import { ContactsPage } from "./contacts-page.tsx";
+import { WRAP_POINT } from "./format.ts";
 
 const api = setupServer();
 
@@ -98,12 +100,37 @@ const renderPage = (search: ContactSearch = {}) => {
   return onSearch;
 };
 
+const NavigatedContacts = ({
+  back,
+  start,
+}: {
+  back: ContactSearch;
+  start: ContactSearch;
+}) => {
+  const [search, setSearch] = useState<ContactSearch>(start);
+
+  return (
+    <>
+      <button onClick={() => setSearch(back)} type="button">
+        Go back
+      </button>
+      <ContactsPage
+        onSearch={(next) => setSearch(consistentSearch(next))}
+        organization={organization}
+        search={search}
+      />
+    </>
+  );
+};
+
+const goBack = () => fireEvent.click(screen.getByText("Go back"));
+
 const PagingContacts = () => {
   const [search, setSearch] = useState<ContactSearch>({});
 
   return (
     <ContactsPage
-      onSearch={setSearch}
+      onSearch={(next) => setSearch(consistentSearch(next))}
       organization={organization}
       search={search}
     />
@@ -141,7 +168,11 @@ describe("contacts page", () => {
       http.get(
         "*/api/organizations/:organizationId/contacts",
         ({ request }) => {
-          asked = new URL(request.url).searchParams;
+          const params = new URL(request.url).searchParams;
+
+          if (params.has("list")) {
+            asked = params;
+          }
 
           return HttpResponse.json(page([ALAN]));
         }
@@ -187,12 +218,14 @@ describe("contacts page", () => {
     expect(onSearch).toHaveBeenCalledWith({ before: ADA.id });
   });
 
-  it("keeps Previous and Next off until the asked-for page arrives", async () => {
+  it("keeps Previous and Next off, and focusable, until the asked-for page arrives", async () => {
+    let pagesAsked = 0;
     api.use(
       http.get(
         "*/api/organizations/:organizationId/contacts",
         async ({ request }) => {
           if (new URL(request.url).searchParams.has("after")) {
+            pagesAsked += 1;
             await delay("infinite");
           }
 
@@ -206,11 +239,18 @@ describe("contacts page", () => {
 
     renderWithOrganizations(<PagingContacts />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+    const next = await screen.findByRole("button", { name: "Next" });
 
-    expect(
-      screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")
-    ).toBeTruthy();
+    fireEvent.click(next);
+
+    await expect.poll(() => next.getAttribute("aria-disabled")).toBe("true");
+    expect(next.hasAttribute("disabled")).toBeFalsy();
+    await expect.poll(() => pagesAsked).toBe(1);
+
+    fireEvent.click(next);
+    await delay(50);
+
+    expect(pagesAsked).toBe(1);
     expect(
       screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")
     ).toBeTruthy();
@@ -241,7 +281,9 @@ describe("contacts page", () => {
     );
 
     await expect(
-      screen.findByText("Added ada@example.com")
+      screen.findByText("Added ada@example.com", {
+        normalizer: (text) => text.replaceAll(WRAP_POINT, ""),
+      })
     ).resolves.toBeTruthy();
     expect(created).toStrictEqual({
       email: "grace@example.com",
@@ -274,6 +316,158 @@ describe("contacts page", () => {
 
     await expect(screen.findByText("No contacts yet")).resolves.toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("offers one Add contact on a list with no one on it, in its empty state", async () => {
+    api.use(...audience({ contacts: page([]) }));
+
+    renderPage({ list: ListIdSchema.make(NEWS.id) });
+
+    await expect(
+      screen.findByText("No one is on Weekly news yet")
+    ).resolves.toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Add contact" })).toHaveLength(
+      1
+    );
+  });
+
+  it("doesn't offer Add contact beside contacts that didn't load", async () => {
+    api.use(
+      http.get("*/api/organizations/:organizationId/contacts", () =>
+        HttpResponse.error()
+      ),
+      ...audience()
+    );
+
+    renderPage();
+
+    await screen.findByRole("button", { name: "Try again" });
+
+    expect(screen.queryByRole("button", { name: "Add contact" })).toBeNull();
+  });
+
+  it("keeps the list filter in place and shows the selection in its own bar", async () => {
+    api.use(...audience());
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select ada@example.com" })
+    );
+
+    const bar = screen.getByRole("region", { name: "Selected contacts" });
+
+    expect(bar.textContent).toContain("1 selected");
+    expect(screen.getByRole("combobox", { name: "List" })).toBeTruthy();
+
+    fireEvent.click(
+      within(bar).getByRole("button", { name: "Clear selection" })
+    );
+
+    expect(document.activeElement).toBe(
+      screen.getByRole("checkbox", {
+        name: "Select every contact on this page",
+      })
+    );
+    await expect
+      .poll(() => screen.queryByRole("region", { name: "Selected contacts" }))
+      .toBeNull();
+  });
+
+  it("leaves the count out of the title when the page didn't load", async () => {
+    api.use(
+      http.get("*/api/organizations/:organizationId/lists", () =>
+        HttpResponse.error()
+      ),
+      ...audience()
+    );
+
+    renderPage();
+
+    await screen.findByRole("button", { name: "Try again" });
+
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Contacts"
+    );
+  });
+
+  it("counts everyone on the list in the title, whatever status is shown", async () => {
+    api.use(...audience({ contacts: page([ADA]) }));
+
+    renderPage({
+      list: ListIdSchema.make(NEWS.id),
+      status: "subscribed",
+    });
+
+    const title = await screen.findByRole("heading", { level: 1 });
+
+    await expect.poll(() => title.textContent).toContain("3 on this list");
+  });
+
+  it("doesn't bring Add to list back by itself after the page moves on while it was open", async () => {
+    api.use(...audience());
+
+    renderWithOrganizations(
+      <NavigatedContacts
+        back={{ list: ListIdSchema.make(NEWS.id) }}
+        start={{}}
+      />
+    );
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select ada@example.com" })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Add to list" }));
+    await screen.findByRole("dialog");
+
+    goBack();
+    await expect.poll(() => screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(
+      await screen.findByRole("checkbox", { name: "Select ada@example.com" })
+    );
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("keeps the list filter in place while the next rows load", async () => {
+    let answer = false;
+    api.use(
+      http.get(
+        "*/api/organizations/:organizationId/contacts",
+        async ({ request }) => {
+          if (new URL(request.url).searchParams.has("list")) {
+            return HttpResponse.json(page([]));
+          }
+
+          await vi.waitUntil(() => answer, { timeout: 5000 });
+
+          return HttpResponse.json(page([ADA]));
+        }
+      ),
+      ...audience()
+    );
+
+    renderWithOrganizations(
+      <NavigatedContacts
+        back={{}}
+        start={{ list: ListIdSchema.make(NEWS.id) }}
+      />
+    );
+
+    const filter = await screen.findByRole("combobox", { name: "List" });
+
+    goBack();
+    await delay(50);
+
+    expect(filter.isConnected).toBeTruthy();
+
+    answer = true;
+
+    await expect(
+      screen.findByRole("table", { name: "Contacts" })
+    ).resolves.toBeTruthy();
+    expect(filter.isConnected).toBeTruthy();
   });
 
   it("offers Try again when contacts don't load, and shows them once they do", async () => {

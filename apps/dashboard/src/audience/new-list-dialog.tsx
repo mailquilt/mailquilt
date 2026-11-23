@@ -81,7 +81,7 @@ export const NewListDialog = ({
           {(field) => (
             <FormField
               autoComplete="off"
-              className="w-full max-sm:h-11 pointer-coarse:h-11"
+              className="w-full"
               field={field}
               label="List name"
               placeholder="Weekly news"

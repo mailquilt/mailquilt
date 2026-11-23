@@ -52,6 +52,33 @@ describe("lists page", () => {
     ).toBe(`/contacts?list=${NEWS.id}`);
   });
 
+  it("draws every list's make-up to the biggest list's scale", async () => {
+    const SMALL = {
+      createdAt: "2026-11-03T09:00:00.000Z",
+      id: "lst_01h455vb4pex5vsknk084sn02r",
+      name: "Small news",
+      subscriptions: { pending: 0, subscribed: 821, unsubscribed: 0 },
+    };
+
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get("*/api/organizations/:organizationId/lists", () =>
+        HttpResponse.json([NEWS, SMALL])
+      )
+    );
+
+    renderWithOrganizations(<ListsPage organization={organization} />);
+
+    const row = await screen.findByRole("row", { name: /Small news/u });
+    const subscribed = row.querySelector('[data-status="subscribed"]');
+
+    expect(
+      subscribed instanceof HTMLElement
+        ? subscribed.style.getPropertyValue("--mq-share")
+        : undefined
+    ).toBe("50%");
+  });
+
   it("creates the first list from the empty page", async () => {
     let lists: readonly object[] = [];
     api.use(

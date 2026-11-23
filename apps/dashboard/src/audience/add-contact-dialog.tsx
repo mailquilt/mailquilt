@@ -10,7 +10,7 @@ import { submitForm } from "../forms/submit-form.ts";
 import { ActionDialog } from "../layout/action-dialog.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
 import { useCreateContact } from "./audience-api.ts";
-import { formatCount } from "./format.ts";
+import { formatCount, wrappableAddress } from "./format.ts";
 
 const NewContact = Schema.Struct({
   email: ContactEmail,
@@ -86,7 +86,7 @@ export const AddContactDialog = ({
                 names.length === 0
                   ? undefined
                   : `Subscribed to ${new Intl.ListFormat("en").format(names)}.`,
-              title: `Added ${contact.email}`,
+              title: `Added ${wrappableAddress(contact.email)}`,
             });
           },
         }
@@ -128,7 +128,7 @@ export const AddContactDialog = ({
           {(field) => (
             <FormField
               autoComplete="off"
-              className="w-full max-sm:h-11 pointer-coarse:h-11"
+              className="w-full"
               field={field}
               inputMode="email"
               label="Email address"
@@ -146,7 +146,7 @@ export const AddContactDialog = ({
                 <legend className="text-base font-medium text-kumo-strong">
                   Subscribe to
                 </legend>
-                <p className="mt-0.5 mb-2 text-sm text-kumo-subtle">
+                <p className="mt-0.5 mb-2 text-sm leading-4.5 text-kumo-subtle">
                   Optional. They’ll get the campaigns sent to these lists.
                 </p>
                 <ul className="-mx-1 flex max-h-56 flex-col overflow-y-auto px-1">
