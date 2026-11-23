@@ -1,34 +1,57 @@
+import { LayerCard } from "@cloudflare/kumo";
 import { useEffect, useState } from "react";
 
 /**
- * A table's place on the page: edge to edge inside the page block, with no
- * card, its first and last columns on the page's gutter. `busy` dims the
- * rows under a moving line while the next ones load, so the table never
- * empties and refills. An empty, didn't-load or loading state in place of
- * the rows sits under the same line the header would.
+ * A table's place on the page. `bordered` sets it in Kumo's `LayerCard`,
+ * lined up with the page header, its cells inset to the card and `footer`
+ * (the pager) at its foot under a hairline; without it, the region sits
+ * open on the page, as a one-column page's states do. `busy` dims the rows
+ * under a moving line while the next ones load, so the table never empties
+ * and refills. An empty or didn't-load state takes the rows' place, inside
+ * the same card.
  */
 export const TableRegion = ({
+  bordered = false,
   busy = false,
   children,
+  footer,
   label,
 }: {
+  bordered?: boolean;
   busy?: boolean;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   label: string;
-}) => (
-  <section
-    aria-busy={busy}
-    aria-label={label}
-    className="mq-bleed mq-region-state relative"
-  >
-    {busy ? <span aria-hidden="true" className="mq-busy-line" /> : null}
-    <div
-      className={`transition-opacity duration-150 motion-reduce:transition-none ${busy ? "opacity-50" : ""}`}
+}) => {
+  const content = (
+    <>
+      {busy ? <span aria-hidden="true" className="mq-busy-line" /> : null}
+      <div
+        className={`transition-opacity duration-150 motion-reduce:transition-none ${busy ? "opacity-50" : ""}`}
+      >
+        {children}
+      </div>
+      {footer === undefined ? null : (
+        <div className="mq-table-foot">{footer}</div>
+      )}
+    </>
+  );
+
+  return bordered ? (
+    <LayerCard
+      aria-busy={busy}
+      aria-label={label}
+      className="mq-table-card relative"
+      render={<section />}
     >
-      {children}
-    </div>
-  </section>
-);
+      {content}
+    </LayerCard>
+  ) : (
+    <section aria-busy={busy} aria-label={label} className="mq-bleed relative">
+      {content}
+    </section>
+  );
+};
 
 /** The row above a table: its filters. It stays put while rows are selected. */
 export const Toolbar = ({ children }: { children: React.ReactNode }) => (

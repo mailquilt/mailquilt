@@ -1,4 +1,4 @@
-import { Button, Checkbox, Select } from "@cloudflare/kumo";
+import { Button, Checkbox, Pagination, Select } from "@cloudflare/kumo";
 import type {
   Contact,
   ContactId,
@@ -17,9 +17,9 @@ import {
 import type { RowSelectionState } from "@tanstack/react-table";
 import { Array as Arr } from "effect";
 import type { DateTime } from "effect";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { CaretLeftIcon, CaretRightIcon, PlusIcon } from "../icons/icons.tsx";
+import { PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
@@ -344,46 +344,59 @@ const Pager = ({
   page: ContactPage;
 }) => {
   const { next, previous } = page;
+  const current = previous === null ? 1 : 2;
+  const pager = useRef<HTMLDivElement>(null);
+  const pressed = useRef(false);
+  const atFirst = previous === null;
+  const atLast = next === null;
+
+  // WARNING: Kumo's arrows are plain disabled buttons. Reaching the first or last page turns off the arrow just pressed, and the browser drops focus to the page, so focus moves to the other arrow.
+  useEffect(() => {
+    const focused = document.activeElement;
+
+    const lostFocus =
+      focused === document.body ||
+      (focused instanceof HTMLButtonElement &&
+        focused.disabled &&
+        pager.current?.contains(focused) === true);
+
+    if (pressed.current && (atFirst || atLast) && lostFocus) {
+      pager.current
+        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+        ?.focus();
+    }
+
+    pressed.current = false;
+  }, [atFirst, atLast]);
 
   return (
-    <nav
-      aria-label="Pages of contacts"
-      className="flex items-center justify-between gap-3 pt-4 text-sm text-kumo-subtle"
-    >
-      <span className="tabular-nums">
-        {formatCount(page.start + 1)}–
-        {formatCount(page.start + page.contacts.length)} of{" "}
-        {formatCount(page.total)}
-      </span>
-      <span className="flex gap-2">
-        <Button
-          aria-disabled={loading || undefined}
-          disabled={previous === null}
-          icon={CaretLeftIcon}
-          onClick={() => {
-            if (!loading && previous !== null) {
-              onPage({ before: previous });
-            }
-          }}
-          variant="secondary"
-        >
-          Previous
-        </Button>
-        <Button
-          aria-disabled={loading || undefined}
-          disabled={next === null}
-          onClick={() => {
-            if (!loading && next !== null) {
-              onPage({ after: next });
-            }
-          }}
-          variant="secondary"
-        >
-          Next
-          <CaretRightIcon aria-hidden="true" className="size-3.5" />
-        </Button>
-      </span>
-    </nav>
+    <div ref={pager}>
+      <Pagination
+        hasNextPage={next !== null}
+        labels={{ navigation: "Pages of contacts" }}
+        page={current}
+        setPage={(asked) => {
+          if (loading) {
+            return;
+          }
+
+          pressed.current = true;
+
+          if (asked < current && previous !== null) {
+            onPage({ before: previous });
+          } else if (asked > current && next !== null) {
+            onPage({ after: next });
+          }
+        }}
+      >
+        <Pagination.Info className="tabular-nums">
+          {() =>
+            `${formatCount(page.start + 1)}–${formatCount(page.start + page.contacts.length)} of ${formatCount(page.total)}`
+          }
+        </Pagination.Info>
+        <Pagination.Controls controls="simple" />
+      </Pagination>
+    </div>
   );
 };
 
@@ -577,7 +590,26 @@ const ContactsTable = ({
             ?.focus();
         }}
       />
-      <TableRegion busy={query.isPlaceholderData} label="Contacts">
+      <TableRegion
+        bordered
+        busy={query.isPlaceholderData}
+        footer={
+          page.total === 0 ? undefined : (
+            <Pager
+              loading={query.isPlaceholderData}
+              onPage={(cursor) =>
+                onSearch({
+                  list: search.list,
+                  status: search.status,
+                  ...cursor,
+                })
+              }
+              page={page}
+            />
+          )
+        }
+        label="Contacts"
+      >
         {page.total === 0 ? (
           <NoContacts
             addButton={addContactButton}
@@ -600,15 +632,6 @@ const ContactsTable = ({
           />
         )}
       </TableRegion>
-      {page.total === 0 ? null : (
-        <Pager
-          loading={query.isPlaceholderData}
-          onPage={(cursor) =>
-            onSearch({ list: search.list, status: search.status, ...cursor })
-          }
-          page={page}
-        />
-      )}
       {Arr.isReadonlyArrayNonEmpty(selected) ? (
         <AddToListDialog
           contactIds={selected}
@@ -717,7 +740,7 @@ export const ContactsPage = ({
   const body = () => {
     if (page.data === null) {
       return (
-        <TableRegion label="Contacts">
+        <TableRegion bordered label="Contacts">
           <EmptyState
             actions={
               <Button onClick={() => onSearch({})} variant="secondary">
@@ -733,7 +756,7 @@ export const ContactsPage = ({
 
     if (lists.data === undefined || page.data === undefined) {
       return (
-        <TableRegion label="Contacts">
+        <TableRegion bordered label="Contacts">
           <LoadFailed
             onRetry={retry}
             retrying={lists.isFetching || page.isFetching}
