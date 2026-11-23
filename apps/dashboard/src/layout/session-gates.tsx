@@ -6,13 +6,15 @@ import { authClient } from "../auth/auth-client.ts";
 import { PageLoadFailed, PageLoading } from "./page-states.tsx";
 
 export interface Account {
+  readonly id: string;
   readonly name: string;
   readonly email: string;
   /** Can see and change Instance settings. */
   readonly instanceAdmin: boolean;
 }
 
-const AccountContext = createContext<Account | null>(null);
+/** The signed-in person. `SignedInOnly` provides it; tests give it directly. */
+export const AccountContext = createContext<Account | null>(null);
 
 /** The signed-in person. Only pages inside `SignedInOnly` can ask. */
 export const useAccount = () => {

@@ -34,7 +34,12 @@ const renderAccountMenu = ({
         <LinkProvider component={RouterLink}>
           <Sidebar.Provider defaultOpen={sidebarOpen}>
             <AccountMenu
-              account={{ email: "ada@example.com", instanceAdmin, name: "Ada" }}
+              account={{
+                email: "ada@example.com",
+                id: "u",
+                instanceAdmin,
+                name: "Ada",
+              }}
             />
           </Sidebar.Provider>
         </LinkProvider>

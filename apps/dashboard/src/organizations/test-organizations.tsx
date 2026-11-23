@@ -9,6 +9,7 @@ import {
 import { render } from "@testing-library/react";
 
 import { RouterLink } from "../layout/router-link.tsx";
+import { AccountContext } from "../layout/session-gates.tsx";
 import { OrganizationsProvider } from "./organizations.tsx";
 
 export const ACME = {
@@ -23,10 +24,18 @@ export const BOLT = {
   role: "owner",
 } as const;
 
+const ADA = {
+  email: "ada@example.com",
+  id: "u",
+  instanceAdmin: false,
+  name: "Ada",
+} as const;
+
 /**
  * Renders `ui` as signed-in pages see it: inside the router, with Kumo's
- * links routed through it, the query client, toasts and the tab's
- * Organization. Returns the router, so a test can see where a link went.
+ * links routed through it, the query client, toasts, the signed-in account
+ * and the tab's Organization. Returns the router, so a test can see where a
+ * link went.
  */
 export const renderWithOrganizations = (ui: React.ReactNode) => {
   const router = createRouter({
@@ -35,9 +44,11 @@ export const renderWithOrganizations = (ui: React.ReactNode) => {
       component: () => (
         <LinkProvider component={RouterLink}>
           <Toasty>
-            <OrganizationsProvider>
-              <Sidebar.Provider>{ui}</Sidebar.Provider>
-            </OrganizationsProvider>
+            <AccountContext value={ADA}>
+              <OrganizationsProvider>
+                <Sidebar.Provider>{ui}</Sidebar.Provider>
+              </OrganizationsProvider>
+            </AccountContext>
           </Toasty>
         </LinkProvider>
       ),
