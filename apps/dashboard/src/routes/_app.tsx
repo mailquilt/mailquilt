@@ -1,4 +1,3 @@
-import { Toasty } from "@cloudflare/kumo";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 import { AppShell } from "../layout/app-shell.tsx";
@@ -7,13 +6,11 @@ import { OrganizationsProvider } from "../organizations/organizations.tsx";
 
 const SignedInPages = () => (
   <SignedInOnly>
-    <Toasty>
-      <OrganizationsProvider>
-        <AppShell>
-          <Outlet />
-        </AppShell>
-      </OrganizationsProvider>
-    </Toasty>
+    <OrganizationsProvider>
+      <AppShell>
+        <Outlet />
+      </AppShell>
+    </OrganizationsProvider>
   </SignedInOnly>
 );
 

@@ -38,7 +38,6 @@ const ADA = {
 const ORGANIZATION = "*/api/organizations/:organizationId";
 
 const signedIn = [
-  http.get("*/health", () => HttpResponse.json({ database: "connected" })),
   http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
   http.get("*/api/organizations", () => HttpResponse.json([ACME])),
 ];

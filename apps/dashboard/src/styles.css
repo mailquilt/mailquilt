@@ -1339,8 +1339,13 @@ aside.mq-frame {
   padding-bottom: 6rem;
 }
 
-/* Toasts rise above the bar while it's showing, never over it, and slide back as it leaves. */
+/*
+ * Toasts rise above the bar while it's showing, never over it, and slide back as it leaves.
+ * Kumo stacks them at z-index 1, under the sign-in block and the sticky bars; they sit above
+ * the page (the frame bar is 30) and under dialogs and sheets (the scrim is 60).
+ */
 [data-theme="mailquilt"] [role="region"][aria-label="Notifications"] {
+  z-index: 40;
   transition: bottom 240ms var(--ease-out-strong);
 }
 
@@ -1472,4 +1477,28 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
   .mq-form-end > p {
     flex-basis: 100%;
   }
+}
+
+/*
+ * Tabbing never lands under a toast that stays, such as "Can't reach the Mailquilt API" (WCAG 2.4.11).
+ * Last in the file, so it wins over the bar's and the form foot's smaller padding; the toast stands above both.
+ */
+html[data-theme="mailquilt"]:has(.mq-lasting-toast) {
+  scroll-padding-bottom: 8rem;
+}
+
+html[data-theme="mailquilt"]:has(.mq-lasting-toast):has(
+    .mq-selbar:not([data-leaving])
+  ) {
+  scroll-padding-bottom: calc(var(--mq-selbar-reach) + 8rem);
+}
+
+html[data-theme="mailquilt"]:has(.mq-lasting-toast):has(.mq-form-foot) {
+  scroll-padding-bottom: 13.5rem;
+}
+
+/* Toasts rise above a form's sticky foot, never over its buttons. */
+:root[data-theme="mailquilt"]:has(.mq-form-foot)
+  [role="region"][aria-label="Notifications"] {
+  bottom: 5.5rem;
 }
