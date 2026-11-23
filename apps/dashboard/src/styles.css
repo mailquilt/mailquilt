@@ -782,6 +782,27 @@ aside.mq-frame {
   background: var(--mq-scrim-under-kumo);
 }
 
+/* LayerDialog's window sits above that scrim; it has no z-index of its own. */
+[data-theme="mailquilt"]
+  [data-base-ui-portal]
+  > [data-layer-dialog-backdrop]
+  + [role="presentation"] {
+  z-index: 61;
+}
+
+/*
+ * LayerDialog pads its body below the description even when there is
+ * nothing in it, as in a delete confirmation, which left a lopsided gap. Such
+ * a card ends at its description; an error banner brings the body back.
+ * WARNING: this matches Kumo 2.18's body, a ScrollArea root, viewport and
+ * content around `.mq-dialog-body`. If an upgrade adds or drops a wrapper,
+ * the rule stops matching and the gap comes back; check Delete connection.
+ */
+[data-theme="mailquilt"]
+  [role="presentation"]:has(> * > * > .mq-dialog-body > form:empty) {
+  display: none;
+}
+
 /* Kumo's toast surface, drawn as a quiet popover: no border, a soft shadow, no close button. */
 [data-theme="mailquilt"] [data-kumo-part="surface"] {
   border: 0;

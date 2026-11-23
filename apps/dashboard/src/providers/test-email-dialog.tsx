@@ -319,7 +319,7 @@ export const TestEmailDialog = ({
           </form.Field>
         </form>
         <div
-          className={`min-w-0 transition-opacity motion-reduce:transition-none ${send.isPending ? "opacity-50" : ""}`}
+          className={`min-w-0 transition-opacity empty:hidden motion-reduce:transition-none ${send.isPending ? "opacity-50" : ""}`}
         >
           {outcome?.kind === "sent" ? (
             <Sent

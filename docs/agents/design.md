@@ -16,8 +16,9 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
 1. **UX first.** Write down the screen's job, who arrives and in what state, every state it has (loading, empty, error, success, disabled), and its copy, before any styling.
 2. **Mock up anything new, then stop.** Every new screen, component, menu, dialog or sheet is shown as rendered mockups before it is built: desktop and phone, light and dark, every state from step 1. Show two or three directions with a recommendation, and wait for the maintainer's pick. This holds on a `ready-for-agent` ticket too. Only copy, spacing and token changes inside an existing component skip this step.
 3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes, its focus and its motion. Keep a default only when it is right for this screen, and say which ones you kept. Defaults that cost a round on #6 and the redesign (#69):
-   - Kumo pins dialogs near the top of the window, and `LayerDialog` puts its desktop card inside the phone drawer.
-   - `LayerDialog` focuses its own frame when it opens, not its field, and has no option to change that. Kumo's `Dialog` takes no `initialFocus` or `finalFocus` at all.
+   - Kumo pins `Dialog` near the top of the window, and `LayerDialog` puts its desktop card inside the phone drawer.
+   - `LayerDialog` focuses its own frame when it opens, not its field, and takes no `initialFocus` or `finalFocus`, nor does Kumo's `Dialog`.
+   - `LayerDialog`'s window has no z-index, so above the dark scrim it would sit under it, and its body keeps its padding when empty.
    - Kumo's dialog backdrop is a pale wash that greys out the ink frame. Overriding its `opacity` stops its fade; override only its colour.
    - Kumo's loading `Button` disables itself, and the browser then drops keyboard focus to the page, even inside a dialog.
    - A dialog given a new `key` in the same render that opens it mounts already open and skips its entrance; one keyed by `open` unmounts as it closes and skips its exit. Use `useDialog` (`src/layout/action-dialog.tsx`).
