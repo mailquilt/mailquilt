@@ -14,6 +14,7 @@ import {
 
 import {
   ACME,
+  BOLT,
   renderWithOrganizations,
 } from "../organizations/test-organizations.tsx";
 import { AppShell } from "./app-shell.tsx";
@@ -40,6 +41,20 @@ const signedIn = [
   http.get("*/health", () => HttpResponse.json({ database: "connected" })),
   http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
   http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+];
+
+const quietOrganization = [
+  http.get(`${ORGANIZATION}/lists`, () => HttpResponse.json([])),
+  http.get(`${ORGANIZATION}/provider-connections`, () => HttpResponse.json([])),
+  http.get(`${ORGANIZATION}/contacts`, () =>
+    HttpResponse.json({
+      contacts: [],
+      next: null,
+      previous: null,
+      start: 0,
+      total: 0,
+    })
+  ),
 ];
 
 const contactsPage = (total: number) => ({
@@ -130,5 +145,54 @@ describe("app shell", () => {
     fireEvent.click(screen.getByRole("link", { name: "Lists" }));
 
     await expect.poll(() => menu.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("gives focus back to the menu button when the navigation's Close button closes it", async () => {
+    window.happyDOM?.setViewport({ height: 844, width: 390 });
+    api.use(...signedIn, ...quietOrganization);
+
+    renderShell();
+
+    const menu = await screen.findByRole(
+      "button",
+      { name: "Open navigation" },
+      { timeout: 3000 }
+    );
+
+    fireEvent.click(menu);
+
+    const close = screen.getByRole("button", { name: "Close navigation" });
+
+    close.focus();
+    fireEvent.click(close);
+
+    await expect.poll(() => document.activeElement).toBe(menu);
+  });
+
+  it("moves focus to the page when an Organization is chosen in the full-screen navigation", async () => {
+    window.happyDOM?.setViewport({ height: 844, width: 390 });
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME, BOLT])),
+      ...signedIn,
+      ...quietOrganization
+    );
+
+    renderShell();
+
+    fireEvent.click(
+      await screen.findByRole(
+        "button",
+        { name: "Open navigation" },
+        { timeout: 3000 }
+      )
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Organization: Acme Newsletter/u })
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitemradio", { name: /Bolt Weekly/u })
+    );
+
+    await expect.poll(() => document.activeElement?.id).toBe("main");
   });
 });

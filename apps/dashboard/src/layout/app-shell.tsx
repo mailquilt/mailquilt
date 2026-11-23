@@ -2,7 +2,7 @@ import { Sidebar, useSidebar } from "@cloudflare/kumo";
 import { ListIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
 import type { OrganizationId } from "@repo/domain";
 import { Link, useLocation, useRouter } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { useContactPage, useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
@@ -238,6 +238,37 @@ const RailQuilt = () => {
 const FrameBar = () => {
   const { isMobile, openMobile, toggleSidebar } = useSidebar();
   const { active } = useOrganizations();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+
+  // WARNING: the closed navigation is inert, so its Close button (or anything else in it) can't keep focus; when focus is lost as it closes, it goes back to the button that opened it, as Escape does.
+  useEffect(() => {
+    if (openMobile) {
+      wasOpen.current = true;
+
+      return;
+    }
+
+    if (!wasOpen.current) {
+      return;
+    }
+
+    wasOpen.current = false;
+
+    const frame = requestAnimationFrame(() => {
+      const focus = document.activeElement;
+
+      if (
+        focus === null ||
+        focus === document.body ||
+        focus.closest('[data-sidebar="sidebar"][data-mobile]')
+      ) {
+        menuButton.current?.focus();
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [openMobile]);
 
   if (!isMobile) {
     return null;
@@ -257,6 +288,7 @@ const FrameBar = () => {
         aria-label="Open navigation"
         className="mq-frame-icon-button"
         onClick={toggleSidebar}
+        ref={menuButton}
         type="button"
       >
         <ListIcon aria-hidden="true" className="size-5" />

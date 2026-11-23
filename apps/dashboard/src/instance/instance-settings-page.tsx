@@ -259,8 +259,10 @@ const Settings = ({ settings }: { settings: InstanceSettings }) => {
  */
 export const InstanceSettingsPage = () => {
   const settings = useInstanceSettings();
+  const [retrying, setRetrying] = useState(false);
 
-  if (settings.isPending) {
+  // WARNING: a query with no data goes back to pending when it retries, so while Try again runs the failure stays up, keeping the button and its focus, rather than the loader replacing it.
+  if (settings.isPending && !retrying) {
     return <PageAreaLoading label="Loading instance settings" />;
   }
 
@@ -277,10 +279,14 @@ export const InstanceSettingsPage = () => {
             ? "Only the person who runs this Mailquilt can see or change its settings."
             : "These apply to everyone on this Mailquilt. Only you can see them, as its admin."}
         </p>
-        {settings.isError && !notAdmin ? (
+        {(settings.isError || retrying) && !notAdmin ? (
           <LoadFailed
-            onRetry={() => settings.refetch()}
-            retrying={settings.isFetching}
+            onRetry={async () => {
+              setRetrying(true);
+              await settings.refetch();
+              setRetrying(false);
+            }}
+            retrying={retrying || settings.isFetching}
             title="Instance settings didn’t load"
           />
         ) : null}

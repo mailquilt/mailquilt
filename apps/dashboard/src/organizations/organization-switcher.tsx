@@ -75,7 +75,15 @@ export const OrganizationSwitcher = () => {
                   key={organization.id}
                   onClick={() => {
                     switchTo(organization.id);
-                    setOpenMobile(false);
+
+                    if (isMobile) {
+                      setOpenMobile(false);
+                      requestAnimationFrame(() =>
+                        document
+                          .querySelector<HTMLElement>("#main")
+                          ?.focus({ preventScroll: true })
+                      );
+                    }
                   }}
                   value={organization.id}
                 >

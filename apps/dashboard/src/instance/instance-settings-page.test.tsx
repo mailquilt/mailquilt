@@ -18,7 +18,15 @@ import {
 } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { InstanceSettingsPage } from "./instance-settings-page.tsx";
 
@@ -48,7 +56,11 @@ const renderPage = () => {
   });
 
   render(
-    <QueryClientProvider client={new QueryClient()}>
+    <QueryClientProvider
+      client={
+        new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } })
+      }
+    >
       <Toasty>
         <RouterProvider router={router} />
       </Toasty>
@@ -85,6 +97,47 @@ describe("Instance settings", () => {
       )
     ).resolves.toBeDefined();
     expect(screen.queryByText("Who can sign up")).toBeNull();
+  });
+
+  it("keeps Try again in place, and focused, while it tries again", async () => {
+    let failing = true;
+    let answer = false;
+    api.use(
+      http.get(SETTINGS, async () => {
+        if (failing) {
+          return HttpResponse.error();
+        }
+
+        await vi.waitUntil(() => answer, { timeout: 5000 });
+
+        return HttpResponse.json({
+          signUp: "invite-only",
+          systemMailer: SAVED,
+        });
+      })
+    );
+    renderPage();
+
+    const retry = await screen.findByRole(
+      "button",
+      { name: "Try again" },
+      { timeout: 3000 }
+    );
+
+    failing = false;
+    retry.focus();
+    fireEvent.click(retry);
+
+    const trying = await screen.findByRole("button", { name: "Trying again…" });
+
+    expect(trying).toBe(retry);
+    expect(document.activeElement).toBe(retry);
+
+    answer = true;
+
+    await expect(
+      screen.findAllByText("Who can sign up")
+    ).resolves.not.toHaveLength(0);
   });
 
   it("opens sign-up to anyone with the address", async () => {
