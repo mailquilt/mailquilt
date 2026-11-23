@@ -117,9 +117,11 @@ const listColumns = (biggest: number) =>
 
         return (
           <>
-            <span className="mb-2 block">
-              <MakeUp biggest={biggest} list={row.original} />
-            </span>
+            {totalOf(row.original) === 0 ? null : (
+              <span className="mb-2 block">
+                <MakeUp biggest={biggest} list={row.original} />
+              </span>
+            )}
             <span className="text-sm text-kumo-subtle tabular-nums">
               <span className="font-medium text-kumo-strong">
                 {formatCount(subscribed)}
@@ -148,7 +150,7 @@ const listColumns = (biggest: number) =>
 const COLUMN_CLASSES = {
   created: "whitespace-nowrap max-xl:hidden",
   makeUp: "w-[32%] max-lg:hidden",
-  name: "whitespace-nowrap",
+  name: "mq-name-with-bar max-w-[24rem] truncate whitespace-nowrap",
   open: "w-8",
   pending: NUMBER,
   subscribed: NUMBER,

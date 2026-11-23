@@ -43,6 +43,7 @@ export const DataTable = <
           {group.headers.map((header) => (
             <Table.Head
               className={columnClassNames[header.column.id]}
+              data-area={areas[header.column.id]}
               key={header.id}
             >
               {header.isPlaceholder ? null : (

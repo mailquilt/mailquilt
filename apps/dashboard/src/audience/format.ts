@@ -16,7 +16,8 @@ export const formatDay = (date: DateTime.Utc) => {
       });
 };
 
-const WRAP_POINT = "​";
+/** A zero-width space: where a line may break, unseen. */
+export const WRAP_POINT = String.fromCodePoint(0x20_0b);
 
 /**
  * An email address that a line can break only after its "@" or a dot,

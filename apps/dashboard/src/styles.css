@@ -947,7 +947,7 @@ aside.mq-frame {
 }
 
 /* An empty, didn't-load or loading state sits where the rows would be, under the same line. */
-.mq-region-state > .mq-state {
+.mq-region-state .mq-state {
   border-top: 1px solid var(--color-kumo-hairline);
 }
 
@@ -996,9 +996,16 @@ aside.mq-frame {
   background: var(--color-kumo-base) !important;
   padding-block: 0 !important;
   color: var(--text-color-kumo-subtle);
-  font-size: 0.8125rem !important;
+  font-size: var(--text-sm) !important;
   font-weight: 500 !important;
   white-space: nowrap;
+}
+
+/* A List's name with its bar under it (640–1023px) gets room above and below. */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .mq-table td.mq-name-with-bar {
+    padding-block: 0.75rem !important;
+  }
 }
 
 .mq-table td {
@@ -1043,6 +1050,27 @@ aside.mq-frame {
  */
 @media (max-width: 639px) {
   .mq-stack thead {
+    display: none;
+  }
+
+  /* Select all stays on phones: the header row shows only its checkbox, labelled. */
+  .mq-stack:not(.mq-no-check) thead {
+    display: block;
+  }
+
+  .mq-stack:not(.mq-no-check) thead tr {
+    display: flex;
+    border-bottom: 1px solid var(--color-kumo-hairline);
+    padding: 0.5rem var(--gutter);
+  }
+
+  .mq-table.mq-stack thead th {
+    height: auto;
+    border: 0 !important;
+    padding: 0 !important;
+  }
+
+  .mq-stack thead th:not([data-area="check"]) {
     display: none;
   }
 
@@ -1161,19 +1189,12 @@ aside.mq-frame {
 /* ---------- The selection bar: ink, floating at the foot of the page area ---------- */
 
 :root[data-theme="mailquilt"] {
-  --mq-selbar-bg: #111113;
-  --mq-selbar-text: #ffffff;
-  --mq-selbar-hover: rgb(255 255 255 / 0.12);
-  --mq-selbar-strong: rgb(255 255 255 / 0.14);
+  --mq-selbar-bg: var(--mq-logo-ink);
+  --mq-selbar-text: var(--text-color-kumo-inverse);
+  --mq-selbar-hover: color-mix(in srgb, currentColor 12%, transparent);
+  --mq-selbar-strong: color-mix(in srgb, currentColor 14%, transparent);
   /* How far the bar reaches up from the window's bottom edge, so toasts and focus clear it. */
   --mq-selbar-reach: 4.75rem;
-}
-
-:root[data-theme="mailquilt"][data-mode="dark"] {
-  --mq-selbar-bg: #f0f6fc;
-  --mq-selbar-text: #111113;
-  --mq-selbar-hover: rgb(17 17 19 / 0.08);
-  --mq-selbar-strong: rgb(17 17 19 / 0.1);
 }
 
 .mq-selbar {
@@ -1301,8 +1322,8 @@ aside.mq-frame {
   }
 }
 
-/* Room under the last row, so the bar never covers it. */
-.mq-page-body:has(.mq-selbar) {
+/* Room under the last row for the bar, kept whenever rows can be selected, so the page doesn't jump as the bar comes and goes. */
+.mq-page-body:has(.mq-table [data-area="check"]) {
   padding-bottom: 6rem;
 }
 

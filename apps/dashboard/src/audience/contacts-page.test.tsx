@@ -18,8 +18,10 @@ import {
   ACME,
   renderWithOrganizations,
 } from "../organizations/test-organizations.tsx";
+import { consistentSearch } from "./contact-search.ts";
 import type { ContactSearch } from "./contact-search.ts";
 import { ContactsPage } from "./contacts-page.tsx";
+import { WRAP_POINT } from "./format.ts";
 
 const api = setupServer();
 
@@ -103,7 +105,7 @@ const PagingContacts = () => {
 
   return (
     <ContactsPage
-      onSearch={setSearch}
+      onSearch={(next) => setSearch(consistentSearch(next))}
       organization={organization}
       search={search}
     />
@@ -141,7 +143,11 @@ describe("contacts page", () => {
       http.get(
         "*/api/organizations/:organizationId/contacts",
         ({ request }) => {
-          asked = new URL(request.url).searchParams;
+          const params = new URL(request.url).searchParams;
+
+          if (params.has("list")) {
+            asked = params;
+          }
 
           return HttpResponse.json(page([ALAN]));
         }
@@ -187,12 +193,14 @@ describe("contacts page", () => {
     expect(onSearch).toHaveBeenCalledWith({ before: ADA.id });
   });
 
-  it("keeps Previous and Next off until the asked-for page arrives", async () => {
+  it("keeps Previous and Next off, and focusable, until the asked-for page arrives", async () => {
+    let pagesAsked = 0;
     api.use(
       http.get(
         "*/api/organizations/:organizationId/contacts",
         async ({ request }) => {
           if (new URL(request.url).searchParams.has("after")) {
+            pagesAsked += 1;
             await delay("infinite");
           }
 
@@ -206,11 +214,18 @@ describe("contacts page", () => {
 
     renderWithOrganizations(<PagingContacts />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Next" }));
+    const next = await screen.findByRole("button", { name: "Next" });
 
-    expect(
-      screen.getByRole("button", { name: "Next" }).hasAttribute("disabled")
-    ).toBeTruthy();
+    fireEvent.click(next);
+
+    await expect.poll(() => next.getAttribute("aria-disabled")).toBe("true");
+    expect(next.hasAttribute("disabled")).toBeFalsy();
+    await expect.poll(() => pagesAsked).toBe(1);
+
+    fireEvent.click(next);
+    await delay(50);
+
+    expect(pagesAsked).toBe(1);
     expect(
       screen.getByRole("button", { name: "Previous" }).hasAttribute("disabled")
     ).toBeTruthy();
@@ -242,7 +257,7 @@ describe("contacts page", () => {
 
     await expect(
       screen.findByText("Added ada@example.com", {
-        normalizer: (text) => text.replaceAll("\u200B", ""),
+        normalizer: (text) => text.replaceAll(WRAP_POINT, ""),
       })
     ).resolves.toBeTruthy();
     expect(created).toStrictEqual({
@@ -324,9 +339,44 @@ describe("contacts page", () => {
       within(bar).getByRole("button", { name: "Clear selection" })
     );
 
+    expect(document.activeElement).toBe(
+      screen.getByRole("checkbox", {
+        name: "Select every contact on this page",
+      })
+    );
     await expect
       .poll(() => screen.queryByRole("region", { name: "Selected contacts" }))
       .toBeNull();
+  });
+
+  it("leaves the count out of the title when the page didn't load", async () => {
+    api.use(
+      http.get("*/api/organizations/:organizationId/lists", () =>
+        HttpResponse.error()
+      ),
+      ...audience()
+    );
+
+    renderPage();
+
+    await screen.findByRole("button", { name: "Try again" });
+
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
+      "Contacts"
+    );
+  });
+
+  it("counts everyone on the list in the title, whatever status is shown", async () => {
+    api.use(...audience({ contacts: page([ADA]) }));
+
+    renderPage({
+      list: ListIdSchema.make(NEWS.id),
+      status: "subscribed",
+    });
+
+    const title = await screen.findByRole("heading", { level: 1 });
+
+    await expect.poll(() => title.textContent).toContain("3 on this list");
   });
 
   it("offers Try again when contacts don't load, and shows them once they do", async () => {

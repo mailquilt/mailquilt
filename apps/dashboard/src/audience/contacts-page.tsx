@@ -58,8 +58,8 @@ const totalOf = (list: List) =>
   list.subscriptions.unsubscribed;
 
 const COLUMN_CLASSES = {
-  added: "whitespace-nowrap",
-  email: "max-w-[26rem] truncate whitespace-nowrap md:max-xl:max-w-[16rem]",
+  added: "whitespace-nowrap sm:max-md:hidden",
+  email: "max-w-[26rem] truncate whitespace-nowrap sm:max-xl:max-w-[16rem]",
   joined: "whitespace-nowrap",
   lists: "whitespace-nowrap",
   select: "w-9",
@@ -89,13 +89,20 @@ const selectColumn = helper.display({
     </span>
   ),
   header: ({ table }) => (
-    <span className={CHECKBOX_TARGET_LIKE_KUMO_TABLE}>
-      <Checkbox
-        aria-label="Select every contact on this page"
-        checked={table.getIsAllPageRowsSelected()}
-        indeterminate={table.getIsSomePageRowsSelected()}
-        onCheckedChange={(checked) => table.toggleAllPageRowsSelected(checked)}
-      />
+    <span className="flex items-center gap-3">
+      <span className={CHECKBOX_TARGET_LIKE_KUMO_TABLE}>
+        <Checkbox
+          aria-label="Select every contact on this page"
+          checked={table.getIsAllPageRowsSelected()}
+          indeterminate={table.getIsSomePageRowsSelected()}
+          onCheckedChange={(checked) =>
+            table.toggleAllPageRowsSelected(checked)
+          }
+        />
+      </span>
+      <span aria-hidden="true" className="text-sm text-kumo-subtle sm:hidden">
+        Select all
+      </span>
     </span>
   ),
   id: "select",
@@ -224,10 +231,12 @@ const ListFilter = ({
   list,
   lists,
   onChange,
+  totalContacts,
 }: {
   list: List | undefined;
   lists: readonly List[];
   onChange: (listId: string) => void;
+  totalContacts: number | undefined;
 }) => (
   <Select
     aria-label="List"
@@ -241,8 +250,18 @@ const ListFilter = ({
     )}
     value={list?.id ?? ALL_CONTACTS}
   >
-    <Select.Option className="mq-count-option" value={ALL_CONTACTS}>
-      All contacts
+    <Select.Option
+      className="mq-count-option *:first:flex-1"
+      value={ALL_CONTACTS}
+    >
+      <span className="flex w-full justify-between gap-6">
+        All contacts
+        {totalContacts === undefined ? null : (
+          <span className="text-kumo-subtle tabular-nums">
+            {formatCount(totalContacts)}
+          </span>
+        )}
+      </span>
     </Select.Option>
     {lists.length === 0 ? null : (
       <Select.Group>
@@ -338,10 +357,11 @@ const Pager = ({
       </span>
       <span className="flex gap-2">
         <Button
-          disabled={loading || previous === null}
+          aria-disabled={loading || undefined}
+          disabled={previous === null}
           icon={CaretLeftIcon}
           onClick={() => {
-            if (previous !== null) {
+            if (!loading && previous !== null) {
               onPage({ before: previous });
             }
           }}
@@ -350,9 +370,10 @@ const Pager = ({
           Previous
         </Button>
         <Button
-          disabled={loading || next === null}
+          aria-disabled={loading || undefined}
+          disabled={next === null}
           onClick={() => {
-            if (next !== null) {
+            if (!loading && next !== null) {
               onPage({ after: next });
             }
           }}
@@ -380,7 +401,7 @@ const NoContacts = ({
   status: SubscriptionStatus | undefined;
 }) => {
   const add = (
-    <Button icon={PlusIcon} onClick={onAdd} variant="primary">
+    <Button icon={PlusIcon} onClick={onAdd} ref={addButton} variant="primary">
       Add contact
     </Button>
   );
@@ -445,6 +466,8 @@ const ContactsTable = ({
   query,
   search,
   shownList,
+  shownSearchKey,
+  totalContacts,
 }: {
   addContactButton: React.RefObject<HTMLButtonElement | null>;
   list: List | undefined;
@@ -456,8 +479,17 @@ const ContactsTable = ({
   query: ReturnType<typeof useContactPage>;
   search: ContactSearch;
   shownList: List | undefined;
+  shownSearchKey: string;
+  totalContacts: number | undefined;
 }) => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [selectionFor, setSelectionFor] = useState(shownSearchKey);
+
+  if (selectionFor !== shownSearchKey) {
+    setSelectionFor(shownSearchKey);
+    setRowSelection({});
+  }
+
   const addingToList = useDialog();
   const addToListButton = useRef<HTMLButtonElement>(null);
 
@@ -488,6 +520,7 @@ const ContactsTable = ({
       <ListFilter
         list={list}
         lists={lists}
+        totalContacts={totalContacts}
         onChange={(value) =>
           onSearch(
             value === ALL_CONTACTS
@@ -519,6 +552,30 @@ const ContactsTable = ({
       {page.total === 0 && search.list === undefined ? null : (
         <Toolbar>{filters}</Toolbar>
       )}
+      <SelectionBar
+        actions={
+          <button
+            className="mq-selbar-button"
+            data-strong=""
+            disabled={lists.length === 0}
+            onClick={() => addingToList.setOpen(true)}
+            ref={addToListButton}
+            type="button"
+          >
+            Add to list
+          </button>
+        }
+        count={selected.length}
+        label="Selected contacts"
+        onClear={() => {
+          setRowSelection({});
+          document
+            .querySelector<HTMLElement>(
+              '[aria-label="Select every contact on this page"]'
+            )
+            ?.focus();
+        }}
+      />
       <TableRegion busy={query.isPlaceholderData} label="Contacts">
         {page.total === 0 ? (
           <NoContacts
@@ -551,23 +608,6 @@ const ContactsTable = ({
           page={page}
         />
       )}
-      <SelectionBar
-        actions={
-          <button
-            className="mq-selbar-button"
-            data-strong=""
-            disabled={lists.length === 0}
-            onClick={() => addingToList.setOpen(true)}
-            ref={addToListButton}
-            type="button"
-          >
-            Add to list
-          </button>
-        }
-        count={selected.length}
-        label="Selected contacts"
-        onClear={() => setRowSelection({})}
-      />
       {Arr.isReadonlyArrayNonEmpty(selected) ? (
         <AddToListDialog
           contactIds={selected}
@@ -599,16 +639,23 @@ const headerAddsContact = (
 };
 
 const countOf = (
+  lists: readonly List[] | undefined,
   page: ContactPage | null | undefined,
   shownList: List | undefined
 ) => {
-  if (page === undefined || page === null || page.total === 0) {
+  if (lists === undefined || page === undefined || page === null) {
     return;
   }
 
-  const count = formatCount(page.total);
+  const count = shownList === undefined ? page.total : totalOf(shownList);
 
-  return shownList === undefined ? count : `${count} on this list`;
+  if (count === 0) {
+    return;
+  }
+
+  return shownList === undefined
+    ? formatCount(count)
+    : `${formatCount(count)} on this list`;
 };
 
 /**
@@ -627,6 +674,7 @@ export const ContactsPage = ({
 }) => {
   const lists = useLists(organization.id);
   const page = useContactPage(organization.id, search);
+  const everyone = useContactPage(organization.id, {});
   const adding = useDialog();
 
   const startAdding = () => adding.setOpen(true);
@@ -697,7 +745,6 @@ export const ContactsPage = ({
     return (
       <ContactsTable
         addContactButton={addContactButton}
-        key={JSON.stringify(shownSearch)}
         list={list}
         lists={lists.data}
         onAddContact={startAdding}
@@ -707,6 +754,8 @@ export const ContactsPage = ({
         query={page}
         search={search}
         shownList={shownList}
+        shownSearchKey={JSON.stringify(shownSearch)}
+        totalContacts={everyone.data?.total}
       />
     );
   };
@@ -714,7 +763,7 @@ export const ContactsPage = ({
   return (
     <TablePage
       actions={
-        headerAddsContact(lists.data, page.data, search) ? (
+        headerAddsContact(lists.data, page.data, shownSearch) ? (
           <Button
             icon={PlusIcon}
             onClick={startAdding}
@@ -727,7 +776,7 @@ export const ContactsPage = ({
       }
       description={`Everyone in ${organization.name}’s audience. Each address appears once.`}
       title="Contacts"
-      titleDetail={countOf(page.data, shownList)}
+      titleDetail={countOf(lists.data, page.data, shownList)}
     >
       {body()}
       <AddContactDialog
