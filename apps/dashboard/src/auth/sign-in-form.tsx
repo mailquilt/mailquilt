@@ -1,4 +1,5 @@
 import { Banner, Button } from "@cloudflare/kumo";
+import { WarningCircleIcon, WarningIcon } from "@phosphor-icons/react";
 import { EmailAddress, Password } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
 import { useMutation } from "@tanstack/react-query";
@@ -38,6 +39,7 @@ const VerifyFirst = ({ email }: { email: string }) => {
         <Banner.Action
           loading={send.isPending}
           onClick={() => send.mutate(email)}
+          variant="secondary"
         >
           {SEND_LINK_LABEL}
         </Banner.Action>
@@ -47,6 +49,7 @@ const VerifyFirst = ({ email }: { email: string }) => {
           ? LINK_NOT_SENT_MESSAGE
           : "Open the link we emailed you to finish signing up."
       }
+      icon={<WarningIcon />}
       role="alert"
       title="Verify your email address first"
       variant="alert"
@@ -77,11 +80,21 @@ export const SignInForm = () => {
     problem = <VerifyFirst email={signIn.variables.email} />;
   } else if (error) {
     problem = (
-      <Banner role="alert" title={authErrorMessage(error)} variant="error" />
+      <Banner
+        icon={<WarningCircleIcon />}
+        role="alert"
+        title={authErrorMessage(error)}
+        variant="error"
+      />
     );
   } else if (signIn.isError) {
     problem = (
-      <Banner role="alert" title={UNREACHABLE_MESSAGE} variant="error" />
+      <Banner
+        icon={<WarningCircleIcon />}
+        role="alert"
+        title={UNREACHABLE_MESSAGE}
+        variant="error"
+      />
     );
   }
 
@@ -111,7 +124,6 @@ export const SignInForm = () => {
       <Button
         className="mt-1 w-full justify-center"
         loading={signIn.isPending}
-        size="lg"
         type="submit"
         variant="primary"
       >

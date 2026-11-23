@@ -10,12 +10,7 @@ export const NotFound = () => (
     <AuthHeading description="The link may be out of date, or the address mistyped.">
       There’s no page here
     </AuthHeading>
-    <LinkButton
-      className="w-full justify-center"
-      href="/"
-      size="lg"
-      variant="primary"
-    >
+    <LinkButton className="w-full justify-center" href="/" variant="primary">
       Go to Mailquilt
     </LinkButton>
   </AuthLayout>

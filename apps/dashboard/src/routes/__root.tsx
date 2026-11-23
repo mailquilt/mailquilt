@@ -23,7 +23,7 @@ const RootDocument = ({ children }: { children: React.ReactNode }) => (
       <ScriptOnce>{themeScript}</ScriptOnce>
       <HeadContent />
     </head>
-    <body className="bg-kumo-base text-kumo-default">
+    <body className="bg-(--mq-frame) text-kumo-default">
       {children}
       <TanStackDevtools
         config={{ position: "bottom-right" }}
