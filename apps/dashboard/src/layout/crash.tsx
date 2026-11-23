@@ -1,8 +1,9 @@
-import { Button, Empty, LinkButton } from "@cloudflare/kumo";
+import { Button, Collapsible, Empty, LinkButton } from "@cloudflare/kumo";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { useContext } from "react";
+import { useContext, useState } from "react";
 
 import { QuiltSlot } from "../brand/quilt-block.tsx";
+import { CopyIcon } from "../icons/icons.tsx";
 import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
 import { CrashPlaceContext } from "./crash-place.ts";
 import { SlotArt } from "./empty-state.tsx";
@@ -14,36 +15,64 @@ const WHAT_HAPPENED =
 
 const reload = () => location.reload();
 
+const COPIED_FOR_MS = 2000;
+
+const CopyMessage = ({ message }: { message: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <Button
+      icon={CopyIcon}
+      onClick={async () => {
+        await navigator.clipboard.writeText(message);
+        setCopied(true);
+        setTimeout(() => setCopied(false), COPIED_FOR_MS);
+      }}
+      size="sm"
+      variant="secondary"
+    >
+      <span aria-live="polite">{copied ? "Copied" : "Copy error"}</span>
+    </Button>
+  );
+};
+
 const ErrorDetails = ({
   centred,
   error,
 }: {
   centred: boolean;
   error: unknown;
-}) => (
-  <details
-    className={`mt-6 w-full text-sm text-kumo-subtle ${centred ? "text-center" : ""}`}
-  >
-    <summary className="cursor-pointer rounded-md text-kumo-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kumo-focus">
-      Error details
-    </summary>
-    <p className="mt-2 rounded-lg bg-kumo-elevated px-3 py-2 text-left font-mono text-xs break-words text-kumo-default ring ring-kumo-hairline">
-      {error instanceof Error ? error.message : String(error)}
-    </p>
-    <p className="mt-2">
-      If it happens again,{" "}
-      <a
-        className="underline decoration-kumo-hairline underline-offset-4 hover:text-kumo-strong"
-        href={NEW_ISSUE_URL}
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        report it on GitHub
-      </a>{" "}
-      with these details.
-    </p>
-  </details>
-);
+}) => {
+  const message = error instanceof Error ? error.message : String(error);
+
+  return (
+    <Collapsible
+      className={`mt-5 flex w-full flex-col ${centred ? "items-center" : "items-start"}`}
+    >
+      <Collapsible.DefaultTrigger>Error details</Collapsible.DefaultTrigger>
+      <Collapsible.DefaultPanel className="w-full max-w-[28rem] text-left">
+        <p className="rounded-lg bg-kumo-elevated px-3 py-2 font-mono text-xs break-words text-kumo-default ring ring-kumo-hairline">
+          {message}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-kumo-subtle">
+          <CopyMessage message={message} />
+          <span>
+            If it happens again,{" "}
+            <a
+              className="underline decoration-kumo-hairline underline-offset-4 hover:text-kumo-strong"
+              href={NEW_ISSUE_URL}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              report it on GitHub
+            </a>
+            .
+          </span>
+        </div>
+      </Collapsible.DefaultPanel>
+    </Collapsible>
+  );
+};
 
 const PageCrash = ({ error }: { error: unknown }) => (
   <div

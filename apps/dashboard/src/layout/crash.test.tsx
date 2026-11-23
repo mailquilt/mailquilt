@@ -6,9 +6,10 @@ import {
   Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { getRouter } from "../router.tsx";
 import { CrashPlaceContext } from "./crash-place.ts";
 import type { CrashPlace } from "./crash-place.ts";
 import { Crash } from "./crash.tsx";
@@ -51,7 +52,10 @@ describe("crash", () => {
       screen.findByRole("heading", { name: "This page hit an error" })
     ).resolves.toBeDefined();
     expect(screen.getByRole("button", { name: "Reload" })).toBeTruthy();
-    expect(screen.getByText(MESSAGE)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Error details" }));
+
+    await expect(screen.findByText(MESSAGE)).resolves.toBeDefined();
     expect(screen.queryByRole("link", { name: "Go to Mailquilt" })).toBeNull();
   });
 
@@ -63,5 +67,9 @@ describe("crash", () => {
     ).resolves.toBeDefined();
     expect(screen.getByRole("link", { name: "Go to Mailquilt" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Mailquilt home" })).toBeTruthy();
+  });
+
+  it("is the app router's error component", () => {
+    expect(getRouter().options.defaultErrorComponent).toBe(Crash);
   });
 });
