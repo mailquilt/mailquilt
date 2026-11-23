@@ -13,7 +13,8 @@ import { callApi } from "../api.ts";
 
 const DEFAULT_RETRIES = 3;
 
-const connectionsKey = (organizationId: OrganizationId) =>
+/** Where the Organization's Provider Connections are kept in the query cache. Creating an Organization seeds its key with an empty list. */
+export const connectionsKey = (organizationId: OrganizationId) =>
   ["organizations", organizationId, "provider-connections"] as const;
 
 /** A Provider Connection's settings as the connect and edit forms send them. */
