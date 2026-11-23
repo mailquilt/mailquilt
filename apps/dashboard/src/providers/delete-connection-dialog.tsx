@@ -51,7 +51,11 @@ export const DeleteConnectionDialog = ({
     <ActionDialog
       actionLabel="Delete connection"
       busy={remove.isPending}
-      description="Mailquilt forgets this server and its sign-in."
+      description={
+        connection.signsIn
+          ? `${organization.name} can’t send through it any more, and its saved username and password are erased. This can’t be undone.`
+          : `${organization.name} can’t send through it any more. This can’t be undone.`
+      }
       destructive
       finalFocus={finalFocus}
       formId={formId}
@@ -61,7 +65,6 @@ export const DeleteConnectionDialog = ({
       title={`Delete ${connection.name}?`}
     >
       <form
-        className="flex flex-col gap-4"
         id={formId}
         onSubmit={(event) => {
           event.preventDefault();
@@ -71,14 +74,10 @@ export const DeleteConnectionDialog = ({
         {remove.isError ? (
           <Banner
             role="alert"
-            title="Mailquilt couldn’t delete the connection. Check your connection, then try again."
+            title={`Mailquilt couldn’t confirm that ${connection.name} was deleted. Try again.`}
             variant="error"
           />
         ) : null}
-        <p className="text-base text-(--mq-body)">
-          Email already sent through it isn’t affected. To send through it
-          again, connect it again.
-        </p>
       </form>
     </ActionDialog>
   );

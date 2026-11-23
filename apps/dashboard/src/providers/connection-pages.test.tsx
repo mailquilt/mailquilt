@@ -124,6 +124,18 @@ describe("connecting and editing an SMTP server", () => {
     expect(document.activeElement).toBe(screen.getByLabelText("Name"));
   });
 
+  it("counts the fields left to fix beside Connect", async () => {
+    api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
+    renderWithOrganizations(<ConnectPage organization={organization} />);
+
+    await screen.findByLabelText("Name");
+    submit();
+
+    await expect(
+      screen.findByText("Fix 5 fields to connect.")
+    ).resolves.toBeTruthy();
+  });
+
   it("picks the usual port when the encryption changes", async () => {
     api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
     renderWithOrganizations(<ConnectPage organization={organization} />);

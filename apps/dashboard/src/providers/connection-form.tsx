@@ -20,6 +20,7 @@ import { Predicate, Redacted, Schema } from "effect";
 import { PasswordField } from "../auth/password-field.tsx";
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
+import { SettingsSection } from "../layout/settings-section.tsx";
 import type { ConnectionSettings } from "./providers-api.ts";
 
 const SignInSchema = Schema.Literals(["keep", "new", "none"]);
@@ -200,41 +201,24 @@ const portIssue = (port: string) => {
     : issue(`Enter a port from 1 to ${MAX_PORT}.`);
 };
 
-const Section = ({
+const Part = ({
+  about,
   children,
-  description,
   nested,
   title,
 }: {
+  about: string;
   children: React.ReactNode;
-  description?: string;
   nested: boolean;
-  title?: string;
-}) => {
-  const Heading = nested ? "h3" : "h2";
-
-  return (
-    <section
-      className={`flex flex-col gap-4 border-t border-kumo-hairline py-6 ${nested ? "" : "first:border-t-0 first:pt-0"}`}
-    >
-      {title === undefined ? null : (
-        <div className="flex flex-col gap-1">
-          <Heading
-            className={`font-semibold text-kumo-strong ${nested ? "text-base" : "text-lg"}`}
-          >
-            {title}
-          </Heading>
-          {description === undefined ? null : (
-            <p className="max-w-[36rem] text-base text-(--mq-body)">
-              {description}
-            </p>
-          )}
-        </div>
-      )}
+  title: string;
+}) =>
+  nested ? (
+    <div className="flex flex-col gap-5">{children}</div>
+  ) : (
+    <SettingsSection about={about} title={title}>
       {children}
-    </section>
+    </SettingsSection>
   );
-};
 
 const SignInChoice = ({
   field,
@@ -343,20 +327,34 @@ export const ConnectionForm = ({
 
   const serverListeners = { onChange: requireNewSignInIfServerChanged };
 
+  const submit = (
+    <Button aria-busy={busy} type="submit" variant="primary">
+      {busy ? busyLabel : submitLabel}
+    </Button>
+  );
+
+  const failure =
+    failureMessage === undefined ? null : (
+      <Banner role="alert" title={failureMessage} variant="error" />
+    );
+
   return (
     <form
-      className="flex flex-col"
+      className={nested ? "flex flex-col gap-5" : "flex flex-col"}
       noValidate
       onSubmit={(event) => submitForm(event, form)}
     >
       {named ? (
-        <Section nested={nested}>
+        <Part
+          about="What it’s called in Mailquilt, so you can tell connections apart."
+          nested={nested}
+          title="Connection"
+        >
           <form.Field name="name" validators={CHECKS.name}>
             {(field) => (
               <FormField
                 autoComplete="off"
                 className={FIELD}
-                description="So you can tell connections apart."
                 field={field}
                 label="Name"
                 placeholder="Postmark"
@@ -364,14 +362,14 @@ export const ConnectionForm = ({
               />
             )}
           </form.Field>
-        </Section>
+        </Part>
       ) : null}
-      <Section
-        description="Your provider lists these under its SMTP settings."
+      <Part
+        about="Your provider lists these under its SMTP settings."
         nested={nested}
         title="Server"
       >
-        <div className="grid grid-cols-[minmax(0,1fr)_6rem] items-start gap-4 sm:grid-cols-[minmax(0,1fr)_8rem]">
+        <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
           <form.Field
             listeners={serverListeners}
             name="host"
@@ -402,6 +400,7 @@ export const ConnectionForm = ({
                 field={field}
                 inputMode="numeric"
                 label="Port"
+                placeholder="587"
                 size="base"
               />
             )}
@@ -410,8 +409,7 @@ export const ConnectionForm = ({
         <form.Field listeners={serverListeners} name="security">
           {(field) => (
             <Radio.Group
-              appearance="card"
-              controlPosition="start"
+              appearance={nested ? "segmented" : "card"}
               legend="Encryption"
               onValueChange={(value) => {
                 const security =
@@ -429,7 +427,7 @@ export const ConnectionForm = ({
             >
               {ENCRYPTION.map((option) => (
                 <Radio.Item
-                  description={option.description}
+                  description={nested ? undefined : option.description}
                   key={option.value}
                   label={option.label}
                   value={option.value}
@@ -438,9 +436,9 @@ export const ConnectionForm = ({
             </Radio.Group>
           )}
         </form.Field>
-      </Section>
-      <Section
-        description="Stored encrypted. Mailquilt never shows them again, not even to you."
+      </Part>
+      <Part
+        about="Stored encrypted. Mailquilt never shows them again, not even to you."
         nested={nested}
         title="Sign-in"
       >
@@ -459,7 +457,9 @@ export const ConnectionForm = ({
         <form.Subscribe selector={(state) => state.values.signIn}>
           {(signIn) =>
             signIn === "new" ? (
-              <>
+              <div
+                className={`grid items-start gap-5 ${nested ? "sm:grid-cols-2 sm:gap-3" : ""}`}
+              >
                 <form.Field
                   name="username"
                   validators={{
@@ -495,12 +495,12 @@ export const ConnectionForm = ({
                     />
                   )}
                 </form.Field>
-              </>
+              </div>
             ) : null
           }
         </form.Subscribe>
-      </Section>
-      <Section description={senderDescription} nested={nested} title="Sender">
+      </Part>
+      <Part about={senderDescription} nested={nested} title="Sender">
         <form.Field name="fromName" validators={CHECKS.fromName}>
           {(field) => (
             <FormField
@@ -518,6 +518,7 @@ export const ConnectionForm = ({
             <FormField
               autoComplete="off"
               className={FIELD}
+              description={nested ? senderDescription : undefined}
               field={field}
               inputMode="email"
               label="From email"
@@ -527,25 +528,36 @@ export const ConnectionForm = ({
             />
           )}
         </form.Field>
-      </Section>
-      {failureMessage === undefined ? null : (
-        <Banner
-          className="mb-4"
-          role="alert"
-          title={failureMessage}
-          variant="error"
-        />
+        {failure}
+      </Part>
+      {nested ? (
+        <div className="flex">{submit}</div>
+      ) : (
+        <div className="mq-form-foot">
+          <form.Subscribe
+            selector={(state) =>
+              Object.values(state.fieldMeta).filter(
+                (meta) => (meta?.errors.length ?? 0) > 0
+              ).length
+            }
+          >
+            {(errors) =>
+              errors === 0 ? null : (
+                <p className="mr-auto text-sm text-kumo-danger">
+                  Fix {errors} {errors === 1 ? "field" : "fields"} to{" "}
+                  {submitLabel.toLowerCase()}.
+                </p>
+              )
+            }
+          </form.Subscribe>
+          {cancelHref === undefined ? null : (
+            <LinkButton href={cancelHref} variant="secondary">
+              Cancel
+            </LinkButton>
+          )}
+          {submit}
+        </div>
       )}
-      <div className="flex justify-end gap-2 border-t border-kumo-hairline pt-6 max-sm:flex-col-reverse max-sm:*:h-11 max-sm:*:w-full max-sm:*:justify-center">
-        {cancelHref === undefined ? null : (
-          <LinkButton href={cancelHref} variant="ghost">
-            Cancel
-          </LinkButton>
-        )}
-        <Button aria-busy={busy} type="submit" variant="primary">
-          {busy ? busyLabel : submitLabel}
-        </Button>
-      </div>
     </form>
   );
 };

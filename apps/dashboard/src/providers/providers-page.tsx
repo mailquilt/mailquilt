@@ -15,14 +15,15 @@ import type {
   ProviderConnectionId,
   SmtpSecurity,
 } from "@repo/domain";
-import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { formatDay } from "../audience/format.ts";
 import { useDialog } from "../layout/action-dialog.tsx";
-import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
+import { Breakable } from "../layout/breakable.tsx";
+import { EmptyState, LoadFailed, SlotArt } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
+import { TableRegion } from "../layout/table-region.tsx";
 import { DeleteConnectionDialog } from "./delete-connection-dialog.tsx";
 import { useProviderConnections } from "./providers-api.ts";
 import { TestEmailDialog } from "./test-email-dialog.tsx";
@@ -32,9 +33,6 @@ const ENCRYPTION_NAME: Record<SmtpSecurity, string> = {
   starttls: "STARTTLS",
   tls: "TLS",
 };
-
-const securityOf = ({ signsIn, smtp }: ProviderConnection) =>
-  `${ENCRYPTION_NAME[smtp.security]}, ${signsIn ? "signs in" : "no sign-in"}`;
 
 const focusOnMount = (element: HTMLElement | null) => element?.focus();
 
@@ -52,18 +50,10 @@ const introFor = (
   }
 };
 
-const NoConnection = () => (
-  <section className="rounded-xl border border-kumo-fill bg-kumo-base">
-    <EmptyState
-      actions={
-        <LinkButton href="/providers/new" icon={PlusIcon} variant="primary">
-          Connect SMTP server
-        </LinkButton>
-      }
-      description="Connect the SMTP server you send with. Amazon SES and Cloudflare Email arrive in a later Mailquilt update."
-      title="No provider connected yet"
-    />
-  </section>
+const ConnectButton = () => (
+  <LinkButton href="/providers/new" icon={PlusIcon} variant="primary">
+    Connect SMTP server
+  </LinkButton>
 );
 
 const Detail = ({
@@ -73,15 +63,15 @@ const Detail = ({
   children: React.ReactNode;
   label: string;
 }) => (
-  <>
-    <dt className="text-sm text-kumo-subtle">{label}</dt>
-    <dd className="min-w-0 text-base break-words text-kumo-strong">
+  <div className="min-w-0 max-sm:contents">
+    <dt className="text-sm text-kumo-subtle max-sm:pt-px">{label}</dt>
+    <dd className="mt-0.5 min-w-0 text-base break-words text-kumo-strong max-sm:mt-0">
       {children}
     </dd>
-  </>
+  </div>
 );
 
-const ConnectionCard = ({
+const ConnectionRow = ({
   connection,
   defaultTo,
   intro,
@@ -94,7 +84,6 @@ const ConnectionCard = ({
   onDeleted: (name: string) => void;
   organization: Organization;
 }) => {
-  const navigate = useNavigate();
   const headingId = useId();
   const deleting = useDialog();
   const menuButton = useRef<HTMLButtonElement>(null);
@@ -107,100 +96,92 @@ const ConnectionCard = ({
     connection.smtp.security === "none" ? LockSimpleOpenIcon : LockSimpleIcon;
 
   return (
-    <article
-      aria-labelledby={headingId}
-      className="flex min-w-0 flex-col overflow-hidden rounded-xl border border-kumo-fill bg-kumo-base"
-    >
-      <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 px-6 py-5 max-sm:p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]">
-        <span
-          aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
+    <article aria-labelledby={headingId} className="mq-conn">
+      <span
+        aria-hidden="true"
+        className="flex size-10 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse [grid-area:icon]"
+      >
+        <EnvelopeSimpleIcon className="size-5" />
+      </span>
+      <div className="min-w-0 [grid-area:name]">
+        <h2
+          className="text-base leading-5 font-semibold break-words text-kumo-strong"
+          id={headingId}
         >
-          <EnvelopeSimpleIcon className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2
-            className="text-base font-semibold break-words text-kumo-strong"
-            id={headingId}
-          >
-            {connection.name}
-          </h2>
-          <p className="text-sm text-kumo-subtle">
-            SMTP server, connected {formatDay(connection.createdAt)}
-          </p>
-        </div>
-        <Button
-          className="col-span-full row-start-3 mt-4 w-full justify-center sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:mt-0 sm:w-auto"
-          icon={PaperPlaneTiltIcon}
-          onClick={() => {
-            setTestIntro(undefined);
-            testing.setOpen(true);
-          }}
-          ref={testButton}
-          variant="secondary"
-        >
-          Send test
-          <span className="sr-only"> for {connection.name}</span>
-        </Button>
-        <DropdownMenu>
-          <DropdownMenu.Trigger
-            className="col-start-3 row-start-1 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-kumo-strong hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint sm:col-start-4"
-            ref={menuButton}
-            render={
-              <button
-                aria-label={`More for ${connection.name}`}
-                type="button"
-              />
-            }
-          >
-            <DotsThreeIcon aria-hidden="true" className="size-5" />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="end" className="min-w-44 rounded-xl">
-            <DropdownMenu.Item
-              icon={PencilSimpleIcon}
-              onClick={() =>
-                navigate({
-                  params: { providerConnectionId: connection.id },
-                  to: "/providers/$providerConnectionId/edit",
-                })
-              }
-            >
-              Edit
-            </DropdownMenu.Item>
-            <DropdownMenu.Item
-              icon={TrashIcon}
-              onClick={() => deleting.setOpen(true)}
-              variant="danger"
-            >
-              Delete
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu>
-        <dl className="col-span-full row-start-2 mt-5 grid grid-cols-[5.5rem_minmax(0,1fr)] items-baseline gap-x-4 gap-y-2.5 max-sm:grid-cols-[4.75rem_minmax(0,1fr)] max-sm:gap-x-3">
-          <Detail label="Sends as">
-            {connection.from.name === undefined ? (
-              connection.from.email
-            ) : (
-              <>
-                {connection.from.name}
-                <span className="block text-sm text-kumo-subtle">
-                  {connection.from.email}
-                </span>
-              </>
-            )}
-          </Detail>
-          <Detail label="Server">
-            {connection.smtp.host}:{connection.smtp.port}
-          </Detail>
-          <Detail label="Security">
-            <SecurityIcon
-              aria-hidden="true"
-              className="mr-1.5 inline size-4 align-[-0.125rem] text-kumo-subtle"
-            />
-            {securityOf(connection)}
-          </Detail>
-        </dl>
+          {connection.name}
+        </h2>
+        <p className="mt-0.5 text-sm text-kumo-subtle">
+          SMTP server, connected {formatDay(connection.createdAt)}
+        </p>
       </div>
+      <Button
+        className="mq-conn-test"
+        icon={PaperPlaneTiltIcon}
+        onClick={() => {
+          setTestIntro(undefined);
+          testing.setOpen(true);
+        }}
+        ref={testButton}
+        variant="secondary"
+      >
+        Send test
+        <span className="sr-only"> for {connection.name}</span>
+      </Button>
+      <DropdownMenu>
+        <DropdownMenu.Trigger
+          className="mq-conn-menu flex size-9 cursor-pointer items-center justify-center rounded-lg text-kumo-strong hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
+          ref={menuButton}
+          render={
+            <button aria-label={`More for ${connection.name}`} type="button" />
+          }
+        >
+          <DotsThreeIcon aria-hidden="true" className="size-5" weight="bold" />
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content align="end" className="min-w-44 rounded-xl">
+          <DropdownMenu.Item
+            href={`/providers/${connection.id}/edit`}
+            icon={PencilSimpleIcon}
+          >
+            Edit
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            icon={TrashIcon}
+            onClick={() => deleting.setOpen(true)}
+            variant="danger"
+          >
+            Delete
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu>
+      <dl className="mq-conn-details">
+        <Detail label="Sends as">
+          {connection.from.name === undefined ? (
+            <Breakable value={connection.from.email} />
+          ) : (
+            <>
+              {connection.from.name}
+              <span className="block text-sm text-kumo-subtle">
+                <Breakable value={connection.from.email} />
+              </span>
+            </>
+          )}
+        </Detail>
+        <Detail label="Server">
+          <Breakable
+            value={`${connection.smtp.host}:${connection.smtp.port}`}
+          />
+        </Detail>
+        <Detail label="Security">
+          <SecurityIcon
+            aria-hidden="true"
+            className="mr-1.5 inline size-3.5 align-[-0.125rem] text-kumo-subtle"
+          />
+          {ENCRYPTION_NAME[connection.smtp.security]},{" "}
+          <span className="whitespace-nowrap">
+            {connection.signsIn ? "with sign-in" : "without sign-in"}
+          </span>
+        </Detail>
+      </dl>
       <TestEmailDialog
         connection={connection}
         defaultTo={defaultTo}
@@ -227,7 +208,7 @@ const ConnectionCard = ({
 };
 
 /**
- * The Organization's Provider Connections, two across on wide screens, each
+ * The Organization's Provider Connections, as open rows on the page, each
  * with who it sends as, its server and security, Send test, and its Edit and
  * Delete. A connection that was just connected or saved opens its test by
  * itself, as the next step.
@@ -283,18 +264,18 @@ export const ProvidersPage = ({
     return <PageAreaLoading label="Loading providers" />;
   }
 
-  const description = `Mailquilt sends ${organization.name}’s email through your own account, at your provider’s price.`;
+  const description = `${organization.name} sends through these, at your provider’s own price. Mailquilt never sends your email itself.`;
 
   if (connections.data === undefined) {
     return (
       <TablePage description={description} title="Providers">
-        <section className="rounded-xl border border-kumo-fill bg-kumo-base">
+        <TableRegion label="Providers">
           <LoadFailed
             onRetry={() => connections.refetch()}
             retrying={connections.isFetching}
             title="Your providers didn’t load"
           />
-        </section>
+        </TableRegion>
       </TablePage>
     );
   }
@@ -303,25 +284,31 @@ export const ProvidersPage = ({
     return (
       <TablePage description={description} title="Providers">
         {deleted}
-        <NoConnection />
+        <TableRegion label="Providers">
+          <EmptyState
+            actions={<ConnectButton />}
+            description="Connect the SMTP server you send with. Connecting Amazon SES and Cloudflare Email directly, without SMTP, arrives in a later Mailquilt update."
+            title="No provider connected yet"
+          />
+        </TableRegion>
       </TablePage>
     );
   }
 
   return (
     <TablePage
-      actions={
-        <LinkButton href="/providers/new" icon={PlusIcon} variant="secondary">
-          Connect SMTP server
-        </LinkButton>
-      }
+      actions={<ConnectButton />}
       description={description}
       title="Providers"
+      titleDetail={`${connections.data.length} connected`}
     >
       {deleted}
-      <div className="grid gap-4 xl:grid-cols-2">
+      <section
+        aria-label="Connections"
+        className="mq-bleed border-t border-kumo-hairline"
+      >
         {connections.data.map((connection) => (
-          <ConnectionCard
+          <ConnectionRow
             connection={connection}
             defaultTo={testEmailTo}
             intro={introFor(connection, justConnected, justSaved)}
@@ -330,7 +317,19 @@ export const ProvidersPage = ({
             organization={organization}
           />
         ))}
-      </div>
+      </section>
+      <p className="mt-7 flex items-center gap-4 text-base text-pretty text-kumo-subtle">
+        <span className="shrink-0">
+          <SlotArt size={28} />
+        </span>
+        <span>
+          <span className="font-medium text-kumo-default">
+            Connecting Amazon SES and Cloudflare Email directly
+          </span>
+          , without SMTP, arrives in a later Mailquilt update. Until then,
+          connect their SMTP settings here.
+        </span>
+      </p>
     </TablePage>
   );
 };

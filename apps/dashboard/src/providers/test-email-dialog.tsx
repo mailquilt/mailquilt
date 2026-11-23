@@ -1,5 +1,4 @@
 import { ClipboardText, Collapsible, LinkButton } from "@cloudflare/kumo";
-import { CheckIcon } from "@phosphor-icons/react";
 import {
   MailAddress,
   ProviderConnectionNotFound,
@@ -137,6 +136,9 @@ const failureOf = (connection: ProviderConnection, error: Error) => {
   } satisfies Failure;
 };
 
+const RESULT =
+  "mq-fade-in flex gap-3 rounded-lg bg-kumo-elevated px-3.5 py-3 ring ring-kumo-hairline outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kumo-focus";
+
 const Sent = ({
   connection,
   sent,
@@ -146,20 +148,17 @@ const Sent = ({
   sent: TestEmailSent;
   to: string;
 }) => (
-  <div className="flex gap-2.5 outline-none" ref={revealOnMount} tabIndex={-1}>
-    <span
-      aria-hidden="true"
-      className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) text-kumo-inverse"
-    >
-      <CheckIcon className="size-3" weight="bold" />
-    </span>
+  <div className={RESULT} ref={revealOnMount} tabIndex={-1}>
+    <span aria-hidden="true" className="mq-done-block" />
     <div className="min-w-0 flex-1">
-      <output className="block text-base text-(--mq-body)">
-        <strong className="font-semibold text-kumo-strong">
-          Sent. {connection.name} accepted it.
-        </strong>{" "}
-        Look for “{TEST_EMAIL_SUBJECT}” at {to}. It can take a minute, and may
-        land in spam.
+      <output className="flex flex-col gap-0.5 text-base">
+        <strong className="font-medium text-kumo-strong">
+          {connection.name} accepted the email
+        </strong>
+        <span className="text-pretty text-kumo-subtle">
+          It should reach {to} within a minute, titled “{TEST_EMAIL_SUBJECT}”.
+          If it doesn’t, check the spam folder.
+        </span>
       </output>
       <Collapsible className="mt-1">
         <Collapsible.DefaultTrigger>Message ID</Collapsible.DefaultTrigger>
@@ -184,13 +183,8 @@ const NotSent = ({
   connection: ProviderConnection;
   failure: Failure;
 }) => (
-  <div
-    className="flex gap-2.5 outline-none"
-    ref={revealOnMount}
-    role="alert"
-    tabIndex={-1}
-  >
-    <QuiltSlot className="mt-0.5 size-5 shrink-0" />
+  <div className={RESULT} ref={revealOnMount} role="alert" tabIndex={-1}>
+    <QuiltSlot className="mt-0.5 size-4.5 shrink-0" />
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <h3 className="text-base font-semibold text-kumo-strong">
         {failure.title}
@@ -232,9 +226,6 @@ type Outcome =
       readonly kind: "failed";
       readonly error: Error;
     };
-
-const senderOf = ({ from }: ProviderConnection) =>
-  from.name === undefined ? from.email : `${from.name} <${from.email}>`;
 
 /**
  * Sends a test email through one connection, to the signed-in person's
@@ -295,7 +286,7 @@ export const TestEmailDialog = ({
       busy={send.isPending}
       description={
         intro ??
-        `Through ${connection.name} (${connection.smtp.host}:${connection.smtp.port}), from ${senderOf(connection)}.`
+        `One email through ${connection.name}, from ${connection.from.email}, so you can check it arrives.`
       }
       dismissLabel={done ? "Close" : "Cancel"}
       finalFocus={finalFocus}

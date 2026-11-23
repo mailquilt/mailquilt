@@ -25,6 +25,8 @@
   --text-display--line-height: 1.12;
   --text-display-sm: 1.25rem;
   --text-display-sm--line-height: 1.3;
+  --text-display-xs: 1.0625rem;
+  --text-display-xs--line-height: 1.3;
 
   /* The logo's block geometry: 44-unit blocks with 6-unit corners. */
   --radius-quilt: 13.6%;
@@ -1351,5 +1353,132 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
   .mq-busy-line::after {
     animation: none;
     opacity: 0.6;
+  }
+}
+
+/*
+ * Provider Connections: open rows on the page, hairlines between them and
+ * no card, the page is already the block. How each sends sits under its
+ * name; on phones the details stack and Send test goes full width.
+ */
+.mq-conn {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "icon name test menu"
+    ". details details details";
+  align-items: center;
+  gap: 1rem;
+  border-bottom: 1px solid var(--color-kumo-hairline);
+  padding: 1.25rem var(--gutter) 1.375rem;
+}
+
+.mq-conn-test {
+  grid-area: test;
+}
+
+.mq-conn-menu {
+  grid-area: menu;
+  margin-left: -0.625rem;
+}
+
+.mq-conn-details {
+  display: grid;
+  grid-area: details;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 0.75rem 2rem;
+}
+
+@media (max-width: 639px) {
+  .mq-conn {
+    grid-template-areas:
+      "icon name name menu"
+      "details details details details"
+      "test test test test";
+    gap: 0.875rem;
+    padding-block: 1.125rem;
+  }
+
+  .mq-conn-test {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .mq-conn-details {
+    grid-template-columns: 5.25rem minmax(0, 1fr);
+    gap: 0.5rem 0.75rem;
+  }
+}
+
+/*
+ * A settings section: what it's for on the left, its fields on the right,
+ * a hairline between sections. One column below 1024px.
+ */
+.mq-section {
+  display: grid;
+  grid-template-columns: 16rem minmax(0, 35rem);
+  gap: 1rem 3rem;
+  max-width: 60rem;
+  border-top: 1px solid var(--color-kumo-hairline);
+  padding-block: 1.75rem;
+}
+
+.mq-section:first-child {
+  border-top: 0;
+  padding-top: 0.25rem;
+}
+
+@media (max-width: 1023px) {
+  .mq-section {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+  }
+}
+
+/*
+ * Cancel and Connect stay in reach at the foot of a long form, across the
+ * page block's full width. It reaches into PageFrame's bottom padding
+ * (4rem, 3rem on phones), so it sits on the block's lower edge.
+ */
+.mq-form-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin: 0.5rem calc(var(--gutter) * -1) -4rem;
+  border-top: 1px solid var(--color-kumo-hairline);
+  border-radius: 0 0 0.75rem 0.75rem;
+  background: color-mix(in srgb, var(--color-kumo-base) 92%, transparent);
+  padding: 0.875rem var(--gutter);
+  backdrop-filter: blur(8px);
+}
+
+/* Tabbing to a field never lands under the foot (WCAG 2.4.11). */
+html[data-theme="mailquilt"]:has(.mq-form-foot) {
+  scroll-padding-bottom: 6rem;
+}
+
+@media (max-width: 639px) {
+  .mq-form-foot {
+    margin-bottom: -3rem;
+    border-radius: 0;
+    padding-bottom: max(0.875rem, env(safe-area-inset-bottom));
+  }
+
+  .mq-form-foot > * {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .mq-form-foot > p {
+    flex-basis: 100%;
+  }
+
+  html[data-theme="mailquilt"]:has(.mq-form-foot) {
+    scroll-padding-bottom: 8rem;
   }
 }

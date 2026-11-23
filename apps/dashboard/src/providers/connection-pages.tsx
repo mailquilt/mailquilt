@@ -1,11 +1,12 @@
 import { LinkButton } from "@cloudflare/kumo";
-import { CaretLeftIcon } from "@phosphor-icons/react";
 import type { Organization, ProviderConnectionId } from "@repo/domain";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 
-import { LoadFailed } from "../layout/empty-state.tsx";
+import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
+import { PageHeader } from "../layout/page-header.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
+import { TableRegion } from "../layout/table-region.tsx";
 import {
   ConnectionForm,
   connectionFailureMessage,
@@ -31,20 +32,14 @@ const FormPage = ({
   title: string;
 }) => (
   <PageFrame>
-    <div className="mx-auto max-w-[44rem]">
-      <Link
-        className="mb-4 inline-flex items-center gap-1 rounded-sm text-sm text-kumo-subtle hover:text-kumo-strong focus-visible:outline-2 focus-visible:outline-kumo-focus"
-        to="/providers"
-      >
-        <CaretLeftIcon aria-hidden="true" className="size-3.5" />
-        Providers
-      </Link>
-      <h1 className="font-display text-display font-semibold text-kumo-strong">
-        {title}
-      </h1>
-      <p className="mt-1.5 mb-8 text-base text-(--mq-body)">{description}</p>
-      {children}
+    <div className="max-w-[60rem]">
+      <PageHeader
+        crumbs={[{ href: "/providers", label: "Providers" }]}
+        description={description}
+        title={title}
+      />
     </div>
+    {children}
   </PageFrame>
 );
 
@@ -113,27 +108,29 @@ export const EditPage = ({
   const body = () => {
     if (connections.data === undefined) {
       return (
-        <section className="rounded-xl border border-kumo-fill bg-kumo-base">
+        <TableRegion label="Connection">
           <LoadFailed
             onRetry={() => connections.refetch()}
             retrying={connections.isFetching}
             title="The connection didn’t load"
           />
-        </section>
+        </TableRegion>
       );
     }
 
     if (connection === undefined) {
       return (
-        <div className="flex flex-col items-start gap-5">
-          <p className="text-base text-(--mq-body)">
-            {organization.name} has no such connection. Someone may have deleted
-            it.
-          </p>
-          <LinkButton href="/providers" variant="primary">
-            Go to Providers
-          </LinkButton>
-        </div>
+        <TableRegion label="Connection">
+          <EmptyState
+            actions={
+              <LinkButton href="/providers" variant="primary">
+                Go to Providers
+              </LinkButton>
+            }
+            description={`${organization.name} has no such connection. Someone may have deleted it.`}
+            title="This connection isn’t here"
+          />
+        </TableRegion>
       );
     }
 

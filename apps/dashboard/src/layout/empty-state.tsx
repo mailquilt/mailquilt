@@ -48,13 +48,14 @@ const EmptyArt = () => (
   </svg>
 );
 
-const SlotArt = () => (
+/** One dashed slot: a piece that isn't there. */
+export const SlotArt = ({ size = 48 }: { size?: number }) => (
   <svg
     aria-hidden="true"
     focusable="false"
-    height="48"
+    height={size}
     viewBox="0 0 48 48"
-    width="48"
+    width={size}
   >
     <rect
       className="stroke-(--mq-logo-slot)"

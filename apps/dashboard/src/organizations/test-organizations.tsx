@@ -1,4 +1,4 @@
-import { Sidebar, Toasty } from "@cloudflare/kumo";
+import { LinkProvider, Sidebar, Toasty } from "@cloudflare/kumo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { render } from "@testing-library/react";
 
+import { RouterLink } from "../layout/router-link.tsx";
 import { OrganizationsProvider } from "./organizations.tsx";
 
 export const ACME = {
@@ -23,19 +24,22 @@ export const BOLT = {
 } as const;
 
 /**
- * Renders `ui` as signed-in pages see it: inside the router, with the query
- * client, toasts and the tab's Organization.
+ * Renders `ui` as signed-in pages see it: inside the router, with Kumo's
+ * links routed through it, the query client, toasts and the tab's
+ * Organization. Returns the router, so a test can see where a link went.
  */
 export const renderWithOrganizations = (ui: React.ReactNode) => {
   const router = createRouter({
     history: createMemoryHistory(),
     routeTree: createRootRoute({
       component: () => (
-        <Toasty>
-          <OrganizationsProvider>
-            <Sidebar.Provider>{ui}</Sidebar.Provider>
-          </OrganizationsProvider>
-        </Toasty>
+        <LinkProvider component={RouterLink}>
+          <Toasty>
+            <OrganizationsProvider>
+              <Sidebar.Provider>{ui}</Sidebar.Provider>
+            </OrganizationsProvider>
+          </Toasty>
+        </LinkProvider>
       ),
     }),
   });
@@ -49,4 +53,6 @@ export const renderWithOrganizations = (ui: React.ReactNode) => {
       <RouterProvider router={router} />
     </QueryClientProvider>
   );
+
+  return router;
 };

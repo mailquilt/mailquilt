@@ -1,6 +1,12 @@
 import { Drawer } from "@base-ui/react/drawer";
 import { Button, Dialog } from "@cloudflare/kumo";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 const DESKTOP = "(min-width: 640px)";
 
@@ -33,12 +39,16 @@ const SHEET_MOTION =
  * empty, that is still closed when it mounts and so animates in. Moving the
  * key in the same render that opens it would mount the dialog already open,
  * and it would appear without its entrance; keying it by `open` would
- * unmount it as it closes, without its exit. `openOnMount` opens it by
+ * unmount it as it closes, without its exit. The key is this dialog's own,
+ * so dialogs side by side never share one: React can't tell siblings with
+ * the same key apart, and would leave a closed one on the page, invisible
+ * and catching clicks. `openOnMount` opens it by
  * itself, just after the page draws, with its entrance.
  */
 export const useDialog = (openOnMount = false) => {
   const [open, setOpen] = useState(false);
-  const [key, setKey] = useState(0);
+  const [opening, setOpening] = useState(0);
+  const id = useId();
   const opensItself = useRef(openOnMount);
 
   // WARNING: a dialog that is open when it first mounts appears without its entrance, so one that opens by itself opens just after.
@@ -53,9 +63,9 @@ export const useDialog = (openOnMount = false) => {
   }, []);
 
   return {
-    handleExited: () => setKey((current) => current + 1),
+    handleExited: () => setOpening((current) => current + 1),
     handleOpenChange: setOpen,
-    key,
+    key: `${id}${opening}`,
     open,
     setOpen,
   };
@@ -248,7 +258,9 @@ export const ActionDialog = ({
             <Dialog.Description className="mt-1.5 text-base text-pretty text-kumo-subtle">
               {description}
             </Dialog.Description>
-            <div className="mt-5 empty:hidden">{children}</div>
+            <div className="mt-5 empty:hidden has-[>form:empty]:hidden">
+              {children}
+            </div>
             <div className="mt-6 flex justify-end gap-2">
               <Actions {...actions} actionFirst={false} Close={Dialog.Close} />
             </div>
@@ -293,7 +305,9 @@ export const ActionDialog = ({
               <Drawer.Description className="mt-1.5 text-base text-pretty text-kumo-subtle">
                 {description}
               </Drawer.Description>
-              <div className="mt-5 empty:hidden">{children}</div>
+              <div className="mt-5 empty:hidden has-[>form:empty]:hidden">
+                {children}
+              </div>
             </Drawer.Content>
             <div className="flex flex-col gap-2 px-4 pt-3 pb-sheet-bottom">
               <Actions {...actions} actionFirst Close={Drawer.Close} />
