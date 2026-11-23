@@ -71,7 +71,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 ## Building and testing
 
 - The dashboard is a static SPA. Public pages are rendered on the server by the same deployed app.
-- A dashboard dialog is Kumo's `Dialog` on desktop, centred over the dark scrim, and the bottom sheet on phones. This replaces `LayerDialog` from #6, because the chosen design (#69) is one card with Cancel beside the action, not a card inside a frame with Cancel in the far corner. Kumo still pins `Dialog` near the top by default, so `ActionDialog` centres it (#70).
+- A dashboard dialog is Kumo's `LayerDialog` on desktop, centred over the dark scrim: the title and content on a card inside a frame, with Cancel at the frame's far left and the action at its far right. Phones keep the bottom sheet built on Base UI's Drawer, because `LayerDialog`'s own phone layout puts the desktop card inside its drawer. #70 had replaced `LayerDialog` with Kumo's one-card `Dialog`; the maintainer compared both and chose `LayerDialog` (2026-11-23).
 - On Node, pg-boss is both the Queue and the Scheduler.
 - Persistence is never tested with in-memory fakes (see `testing.md`).
 - `@cloudflare/vitest-pool-workers` isn't used while it needs Vitest 4 and `@effect/vitest` needs Vitest 5. The Cloudflare runtime is covered by the smoke test on `wrangler dev`.
