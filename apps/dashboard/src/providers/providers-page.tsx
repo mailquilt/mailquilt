@@ -21,8 +21,9 @@ import { formatDay } from "../audience/format.ts";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { Breakable } from "../layout/breakable.tsx";
 import { EmptyState, LoadFailed, SlotArt } from "../layout/empty-state.tsx";
+import { PageFrame } from "../layout/page-frame.tsx";
+import { PageHeader } from "../layout/page-header.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
-import { TablePage } from "../layout/table-page.tsx";
 import { TableRegion } from "../layout/table-region.tsx";
 import { DeleteConnectionDialog } from "./delete-connection-dialog.tsx";
 import { useProviderConnections } from "./providers-api.ts";
@@ -49,6 +50,30 @@ const introFor = (
     return `Saved ${connection.name}. Send yourself a test to check it still works.`;
   }
 };
+
+const ProvidersFrame = ({
+  actions,
+  children,
+  description,
+  titleDetail,
+}: {
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+  description: string;
+  titleDetail?: string;
+}) => (
+  <PageFrame>
+    <div className="mq-capped">
+      <PageHeader
+        actions={actions}
+        description={description}
+        title="Providers"
+        titleDetail={titleDetail}
+      />
+      {children}
+    </div>
+  </PageFrame>
+);
 
 const ConnectButton = () => (
   <LinkButton href="/providers/new" icon={PlusIcon} variant="primary">
@@ -268,7 +293,7 @@ export const ProvidersPage = ({
 
   if (connections.data === undefined) {
     return (
-      <TablePage description={description} title="Providers">
+      <ProvidersFrame description={description}>
         <TableRegion label="Providers">
           <LoadFailed
             onRetry={() => connections.refetch()}
@@ -276,13 +301,13 @@ export const ProvidersPage = ({
             title="Your providers didn’t load"
           />
         </TableRegion>
-      </TablePage>
+      </ProvidersFrame>
     );
   }
 
   if (connections.data.length === 0) {
     return (
-      <TablePage description={description} title="Providers">
+      <ProvidersFrame description={description}>
         {deleted}
         <TableRegion label="Providers">
           <EmptyState
@@ -291,21 +316,20 @@ export const ProvidersPage = ({
             title="No provider connected yet"
           />
         </TableRegion>
-      </TablePage>
+      </ProvidersFrame>
     );
   }
 
   return (
-    <TablePage
+    <ProvidersFrame
       actions={<ConnectButton />}
       description={description}
-      title="Providers"
       titleDetail={`${connections.data.length} connected`}
     >
       {deleted}
       <section
         aria-label="Connections"
-        className="mq-bleed border-t border-kumo-hairline"
+        className="border-t border-kumo-hairline"
       >
         {connections.data.map((connection) => (
           <ConnectionRow
@@ -330,6 +354,6 @@ export const ProvidersPage = ({
           connect their SMTP settings here.
         </span>
       </p>
-    </TablePage>
+    </ProvidersFrame>
   );
 };

@@ -31,8 +31,8 @@ const FormPage = ({
   description: string;
   title: string;
 }) => (
-  <PageFrame>
-    <div className="max-w-[60rem]">
+  <PageFrame fullWidth>
+    <div className="mq-capped">
       <PageHeader
         crumbs={[{ href: "/providers", label: "Providers" }]}
         description={description}
@@ -108,29 +108,33 @@ export const EditPage = ({
   const body = () => {
     if (connections.data === undefined) {
       return (
-        <TableRegion label="Connection">
-          <LoadFailed
-            onRetry={() => connections.refetch()}
-            retrying={connections.isFetching}
-            title="The connection didn’t load"
-          />
-        </TableRegion>
+        <div className="mq-capped">
+          <TableRegion label="Connection">
+            <LoadFailed
+              onRetry={() => connections.refetch()}
+              retrying={connections.isFetching}
+              title="The connection didn’t load"
+            />
+          </TableRegion>
+        </div>
       );
     }
 
     if (connection === undefined) {
       return (
-        <TableRegion label="Connection">
-          <EmptyState
-            actions={
-              <LinkButton href="/providers" variant="primary">
-                Go to Providers
-              </LinkButton>
-            }
-            description={`${organization.name} has no such connection. Someone may have deleted it.`}
-            title="This connection isn’t here"
-          />
-        </TableRegion>
+        <div className="mq-capped">
+          <TableRegion label="Connection">
+            <EmptyState
+              actions={
+                <LinkButton href="/providers" variant="primary">
+                  Go to Providers
+                </LinkButton>
+              }
+              description={`${organization.name} has no such connection. Someone may have deleted it.`}
+              title="This connection isn’t here"
+            />
+          </TableRegion>
+        </div>
       );
     }
 

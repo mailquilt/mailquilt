@@ -264,7 +264,7 @@ export const InstanceSettingsPage = () => {
 
   return (
     <PageFrame>
-      <div className="max-w-[60rem]">
+      <div className="mq-capped">
         <PageHeader
           description={
             notAdmin
