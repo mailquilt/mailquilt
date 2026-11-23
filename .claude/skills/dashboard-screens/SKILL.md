@@ -59,7 +59,7 @@ node $S/screens.mjs --out /tmp/shots --name session-failed --block '*/api/auth/g
 node $S/filmstrip.mjs --out /tmp/shots --name home-load --path / --width 1280
 ```
 
-- Widths default to 320, 390, 768, 1024, 1440 and 1920. Phones (below 700 px) are emulated as mobile, so dialogs open as sheets.
+- Widths default to 320, 390, 768, 1024, 1440, 1920 and 2560. Phones (below 700 px) are emulated as mobile, so dialogs open as sheets.
 - Clicks are real mouse clicks at the element's centre, and keys are real key presses, so focus moves as it does for a person. Each line of output names what has focus in that shot: use it to check focus paths (where focus goes when a dialog opens and closes, after a submit, after an error).
 - `text=Label` matches only buttons, links and menu items. Reach a field with a CSS selector instead, such as `click=input[type=email]`.
 - `text=Label` matches the start of an element's text, so a menu row whose text continues ("Bolt WeeklyOwner") is found.
