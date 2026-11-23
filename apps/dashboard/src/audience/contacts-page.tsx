@@ -1,5 +1,4 @@
 import { Button, Checkbox, Select } from "@cloudflare/kumo";
-import { CaretLeftIcon, CaretRightIcon, PlusIcon } from "@phosphor-icons/react";
 import type {
   Contact,
   ContactId,
@@ -20,6 +19,7 @@ import { Array as Arr } from "effect";
 import type { DateTime } from "effect";
 import { useMemo, useRef, useState } from "react";
 
+import { CaretLeftIcon, CaretRightIcon, PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";

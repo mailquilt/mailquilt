@@ -1,10 +1,10 @@
 import { Banner, Button } from "@cloudflare/kumo";
-import { WarningIcon } from "@phosphor-icons/react";
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import { Predicate } from "effect";
 
 import { UNREACHABLE_MESSAGE } from "../auth/auth-client.ts";
 import { NewAccountForm } from "../auth/new-account-form.tsx";
+import { WarningIcon } from "../icons/icons.tsx";
 import { AuthHeading } from "../layout/auth-layout.tsx";
 import { useMarkSetUp, useSetUpInstance } from "./instance-api.ts";
 import { useInstanceStatusOfGate } from "./setup-gate.tsx";

@@ -18,6 +18,8 @@
     "@cloudflare/kumo": "catalog:",
     "@fontsource-variable/instrument-sans": "catalog:",
     "@fontsource-variable/space-grotesk": "catalog:",
+    "@hugeicons/core-free-icons": "catalog:",
+    "@hugeicons/react": "catalog:",
     "@phosphor-icons/react": "catalog:",
     "@repo/contract": "workspace:*",
     "@repo/domain": "workspace:*",

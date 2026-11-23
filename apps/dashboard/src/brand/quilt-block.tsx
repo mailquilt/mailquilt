@@ -1,4 +1,4 @@
-import { CheckIcon } from "@phosphor-icons/react";
+import { CheckIcon } from "../icons/icons.tsx";
 
 /** A dashed, stitched slot in the logo's proportions: a piece that isn't there. */
 export const QuiltSlot = ({ className }: { className?: string }) => (

@@ -1,14 +1,4 @@
 import { Button, DropdownMenu, LinkButton } from "@cloudflare/kumo";
-import {
-  DotsThreeIcon,
-  EnvelopeSimpleIcon,
-  LockSimpleIcon,
-  LockSimpleOpenIcon,
-  PaperPlaneTiltIcon,
-  PencilSimpleIcon,
-  PlusIcon,
-  TrashIcon,
-} from "@phosphor-icons/react";
 import type {
   Organization,
   ProviderConnection,
@@ -18,6 +8,16 @@ import type {
 import { useEffect, useId, useRef, useState } from "react";
 
 import { formatDay } from "../audience/format.ts";
+import {
+  DotsThreeIcon,
+  EnvelopeSimpleIcon,
+  LockSimpleIcon,
+  LockSimpleOpenIcon,
+  PaperPlaneTiltIcon,
+  PencilSimpleIcon,
+  PlusIcon,
+  TrashIcon,
+} from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { Breakable } from "../layout/breakable.tsx";
 import { EmptyState, LoadFailed, SlotArt } from "../layout/empty-state.tsx";

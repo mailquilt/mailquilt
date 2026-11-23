@@ -1,4 +1,4 @@
-import { PlusIcon } from "@phosphor-icons/react";
+import { PlusIcon } from "../icons/icons.tsx";
 
 const PATCH_FILLS = [
   "bg-(--mq-patch-ink)",

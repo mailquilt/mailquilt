@@ -1,5 +1,4 @@
 import { Banner, Button } from "@cloudflare/kumo";
-import { WarningCircleIcon } from "@phosphor-icons/react";
 import {
   EmailAddress,
   MAX_PASSWORD_LENGTH,
@@ -12,6 +11,7 @@ import { Schema } from "effect";
 
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
+import { WarningCircleIcon } from "../icons/icons.tsx";
 import { PasswordField } from "./password-field.tsx";
 
 export const NewAccount = Schema.Struct({
