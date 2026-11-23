@@ -694,7 +694,7 @@ aside.mq-frame {
 /* One gutter for the whole page; edge-to-edge tables and rows line up with it. */
 .mq-page-body {
   --gutter: 2.5rem;
-  /* How wide a capped page or a form's sections grow; the form's sticky foot lines up with it. */
+  /* How wide a capped page or a form's sections grow. */
   --mq-form-width: 60rem;
   padding-inline: var(--gutter);
 }
@@ -1449,56 +1449,27 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
 }
 
 /*
- * Cancel and Connect stay in reach at the foot of a long form, across the
- * page block's full width. It reaches into PageFrame's bottom padding
- * (4rem, 3rem on phones), so it sits on the block's lower edge. Its
- * contents stop where the form's centred sections do, so the buttons end on
- * the dividers' right edge rather than at the far edge of a wide window: each
- * side's padding grows by half of however much the form (the 100%) is wider
- * than them.
+ * A long form ends with Cancel and its submit button under the last
+ * section's fields, right-aligned to the field column's edge, with no bar
+ * and not sticky. After a submit with errors, how many are left to fix sits
+ * on the left of the same row. On phones the buttons share the row equally,
+ * and the count takes a row of its own above them.
  */
-.mq-form-foot {
-  position: sticky;
-  bottom: 0;
-  z-index: 5;
+.mq-form-end {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
-  margin: 0.5rem calc(var(--gutter) * -1) -4rem;
-  border-top: 1px solid var(--color-kumo-hairline);
-  border-radius: 0 0 0.75rem 0.75rem;
-  background: color-mix(in srgb, var(--color-kumo-base) 92%, transparent);
-  padding: 0.875rem var(--gutter);
-  padding-inline: calc(
-    var(--gutter) + max(0px, (100% - var(--mq-form-width)) / 2)
-  );
-  backdrop-filter: blur(8px);
-}
-
-/* Tabbing to a field never lands under the foot (WCAG 2.4.11). */
-html[data-theme="mailquilt"]:has(.mq-form-foot) {
-  scroll-padding-bottom: 6rem;
 }
 
 @media (max-width: 639px) {
-  .mq-form-foot {
-    margin-bottom: -3rem;
-    border-radius: 0;
-    padding-bottom: max(0.875rem, env(safe-area-inset-bottom));
-  }
-
-  .mq-form-foot > * {
+  .mq-form-end > * {
     flex: 1;
     justify-content: center;
   }
 
-  .mq-form-foot > p {
+  .mq-form-end > p {
     flex-basis: 100%;
-  }
-
-  html[data-theme="mailquilt"]:has(.mq-form-foot) {
-    scroll-padding-bottom: 8rem;
   }
 }

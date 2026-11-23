@@ -529,35 +529,35 @@ export const ConnectionForm = ({
           )}
         </form.Field>
         {failure}
+        {nested ? (
+          <div className="flex">{submit}</div>
+        ) : (
+          <div className="mq-form-end">
+            <form.Subscribe
+              selector={(state) =>
+                Object.values(state.fieldMeta).filter(
+                  (meta) => (meta?.errors.length ?? 0) > 0
+                ).length
+              }
+            >
+              {(errors) =>
+                errors === 0 ? null : (
+                  <p className="mr-auto text-sm text-kumo-danger">
+                    Fix {errors} {errors === 1 ? "field" : "fields"} to{" "}
+                    {submitLabel.toLowerCase()}.
+                  </p>
+                )
+              }
+            </form.Subscribe>
+            {cancelHref === undefined ? null : (
+              <LinkButton href={cancelHref} variant="secondary">
+                Cancel
+              </LinkButton>
+            )}
+            {submit}
+          </div>
+        )}
       </Part>
-      {nested ? (
-        <div className="flex">{submit}</div>
-      ) : (
-        <div className="mq-form-foot">
-          <form.Subscribe
-            selector={(state) =>
-              Object.values(state.fieldMeta).filter(
-                (meta) => (meta?.errors.length ?? 0) > 0
-              ).length
-            }
-          >
-            {(errors) =>
-              errors === 0 ? null : (
-                <p className="mr-auto text-sm text-kumo-danger">
-                  Fix {errors} {errors === 1 ? "field" : "fields"} to{" "}
-                  {submitLabel.toLowerCase()}.
-                </p>
-              )
-            }
-          </form.Subscribe>
-          {cancelHref === undefined ? null : (
-            <LinkButton href={cancelHref} variant="secondary">
-              Cancel
-            </LinkButton>
-          )}
-          {submit}
-        </div>
-      )}
     </form>
   );
 };
