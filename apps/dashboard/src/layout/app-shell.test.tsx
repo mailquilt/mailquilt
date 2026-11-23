@@ -181,6 +181,15 @@ describe("app shell", () => {
     fireEvent.click(menu);
 
     await expect.poll(() => skip.closest("[inert]")).not.toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Close navigation" })
+        .closest("[inert]")
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Close navigation" }));
+
+    await expect.poll(() => skip.closest("[inert]")).toBeNull();
   });
 
   it("gives focus back to the menu button when the navigation's Close button closes it", async () => {
