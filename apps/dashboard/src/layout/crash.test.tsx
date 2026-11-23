@@ -70,6 +70,7 @@ describe("crash", () => {
     await expect(
       screen.findByRole("button", { name: "Copied" })
     ).resolves.toBeDefined();
+    await expect(navigator.clipboard.readText()).resolves.toBe(MESSAGE);
   });
 
   it("draws the whole page, with a way home, when no layout is left to draw in", async () => {
