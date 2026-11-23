@@ -53,19 +53,18 @@ const WHOLE_NUMBER = /^\d+$/u;
 
 const ENCRYPTION = [
   {
-    description:
-      "Usually port 587. Starts plain and switches to encryption; if the server can’t, Mailquilt won’t send.",
+    description: "Port 587. Your provider may call this TLS.",
     label: "STARTTLS",
     value: "starttls",
   },
   {
-    description: "Usually port 465. Encrypted from the first byte.",
+    description: "Port 465. Your provider may call this SSL.",
     label: "TLS",
     value: "tls",
   },
   {
     description:
-      "Usually port 25. Not encrypted, so only for a relay on your own network.",
+      "Port 25. Not encrypted, so only for a relay on your own network.",
     label: "None",
     value: "none",
   },
@@ -409,7 +408,7 @@ export const ConnectionForm = ({
         <form.Field listeners={serverListeners} name="security">
           {(field) => (
             <Radio.Group
-              appearance={nested ? "segmented" : "card"}
+              appearance="card"
               legend="Encryption"
               onValueChange={(value) => {
                 const security =
@@ -427,7 +426,7 @@ export const ConnectionForm = ({
             >
               {ENCRYPTION.map((option) => (
                 <Radio.Item
-                  description={nested ? undefined : option.description}
+                  description={option.description}
                   key={option.value}
                   label={option.label}
                   value={option.value}
