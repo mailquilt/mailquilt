@@ -87,7 +87,7 @@ describe("organizations", () => {
     ).toBeNull();
   });
 
-  it("tries again, showing progress, and fills the page once organizations load", async () => {
+  it("tries again, showing progress and keeping keyboard focus, and fills the page once organizations load", async () => {
     let available = false;
     let listed = false;
     api.use(
@@ -107,11 +107,16 @@ describe("organizations", () => {
     const retry = await screen.findByRole("button", { name: "Try again" });
 
     available = true;
+    retry.focus();
     fireEvent.click(retry);
 
-    await expect(
-      screen.findByRole("button", { name: /Trying again…/u })
-    ).resolves.toBeDefined();
+    const trying = await screen.findByRole("button", {
+      name: /Trying again…/u,
+    });
+
+    expect(trying.getAttribute("aria-disabled")).toBe("true");
+    expect(trying).toHaveProperty("disabled", false);
+    expect(document.activeElement).toBe(trying);
 
     listed = true;
 

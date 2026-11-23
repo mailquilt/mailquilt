@@ -1,4 +1,4 @@
-import { Banner, useKumoToastManager } from "@cloudflare/kumo";
+import { Banner } from "@cloudflare/kumo";
 import { ListName } from "@repo/domain";
 import type { Organization } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
@@ -8,27 +8,31 @@ import { useId, useRef } from "react";
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
 import { ActionDialog } from "../layout/action-dialog.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import { useCreateList } from "./audience-api.ts";
 
 const NewList = Schema.Struct({ name: ListName });
 
 /**
- * Names a new List. It starts empty; Contacts are added from Contacts. Mount
- * it afresh for each opening (a new `key`), so it starts blank.
+ * Names a new List. It starts empty; Contacts are added from Contacts. Give
+ * it `useDialog`'s `key` and `handleExited`, so each opening starts blank.
  */
 export const NewListDialog = ({
   finalFocus,
+  onExited,
   onOpenChange,
   open,
   organization,
 }: {
   finalFocus?: React.RefObject<HTMLElement | null>;
+  /** `useDialog`'s `handleExited`, so it starts fresh after each close. */
+  onExited?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organization: Organization;
 }) => {
   const create = useCreateList(organization.id);
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const formId = useId();
   const nameField = useRef<HTMLInputElement>(null);
 
@@ -55,6 +59,7 @@ export const NewListDialog = ({
       finalFocus={finalFocus}
       formId={formId}
       initialFocus={nameField}
+      onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
       title="New list"

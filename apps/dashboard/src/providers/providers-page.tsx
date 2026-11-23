@@ -19,7 +19,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { formatDay } from "../audience/format.ts";
-import { TableEmpty, TableLoadFailed } from "../audience/table-card.tsx";
+import { useDialog } from "../layout/action-dialog.tsx";
+import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { DeleteConnectionDialog } from "./delete-connection-dialog.tsx";
@@ -53,7 +54,7 @@ const introFor = (
 
 const NoConnection = () => (
   <section className="rounded-xl border border-kumo-fill bg-kumo-base">
-    <TableEmpty
+    <EmptyState
       actions={
         <LinkButton href="/providers/new" icon={PlusIcon} variant="primary">
           Connect SMTP server
@@ -99,11 +100,8 @@ const ConnectionCard = ({
   const menuButton = useRef<HTMLButtonElement>(null);
   const testButton = useRef<HTMLButtonElement>(null);
 
-  const [test, setTest] = useState({
-    intro,
-    open: intro !== undefined,
-    opening: 0,
-  });
+  const testing = useDialog(intro !== undefined);
+  const [testIntro, setTestIntro] = useState(intro);
 
   const SecurityIcon =
     connection.smtp.security === "none" ? LockSimpleOpenIcon : LockSimpleIcon;
@@ -134,13 +132,10 @@ const ConnectionCard = ({
         <Button
           className="col-span-full row-start-3 mt-4 w-full justify-center sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:mt-0 sm:w-auto"
           icon={PaperPlaneTiltIcon}
-          onClick={() =>
-            setTest(({ opening }) => ({
-              intro: undefined,
-              open: true,
-              opening: opening + 1,
-            }))
-          }
+          onClick={() => {
+            setTestIntro(undefined);
+            testing.setOpen(true);
+          }}
           ref={testButton}
           variant="secondary"
         >
@@ -210,10 +205,11 @@ const ConnectionCard = ({
         connection={connection}
         defaultTo={defaultTo}
         finalFocus={testButton}
-        intro={test.intro}
-        key={test.opening}
-        onOpenChange={(open) => setTest((last) => ({ ...last, open }))}
-        open={test.open}
+        intro={testIntro}
+        key={testing.key}
+        onExited={testing.handleExited}
+        onOpenChange={testing.handleOpenChange}
+        open={testing.open}
         organization={organization}
       />
       <DeleteConnectionDialog
@@ -291,7 +287,7 @@ export const ProvidersPage = ({
     return (
       <TablePage description={description} title="Providers">
         <section className="rounded-xl border border-kumo-fill bg-kumo-base">
-          <TableLoadFailed
+          <LoadFailed
             onRetry={() => connections.refetch()}
             retrying={connections.isFetching}
             title="Your providers didn’t load"

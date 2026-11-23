@@ -15,9 +15,12 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
 
 1. **UX first.** Write down the screen's job, who arrives and in what state, every state it has (loading, empty, error, success, disabled), and its copy, before any styling.
 2. **Mock up anything new, then stop.** Every new screen, component, menu, dialog or sheet is shown as rendered mockups before it is built: desktop and phone, light and dark, every state from step 1. Show two or three directions with a recommendation, and wait for the maintainer's pick. This holds on a `ready-for-agent` ticket too. Only copy, spacing and token changes inside an existing component skip this step.
-3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes, its focus and its motion. Keep a default only when it is right for this screen, and say which ones you kept. Defaults that cost a round on #6:
+3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes, its focus and its motion. Keep a default only when it is right for this screen, and say which ones you kept. Defaults that cost a round on #6 and the redesign (#69):
    - Kumo pins dialogs near the top of the window, and `LayerDialog` puts its desktop card inside the phone drawer.
-   - `LayerDialog` focuses its own frame when it opens, not its field, and has no option to change that.
+   - `LayerDialog` focuses its own frame when it opens, not its field, and has no option to change that. Kumo's `Dialog` takes no `initialFocus` or `finalFocus` at all.
+   - Kumo's dialog backdrop is a pale wash that greys out the ink frame. Overriding its `opacity` stops its fade; override only its colour.
+   - Kumo's loading `Button` disables itself, and the browser then drops keyboard focus to the page, even inside a dialog.
+   - A dialog given a new `key` in the same render that opens it mounts already open and skips its entrance; one keyed by `open` unmounts as it closes and skips its exit. Use `useDialog` (`src/layout/action-dialog.tsx`).
    - Kumo inputs are 14px at every size, so Safari on iPhone and iPad zooms into them.
    - Menu radio items stay open after a click (`closeOnClick` is off).
    - A loading `Button`'s accessible name includes its spinner's label.
@@ -41,6 +44,7 @@ The official logo kit is in `docs/brand/` (see its README). Copies of the files 
 
 - **Colours:** ink `#111113`, accent `#D4380F`, quilt grey `#71717A`. The dashboard's light and dark values for each live in `apps/dashboard/src/styles.css`.
 - **Type:** Space Grotesk for display headings, Instrument Sans for everything else.
+- **The frame:** every signed-in page is one light block set into the ink quilt, the same quilt people sign in through. Page titles use the wordmark's two tones ("Contacts **12,480**"), and the navigation uses the logo's blocks: a built page is a block, the current page is lifted off its dashed slot, an unbuilt page is only the slot.
 - **Primary actions are ink.** The accent is close to error red, so it is kept for brand moments (the logo, the quilt, a cost) and the single next step.
 - **Destructive confirmations are danger red.** The button that confirms something that can't be undone, such as deleting a connection, is danger red (`ActionDialog`'s `destructive`), so the final step is the strongest warning, as the red menu item before it was. It is flat `--mq-danger-button` (`#b91c1c`, 6.5:1 with white), not Kumo's lighter gradient, and not the accent.
 - **Quilting stays in the pictures; the words stay plain.** No sewing puns in the copy.

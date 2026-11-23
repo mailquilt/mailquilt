@@ -1,8 +1,9 @@
-import { Banner, Radio, useKumoToastManager } from "@cloudflare/kumo";
+import { Banner, Radio } from "@cloudflare/kumo";
 import type { AddedToList, ContactId, List, Organization } from "@repo/domain";
 import { useId, useState } from "react";
 
 import { ActionDialog } from "../layout/action-dialog.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import { useAddToList } from "./audience-api.ts";
 import { formatCount } from "./format.ts";
 
@@ -38,13 +39,14 @@ export const addedToListMessage = (result: AddedToList, list: List) => {
 /**
  * Subscribes the selected Contacts to one List. Anyone who unsubscribed from
  * it, or hasn't confirmed, is left as they are, and the toast says so. The
- * selection stays, so the same Contacts can go on another List next. Mount it
- * afresh for each opening (a new `key`), so it starts with the first List.
+ * selection stays, so the same Contacts can go on another List next. Give it
+ * `useDialog`'s `key` and `handleExited`, so each opening starts with the first List.
  */
 export const AddToListDialog = ({
   contactIds,
   finalFocus,
   lists,
+  onExited,
   onOpenChange,
   open,
   organization,
@@ -52,12 +54,14 @@ export const AddToListDialog = ({
   contactIds: readonly [ContactId, ...ContactId[]];
   finalFocus?: React.RefObject<HTMLElement | null>;
   lists: readonly List[];
+  /** `useDialog`'s `handleExited`, so it starts fresh after each close. */
+  onExited?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organization: Organization;
 }) => {
   const add = useAddToList(organization.id);
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const formId = useId();
   const [chosen, setChosen] = useState(lists[0]?.id);
 
@@ -70,6 +74,7 @@ export const AddToListDialog = ({
       description="They’ll get the campaigns sent to the list you choose. Anyone who unsubscribed from it stays unsubscribed."
       finalFocus={finalFocus}
       formId={formId}
+      onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
       title={`Add ${contacts(contactIds.length)} to a list`}

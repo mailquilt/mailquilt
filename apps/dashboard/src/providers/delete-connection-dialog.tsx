@@ -1,8 +1,9 @@
-import { Banner, useKumoToastManager } from "@cloudflare/kumo";
+import { Banner } from "@cloudflare/kumo";
 import type { Organization, ProviderConnection } from "@repo/domain";
 import { useId } from "react";
 
 import { ActionDialog } from "../layout/action-dialog.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import { useDeleteConnection } from "./providers-api.ts";
 
 /**
@@ -26,7 +27,7 @@ export const DeleteConnectionDialog = ({
   organization: Organization;
 }) => {
   const remove = useDeleteConnection(organization.id);
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const formId = useId();
 
   // WARNING: the deletion removes this card, and this dialog with it, before mutate's own callbacks would run; mutateAsync's promise still settles.

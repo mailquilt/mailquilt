@@ -1,6 +1,7 @@
-import { Button, Loader } from "@cloudflare/kumo";
+import { Button } from "@cloudflare/kumo";
 
 import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
+import { PatchLoader } from "./empty-state.tsx";
 
 /**
  * The whole page while what it needs is still loading. Pages wait here
@@ -8,7 +9,9 @@ import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
  */
 export const PageLoading = () => (
   <div className="flex min-h-svh items-center justify-center bg-kumo-base">
-    <Loader />
+    <output aria-label="Loading">
+      <PatchLoader />
+    </output>
   </div>
 );
 
@@ -20,7 +23,7 @@ export const PageLoading = () => (
  */
 export const PageAreaLoading = ({ label }: { label: string }) => (
   <output className="pointer-events-none fixed inset-0 flex items-center justify-center">
-    <Loader />
+    <PatchLoader />
     <span className="sr-only">{label}</span>
   </output>
 );

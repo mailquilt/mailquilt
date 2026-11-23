@@ -7,15 +7,17 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 
+import { useDialog } from "../layout/action-dialog.tsx";
+import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { useLists } from "./audience-api.ts";
 import { DataTable } from "./data-table.tsx";
 import { formatCount, formatDay } from "./format.ts";
 import { NewListDialog } from "./new-list-dialog.tsx";
-import { TableCard, TableEmpty, TableLoadFailed } from "./table-card.tsx";
+import { TableCard } from "./table-card.tsx";
 
 const features = tableFeatures({});
 
@@ -112,10 +114,9 @@ const ListsTable = ({ lists }: { lists: readonly List[] }) => {
  */
 export const ListsPage = ({ organization }: { organization: Organization }) => {
   const lists = useLists(organization.id);
-  const [creating, setCreating] = useState({ key: 0, open: false });
+  const creating = useDialog();
 
-  const startCreating = () =>
-    setCreating(({ key }) => ({ key: key + 1, open: true }));
+  const startCreating = () => creating.setOpen(true);
 
   const newListButton = useRef<HTMLButtonElement>(null);
 
@@ -137,7 +138,7 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
   const body = () => {
     if (lists.data === undefined) {
       return (
-        <TableLoadFailed
+        <LoadFailed
           onRetry={() => lists.refetch()}
           retrying={lists.isFetching}
           title="Your lists didn’t load"
@@ -147,7 +148,7 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
 
     if (lists.data.length === 0) {
       return (
-        <TableEmpty
+        <EmptyState
           actions={
             <Button
               icon={PlusIcon}
@@ -177,7 +178,8 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
       <NewListDialog
         finalFocus={newListButton}
         key={creating.key}
-        onOpenChange={(open) => setCreating(({ key }) => ({ key, open }))}
+        onExited={creating.handleExited}
+        onOpenChange={creating.handleOpenChange}
         open={creating.open}
         organization={organization}
       />

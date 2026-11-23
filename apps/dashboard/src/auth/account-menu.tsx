@@ -10,15 +10,17 @@ import type { Account } from "../layout/session-gates.tsx";
 import { ThemePicker } from "../theme/theme-picker.tsx";
 import { authClient } from "./auth-client.ts";
 
-const initialOf = (account: Account) =>
-  (account.name.trim() || account.email).charAt(0).toUpperCase();
+const initialsOf = (account: Account) => {
+  const words = account.name.trim().split(/\s+/u).filter(Boolean);
+  const first = words.at(0)?.charAt(0) ?? account.email.charAt(0);
+  const last = words.length > 1 ? (words.at(-1)?.charAt(0) ?? "") : "";
+
+  return `${first}${last}`.toUpperCase();
+};
 
 const AccountAvatar = ({ account }: { account: Account }) => (
-  <span
-    aria-hidden="true"
-    className="flex size-8 shrink-0 items-center justify-center rounded-quilt bg-(--mq-block-ink) font-display text-sm font-semibold text-kumo-inverse"
-  >
-    {initialOf(account)}
+  <span aria-hidden="true" className="mq-avatar">
+    {initialsOf(account)}
   </span>
 );
 
@@ -42,7 +44,7 @@ const AccountName = ({
 );
 
 /**
- * Who is signed in, at the foot of the sidebar. Opens a menu with, for the
+ * Who is signed in, at the foot of the frame. Opens a menu with, for the
  * instance admin, Instance settings, then their appearance setting and, set
  * apart in red, sign-out. The menu is as wide as
  * the sidebar and opens above it. When the sidebar is collapsed to icons, the
@@ -68,7 +70,7 @@ export const AccountMenu = ({ account }: { account: Account }) => {
     <DropdownMenu>
       <DropdownMenu.Trigger
         aria-label={`Account: ${account.name}`}
-        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg p-1 text-left group-data-[state=collapsed]/sidebar:flex-none hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
+        className="mq-frame-button"
       >
         <AccountAvatar account={account} />
         {besideCollapsedSidebar ? null : <AccountName account={account} />}

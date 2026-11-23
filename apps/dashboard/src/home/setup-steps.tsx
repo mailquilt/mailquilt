@@ -4,9 +4,9 @@ import { OrganizationIdSchema } from "@repo/domain";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
-import { TableLoadFailed } from "../audience/table-card.tsx";
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
+import { LoadFailed } from "../layout/empty-state.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
 import { OrganizationPatch } from "../organizations/organization-patch.tsx";
 import {
@@ -219,7 +219,7 @@ export const SetupSteps = () => {
   if (failed !== undefined) {
     return (
       <section className="rounded-xl border border-kumo-fill bg-kumo-base">
-        <TableLoadFailed
+        <LoadFailed
           onRetry={() => failed.retry()}
           retrying={failed.retrying}
           title="Your setup didn’t load"

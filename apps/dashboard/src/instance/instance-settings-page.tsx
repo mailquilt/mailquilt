@@ -1,10 +1,4 @@
-import {
-  Banner,
-  Button,
-  Link,
-  Radio,
-  useKumoToastManager,
-} from "@cloudflare/kumo";
+import { Banner, Button, Link, Radio } from "@cloudflare/kumo";
 import { CheckIcon } from "@phosphor-icons/react";
 import { SignUpPolicySchema } from "@repo/domain";
 import type {
@@ -16,9 +10,10 @@ import { useLocation } from "@tanstack/react-router";
 import { Predicate, Schema } from "effect";
 import { useId, useState } from "react";
 
-import { TableLoadFailed } from "../audience/table-card.tsx";
+import { LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import {
   ConnectionForm,
   serverFailureMessage,
@@ -75,7 +70,7 @@ const DoneBlock = () => (
 
 const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
   const update = useUpdateSignUp();
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const [edited, setEdited] = useState<SignUpPolicy | null>(null);
   const chosen = edited ?? current;
 
@@ -181,7 +176,7 @@ const SystemMailerSection = ({
   mailer: SystemMailerSettings | null;
 }) => {
   const update = useUpdateSystemMailer();
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
 
   const description =
     "Mailquilt sends its own emails through this server, such as the link that confirms a new account’s address. Campaigns never use it.";
@@ -283,7 +278,7 @@ export const InstanceSettingsPage = () => {
             : "These apply to everyone on this Mailquilt. Only you can see them, as its admin."}
         </p>
         {settings.isError && !notAdmin ? (
-          <TableLoadFailed
+          <LoadFailed
             onRetry={() => settings.refetch()}
             retrying={settings.isFetching}
             title="Instance settings didn’t load"

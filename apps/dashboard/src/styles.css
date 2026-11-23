@@ -38,8 +38,14 @@
   /* Sheets slide up and settle like Kumo's own drawer. */
   --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
 
+  /* Anything entering eases out strongly: fast at first, then settling. */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+
   /* A sheet's last row stays clear of the iPhone home indicator. */
-  --spacing-sheet-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  --spacing-sheet-bottom: max(1rem, env(safe-area-inset-bottom));
+
+  /* A sheet's edge against the page it rises over. */
+  --shadow-sheet: 0 0 0 1px var(--mq-pop-ring), var(--mq-sheet-shadow);
 
   /* The edge of a table column pinned while the rest scrolls sideways. */
   --shadow-pinned-column: inset -1px 0 0 var(--color-kumo-fill);
@@ -274,5 +280,655 @@
   .mq-goose-thread {
     animation: mq-goose-lift 420ms ease-out both;
     animation-delay: var(--mq-goose-delay, 0ms);
+  }
+}
+
+/* ---------- The Inset frame: the page is one light block set into the ink quilt ---------- */
+
+/*
+ * WARNING: unlayered, like the token overrides above, so they win over
+ * Kumo's :root tokens. The frame is ink in both modes, so its palette is
+ * the same in light and dark except the ink itself.
+ */
+:root[data-theme="mailquilt"] {
+  --mq-frame: #111113;
+  --mq-frame-hover: #1d1d21;
+  --mq-frame-active: #26262b;
+  --mq-frame-text: #f4f4f5;
+  --mq-frame-default: #c4c4cc;
+  --mq-frame-muted: #a1a1aa;
+  --mq-frame-subtle: #8b949e;
+  --mq-frame-line: #26262b;
+  --mq-frame-hairline: #222226;
+  --mq-frame-block: #4b4b53;
+  --mq-frame-slot: #5b5b63;
+  --mq-frame-avatar: #3a3a41;
+  --mq-frame-focus: #f0f6fc;
+  --mq-page-ring: transparent;
+
+  /* The dark wash under every dialog and sheet (version 1's, not Kumo's pale one). */
+  --mq-scrim: rgb(9 9 11 / 0.42);
+  /*
+   * The same wash under Kumo's own backdrops, which draw at opacity 0.8 and
+   * fade that opacity in and out: 0.525 × 0.8 = 0.42. Only the colour is
+   * overridden, so Kumo's fade still runs.
+   */
+  --mq-scrim-under-kumo: rgb(9 9 11 / 0.525);
+  --mq-pop-ring: rgb(17 17 19 / 0.09);
+  --mq-sheet-shadow:
+    0 2px 4px rgb(17 17 19 / 0.06), 0 32px 64px -16px rgb(17 17 19 / 0.35);
+  --mq-pop-shadow:
+    0 1px 2px rgb(17 17 19 / 0.06), 0 12px 32px -6px rgb(17 17 19 / 0.22);
+
+  /* Kumo's light warning text is 4.0:1 on its tint; this is 5.9:1. */
+  --mq-warning-text: #945000;
+}
+
+:root[data-theme="mailquilt"][data-mode="dark"] {
+  --mq-frame: #08080a;
+  --mq-frame-hover: #141417;
+  --mq-frame-active: #1d1d21;
+  --mq-page-ring: rgb(255 255 255 / 0.06);
+  --mq-scrim: rgb(0 0 0 / 0.6);
+  --mq-scrim-under-kumo: rgb(0 0 0 / 0.75);
+  --mq-pop-ring: rgb(255 255 255 / 0.08);
+  --mq-sheet-shadow: 0 32px 64px -16px rgb(0 0 0 / 0.8);
+  --mq-pop-shadow:
+    0 1px 2px rgb(0 0 0 / 0.4), 0 16px 40px -8px rgb(0 0 0 / 0.7);
+}
+
+/* WARNING: only while the frame is drawn: on the whole document, the ink would flash before the first page draws. */
+html[data-theme="mailquilt"]:has(.mq-frame-wrapper) {
+  background: var(--mq-frame);
+}
+
+/*
+ * The frame's subtree always draws with dark tokens, so Kumo parts inside it
+ * (menu buttons, group labels, badges, the close button) render as they do
+ * in dark mode. Menus portal to <body>, so they keep the page's own theme.
+ * The last selector is the full-screen navigation on phones and tablets.
+ */
+.mq-frame,
+.mq-frame-bar,
+.mq-frame-wrapper [data-sidebar-backdrop] + nav {
+  --mq-logo-ink: #f0f6fc;
+  --mq-logo-grey: #8b949e;
+  --mq-logo-slot: #6e7681;
+  --mq-patch-ink: #e4e4e7;
+  --mq-patch-grey: #8b949e;
+  --mq-patch-pale: #3f3f46;
+  --mq-quilt-sky: #151518;
+  --mq-quilt-goose: #1c1c20;
+  --mq-quilt-goose-alt: #18181c;
+
+  --text-color-kumo-default: var(--mq-frame-default);
+  --text-color-kumo-strong: var(--mq-frame-text);
+  --text-color-kumo-subtle: var(--mq-frame-subtle);
+  --color-kumo-base: var(--mq-frame);
+  --color-kumo-tint: var(--mq-frame-active);
+  --color-kumo-fill: var(--mq-frame-line);
+  --color-kumo-fill-hover: var(--mq-frame-hover);
+  --color-kumo-line: var(--mq-frame-line);
+  --color-kumo-hairline: var(--mq-frame-hairline);
+  --color-kumo-focus: var(--mq-frame-focus);
+  --sidebar-bg: var(--mq-frame);
+  --sidebar-active-bg: var(--mq-frame-active);
+  color-scheme: dark;
+}
+
+.mq-frame-wrapper {
+  --sidebar-bg: var(--mq-frame);
+  --sidebar-width: 15.5rem;
+  background: var(--mq-frame) !important;
+}
+
+/* The rail is as tall as the window, so the account sits at its foot while the page scrolls. */
+aside.mq-frame {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+}
+
+.mq-frame-head {
+  height: 3.5rem;
+  border: 0;
+  padding: 0.5rem 0.75rem 0 1.25rem;
+}
+
+.mq-frame-foot {
+  height: auto;
+  border: 0;
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+/* Kumo's footer is a fixed-width flex row; the account button fills it. */
+.mq-frame-foot > * {
+  flex: 1;
+}
+
+/* Collapsed to icons on desktop: the header, footer and quilt step aside. */
+.mq-frame[data-state="collapsed"] .mq-frame-head {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.mq-frame[data-state="collapsed"] .mq-frame-foot {
+  padding-inline: 0.5rem;
+}
+
+.mq-frame[data-state="collapsed"] .mq-rail-quilt {
+  display: none;
+}
+
+/* The organization switcher and the account button: rows of the frame. */
+.mq-frame-button {
+  display: flex;
+  width: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out-strong);
+}
+
+.mq-frame-button:hover,
+.mq-frame-button[data-popup-open] {
+  background: var(--mq-frame-active);
+}
+
+.mq-frame-button:active {
+  transform: scale(0.98);
+}
+
+.mq-frame[data-state="collapsed"] .mq-frame-button {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.mq-avatar {
+  display: flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-quilt);
+  background: var(--mq-frame-avatar);
+  color: var(--mq-frame-text);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/*
+ * Keyboard focus in the frame: one light outline on everything, the nav
+ * links included. Kumo marks a focused nav link only with the current
+ * page's fill, which can't be seen on the current page itself.
+ */
+.mq-frame-button:focus-visible,
+.mq-frame-icon-button:focus-visible,
+.mq-frame [data-sidebar="menu-button"]:focus-visible,
+.mq-frame [data-sidebar="close"]:focus-visible,
+.mq-frame [data-sidebar="trigger"]:focus-visible {
+  outline: 2px solid var(--mq-frame-focus) !important;
+  outline-offset: -2px;
+}
+
+.mq-frame-head a:focus-visible,
+.mq-frame-bar a:focus-visible {
+  outline: 2px solid var(--mq-frame-focus);
+  outline-offset: 2px;
+}
+
+/* Navigation blocks: a built page is a quiet block, the current page is lifted off its dashed slot, an unbuilt page is only the slot. */
+.mq-nav-block {
+  position: relative;
+  display: block;
+  width: 0.625rem;
+  height: 0.625rem;
+  flex-shrink: 0;
+}
+
+.mq-nav-block::before,
+.mq-nav-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 2.5px;
+}
+
+.mq-nav-block::after {
+  background: var(--mq-frame-block);
+}
+
+.mq-nav-block[data-state="current"]::before {
+  border: 1.25px dashed var(--mq-frame-subtle);
+  border-radius: 2px;
+}
+
+.mq-nav-block[data-state="current"]::after {
+  background: var(--mq-frame-text);
+  transform: translate(2px, -2px);
+}
+
+.mq-nav-block[data-state="soon"]::after {
+  border: 1.25px dashed var(--mq-frame-slot);
+  border-radius: 2px;
+  background: none;
+}
+
+/* A page that isn't built: quiet but readable (not Kumo's 45% opacity). */
+.mq-nav-soon {
+  cursor: default !important;
+  opacity: 1 !important;
+  color: var(--mq-frame-subtle) !important;
+}
+
+.mq-nav-soon:hover {
+  background: transparent !important;
+}
+
+/* Group labels always show their text, and sit a little tighter, so the rail reads as one column. */
+.mq-frame:not([data-state="collapsed"]) [data-sidebar="group-label"] {
+  grid-template-rows: 1fr;
+  margin: 0;
+  border-color: transparent;
+}
+
+.mq-frame:not([data-state="collapsed"])
+  [data-sidebar="group-label"]
+  > div
+  > div {
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+/* Faint geese at the foot of the rail: the sign-in quilt, stepped back. */
+.mq-rail-quilt {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  max-height: 11rem;
+  mask-image: linear-gradient(to bottom, transparent, #000 75%);
+}
+
+@media (max-height: 760px) {
+  .mq-rail-quilt {
+    display: none;
+  }
+}
+
+/* The page block, set into the frame with the logo's 8-unit seam. */
+.mq-page-wrap {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 0.5rem 0.5rem 0.5rem 0;
+}
+
+.mq-page {
+  position: relative;
+  display: flex;
+  min-height: calc(100svh - 1rem);
+  flex: 1;
+  flex-direction: column;
+  border-radius: 0.75rem;
+  background: var(--color-kumo-base);
+  box-shadow: 0 0 0 1px var(--mq-page-ring);
+}
+
+.mq-page:focus {
+  outline: none;
+}
+
+@media (max-width: 1023px) {
+  .mq-page-wrap {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .mq-page {
+    min-height: calc(100svh - 3.5rem - 0.5rem);
+  }
+}
+
+@media (max-width: 639px) {
+  .mq-page-wrap {
+    padding: 0;
+  }
+
+  .mq-page {
+    min-height: calc(100svh - 3.5rem);
+    border-radius: 0.75rem 0.75rem 0 0;
+  }
+}
+
+/* Phones and tablets: the top edge of the frame, with the logo, the organization and the menu. */
+.mq-frame-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  height: 3.5rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0 0.25rem 0 1rem;
+  background: var(--mq-frame);
+}
+
+.mq-frame-icon-button {
+  display: flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: var(--mq-frame-text);
+}
+
+.mq-frame-icon-button:hover {
+  background: var(--mq-frame-hover);
+}
+
+/* The full-screen navigation: no quilt, the account at its foot, and its top edge is the bar's, so the logo doesn't move as it opens. */
+.mq-frame[data-mobile] .mq-rail-quilt {
+  display: none;
+}
+
+.mq-frame[data-mobile] .mq-frame-head {
+  align-items: center;
+  padding: 0 0.25rem 0 1rem;
+}
+
+.mq-frame[data-mobile] .mq-frame-head a svg {
+  height: 1.25rem;
+}
+
+.mq-frame[data-mobile] .mq-frame-foot {
+  width: 100%;
+  max-width: 28rem;
+  margin-top: auto;
+}
+
+/*
+ * It is touched, not clicked: 44px rows and 16px labels, and a 44px close
+ * button where the ☰ was. The column is capped so counts stay beside their
+ * labels on a tablet.
+ */
+.mq-frame[data-mobile] [data-sidebar="content"] {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.mq-frame[data-mobile] [data-sidebar="menu-button"] {
+  min-height: 2.75rem;
+  font-size: 1rem;
+}
+
+.mq-frame[data-mobile] [data-sidebar="menu-button"] .text-xs,
+.mq-frame[data-mobile] [data-sidebar="group-label"] > div > div {
+  font-size: 0.8125rem;
+}
+
+.mq-frame-close {
+  width: 2.75rem !important;
+  height: 2.75rem !important;
+}
+
+.mq-skip {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  border-radius: 0.5rem;
+  background: var(--color-kumo-base);
+  padding: 0.5rem 0.75rem;
+  font-weight: 500;
+  transform: translateY(-200%);
+}
+
+.mq-skip:focus-visible {
+  transform: none;
+}
+
+/* Tabbing never lands on a control hidden under the sticky bar on phones and tablets (WCAG 2.4.11). */
+@media (max-width: 1023px) {
+  html[data-theme="mailquilt"] {
+    scroll-padding-top: 4.5rem;
+  }
+}
+
+/* One gutter for the whole page; edge-to-edge tables and rows line up with it. */
+.mq-page-body {
+  --gutter: 2.5rem;
+  padding-inline: var(--gutter);
+}
+
+@media (max-width: 1023px) {
+  .mq-page-body {
+    --gutter: 1.75rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .mq-page-body {
+    --gutter: 1rem;
+  }
+}
+
+/* Two-tone titles, like the wordmark: what it is in ink, how many in quilt grey. */
+.mq-tone {
+  color: var(--mq-logo-grey);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Motion (Emil Kowalski's rules: ease-out for anything entering) ---------- */
+
+/* Press: every Kumo button scales down a touch; colour changes stay instant. */
+[data-theme="mailquilt"]
+  :is([data-kumo-component="Button"], [data-kumo-component="LinkButton"]) {
+  transition-property: transform, background-color, color, box-shadow;
+  transition-duration: 160ms, 0ms, 0ms, 0ms;
+  transition-timing-function: var(--ease-out-strong);
+}
+
+[data-theme="mailquilt"]
+  :is([data-kumo-component="Button"], [data-kumo-component="LinkButton"]):not(
+    :disabled
+  ):active {
+  transform: scale(0.97);
+}
+
+/* Menus and selects grow from their trigger (Base UI sets the origin). */
+[data-theme="mailquilt"] :is([role="menu"], [role="listbox"]) {
+  transform-origin: var(--transform-origin);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="mailquilt"]
+    :is(
+      [data-kumo-component="Button"],
+      [data-kumo-component="LinkButton"]
+    ):active,
+  .mq-frame-button:active {
+    transform: none !important;
+  }
+}
+
+/* ---------- Dialogs, sheets and toasts ---------- */
+
+/*
+ * Kumo's dialog (and any Kumo backdrop) washes the window with the dark
+ * scrim, not Kumo's pale one, so the ink frame stays ink. Only the colour
+ * changes; Kumo's own fade still runs.
+ */
+[data-theme="mailquilt"]
+  [data-base-ui-portal]
+  > .bg-kumo-recessed[role="presentation"],
+[data-theme="mailquilt"]
+  [data-base-ui-portal]
+  > .bg-kumo-overlay[role="presentation"] {
+  z-index: 60;
+  background: var(--mq-scrim-under-kumo);
+}
+
+/* Kumo's toast surface, drawn as a quiet popover: no border, a soft shadow, no close button. */
+[data-theme="mailquilt"] [data-kumo-part="surface"] {
+  border: 0;
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  box-shadow:
+    0 0 0 1px var(--mq-pop-ring),
+    var(--mq-pop-shadow);
+}
+
+[data-theme="mailquilt"] [data-kumo-part="surface"] [data-kumo-part="close"] {
+  display: none;
+}
+
+/* The "done" mark: the logo's block settling just above its dashed slot. */
+.mq-done-block {
+  position: relative;
+  width: 1.125rem;
+  height: 1.125rem;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.mq-done-block::before,
+.mq-done-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+}
+
+.mq-done-block::before {
+  border: 1.5px dashed var(--mq-logo-slot);
+}
+
+.mq-done-block::after {
+  background: var(--mq-block-ink);
+  transform: translate(3px, -3px);
+  transition: transform 500ms var(--ease-out-strong) 120ms;
+}
+
+@starting-style {
+  .mq-done-block::after {
+    transform: translate(0, 0);
+  }
+}
+
+/* Kumo's warning banner, readable in light mode (WCAG 1.4.3): text, icon and its action's ring. */
+:root[data-theme="mailquilt"]:not([data-mode="dark"]) .bg-kumo-warning-tint {
+  --text-color-kumo-warning: var(--mq-warning-text);
+  --color-kumo-warning: var(--mq-warning-text);
+}
+
+/* Banner messages never end on one word. */
+.bg-kumo-warning-tint,
+.bg-kumo-danger-tint,
+.bg-kumo-info-tint {
+  text-wrap: pretty;
+}
+
+/* ---------- Empty, didn't load and loading: one pattern on every page ---------- */
+
+/* Kumo's Empty without its own box: it sits on the page, where the rows would be. */
+.mq-state {
+  padding: 4.5rem 1.5rem 5rem;
+}
+
+.mq-state > * {
+  margin-inline: auto;
+  border: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.mq-state p {
+  text-wrap: pretty;
+}
+
+/* The patch loader: nothing for 300ms, so a quick answer never flashes it; then four blocks fill in turn. */
+.mq-loader {
+  opacity: 0;
+  animation: mq-appear 200ms ease 300ms forwards;
+}
+
+.mq-loader-patch {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px;
+}
+
+.mq-loader-patch i {
+  display: block;
+  border-radius: 3px;
+  background: var(--color-kumo-brand);
+  animation: mq-piece 1200ms cubic-bezier(0.77, 0, 0.175, 1) infinite;
+}
+
+.mq-loader-patch i:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.mq-loader-patch i:nth-child(4) {
+  animation-delay: 300ms;
+}
+
+.mq-loader-patch i:nth-child(3) {
+  animation-delay: 450ms;
+}
+
+@keyframes mq-piece {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+
+  40%,
+  60% {
+    opacity: 1;
+  }
+}
+
+@keyframes mq-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+/* What arrives after its place is drawn, such as a count, fades in rather than popping. */
+.mq-fade-in {
+  animation: mq-appear-from-nothing 180ms ease both;
+}
+
+@keyframes mq-appear-from-nothing {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mq-fade-in {
+    animation: none;
+  }
+
+  .mq-loader-patch i {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  .mq-done-block::after {
+    transition: none;
   }
 }
