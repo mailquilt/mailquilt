@@ -179,7 +179,7 @@ export const useCreateOrganization = () => {
   return useMutation({
     mutationFn: (name: string) =>
       callApi((client) => client.organizations.create({ payload: { name } })),
-    onSuccess: async (created) => {
+    onSuccess: (created) => {
       queryClient.setQueryData<readonly Organization[]>(
         queryKey,
         (organizations = []) => [...organizations, created]
@@ -190,7 +190,8 @@ export const useCreateOrganization = () => {
         []
       );
       choose(created.id);
-      await queryClient.invalidateQueries({ queryKey });
+      // WARNING: don't await the reload, or the dialog stays busy, and can't be closed, after the Organization already exists.
+      void queryClient.invalidateQueries({ queryKey });
     },
   });
 };

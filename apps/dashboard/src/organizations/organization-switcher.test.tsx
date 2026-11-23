@@ -1,12 +1,31 @@
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { OrganizationSwitcher } from "./organization-switcher.tsx";
 import { ACME, BOLT, renderWithOrganizations } from "./test-organizations.tsx";
 
 const api = setupServer();
+
+const openNewOrganization = async () => {
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: "Organization: Acme Newsletter, Owner",
+    })
+  );
+  fireEvent.click(
+    await screen.findByRole("menuitem", { name: "New organization" })
+  );
+};
 
 describe("organization switcher", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
@@ -112,6 +131,94 @@ describe("organization switcher", () => {
       ).resolves.toBeDefined();
     }
   );
+
+  it("holds the dialog open, showing progress, while the organization is created", async () => {
+    let answer = false;
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.post("*/api/organizations", async () => {
+        await vi.waitUntil(() => answer, { timeout: 5000 });
+
+        return HttpResponse.json(BOLT, { status: 201 });
+      })
+    );
+
+    renderWithOrganizations(<OrganizationSwitcher />);
+    await openNewOrganization();
+    fireEvent.change(await screen.findByLabelText("Organization name"), {
+      target: { value: "Bolt Weekly" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create organization" })
+    );
+
+    const dialog = await screen.findByRole("dialog");
+
+    await expect
+      .poll(() => screen.getByRole("button", { name: /Create organization/u }))
+      .toHaveProperty("disabled", true);
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(screen.getByRole("dialog")).toBe(dialog);
+
+    answer = true;
+
+    await expect(
+      screen.findByText("Created Bolt Weekly")
+    ).resolves.toBeDefined();
+  });
+
+  it("closes the dialog once the organization exists, without waiting for the list to reload", async () => {
+    let organizations: readonly (typeof ACME | typeof BOLT)[] = [ACME];
+    let lists = 0;
+    let reloaded = false;
+    api.use(
+      http.get("*/api/organizations", async () => {
+        lists += 1;
+
+        if (lists > 1) {
+          await vi.waitUntil(() => reloaded, { timeout: 5000 });
+        }
+
+        return HttpResponse.json(organizations);
+      }),
+      http.post("*/api/organizations", () => {
+        organizations = [ACME, BOLT];
+
+        return HttpResponse.json(BOLT, { status: 201 });
+      })
+    );
+
+    renderWithOrganizations(<OrganizationSwitcher />);
+    await openNewOrganization();
+    fireEvent.change(await screen.findByLabelText("Organization name"), {
+      target: { value: "Bolt Weekly" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create organization" })
+    );
+
+    await expect(
+      screen.findByText("Created Bolt Weekly")
+    ).resolves.toBeDefined();
+
+    reloaded = true;
+  });
+
+  it("keeps what was typed when the screen turns between phone and desktop widths", async () => {
+    api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
+
+    renderWithOrganizations(<OrganizationSwitcher />);
+    await openNewOrganization();
+    fireEvent.change(await screen.findByLabelText("Organization name"), {
+      target: { value: "Bolt Weekly" },
+    });
+
+    window.happyDOM?.setViewport({ height: 390, width: 390 });
+
+    await expect
+      .poll(() => screen.queryByLabelText("Organization name"))
+      .toHaveProperty("value", "Bolt Weekly");
+  });
 
   it("puts the cursor in the name field when the desktop dialog opens", async () => {
     api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
