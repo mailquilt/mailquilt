@@ -17,7 +17,7 @@ import {
 import type { RowSelectionState } from "@tanstack/react-table";
 import { Array as Arr } from "effect";
 import type { DateTime } from "effect";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
@@ -345,31 +345,56 @@ const Pager = ({
 }) => {
   const { next, previous } = page;
   const current = previous === null ? 1 : 2;
+  const pager = useRef<HTMLDivElement>(null);
+  const pressed = useRef(false);
+
+  // WARNING: Kumo's arrows are plain disabled buttons. Reaching the first or last page turns off the arrow just pressed, and the browser drops focus to the page, so focus moves to the other arrow.
+  useEffect(() => {
+    const focused = document.activeElement;
+
+    const lostFocus =
+      focused === document.body ||
+      (focused instanceof HTMLButtonElement &&
+        focused.disabled &&
+        pager.current?.contains(focused) === true);
+
+    if (pressed.current && lostFocus) {
+      pager.current
+        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
+        ?.focus();
+    }
+
+    pressed.current = false;
+  }, [page]);
 
   return (
-    <Pagination
-      hasNextPage={next !== null}
-      labels={{ navigation: "Pages of contacts" }}
-      page={current}
-      setPage={(asked) => {
-        if (loading) {
-          return;
-        }
+    <div ref={pager}>
+      <Pagination
+        hasNextPage={next !== null}
+        labels={{ navigation: "Pages of contacts" }}
+        page={current}
+        setPage={(asked) => {
+          if (loading) {
+            return;
+          }
 
-        if (asked < current && previous !== null) {
-          onPage({ before: previous });
-        } else if (asked > current && next !== null) {
-          onPage({ after: next });
-        }
-      }}
-    >
-      <Pagination.Info className="tabular-nums">
-        {() =>
-          `${formatCount(page.start + 1)}–${formatCount(page.start + page.contacts.length)} of ${formatCount(page.total)}`
-        }
-      </Pagination.Info>
-      <Pagination.Controls controls="simple" />
-    </Pagination>
+          pressed.current = true;
+
+          if (asked < current && previous !== null) {
+            onPage({ before: previous });
+          } else if (asked > current && next !== null) {
+            onPage({ after: next });
+          }
+        }}
+      >
+        <Pagination.Info className="tabular-nums">
+          {() =>
+            `${formatCount(page.start + 1)}–${formatCount(page.start + page.contacts.length)} of ${formatCount(page.total)}`
+          }
+        </Pagination.Info>
+        <Pagination.Controls controls="simple" />
+      </Pagination>
+    </div>
   );
 };
 

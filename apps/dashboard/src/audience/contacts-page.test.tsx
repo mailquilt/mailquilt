@@ -60,6 +60,7 @@ const page = (
     total: number;
     next: string | null;
     previous: string | null;
+    start: number;
   }> = {}
 ) => ({
   contacts,
@@ -254,6 +255,29 @@ describe("contacts page", () => {
     await delay(50);
 
     expect(pagesAsked).toBe(1);
+  });
+
+  it("keeps keyboard focus on the pager when the last page turns Next off", async () => {
+    api.use(
+      http.get("*/api/organizations/:organizationId/contacts", ({ request }) =>
+        HttpResponse.json(
+          new URL(request.url).searchParams.has("after")
+            ? page([ALAN], { previous: ALAN.id, start: 50, total: 51 })
+            : page([ADA], { next: ADA.id, total: 51 })
+        )
+      ),
+      ...audience()
+    );
+
+    renderWithOrganizations(<PagingContacts />);
+
+    const next = await screen.findByRole("button", { name: "Next page" });
+    next.focus();
+    fireEvent.click(next);
+
+    await expect
+      .poll(() => document.activeElement?.getAttribute("aria-label"))
+      .toBe("Previous page");
   });
 
   it("starts a new contact on the list the table is filtered by", async () => {
