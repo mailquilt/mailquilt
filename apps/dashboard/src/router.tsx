@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 
+import { Crash } from "./layout/crash.tsx";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
@@ -9,6 +10,7 @@ export const getRouter = () => {
   const router = createTanStackRouter({
     routeTree,
     scrollRestoration: true,
+    defaultErrorComponent: Crash,
     defaultPreload: "intent",
     defaultPreloadStaleTime: 0,
     Wrap: ({ children }) => (

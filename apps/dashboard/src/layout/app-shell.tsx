@@ -26,6 +26,7 @@ import {
   useOrganizationsStatus,
 } from "../organizations/organizations.tsx";
 import { useProviderConnections } from "../providers/providers-api.ts";
+import { CrashPlaceContext } from "./crash-place.ts";
 import { useAccount } from "./session-gates.tsx";
 
 type CountedPage = "contacts" | "lists" | "providers";
@@ -358,7 +359,9 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <PageWrap>
         <FrameBar />
         <main className="mq-page" id="main" tabIndex={-1}>
-          {status === "failed" ? <OrganizationsUnavailable /> : children}
+          <CrashPlaceContext value="page">
+            {status === "failed" ? <OrganizationsUnavailable /> : children}
+          </CrashPlaceContext>
         </main>
       </PageWrap>
     </Sidebar.Provider>
