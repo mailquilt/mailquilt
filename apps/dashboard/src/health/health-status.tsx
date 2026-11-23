@@ -18,7 +18,7 @@ const healthQuery = queryOptions({
 const PROBLEMS = {
   api: {
     description:
-      "Changes won’t save until it’s back. This clears by itself once it answers.",
+      "Nothing loads or saves until it’s back. This clears by itself once it answers.",
     title: "Can’t reach the Mailquilt API",
   },
   database: {
