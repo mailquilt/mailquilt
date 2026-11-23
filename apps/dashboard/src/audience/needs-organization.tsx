@@ -1,6 +1,6 @@
 import { LinkButton } from "@cloudflare/kumo";
 
-import { PageColumn } from "../layout/page-column.tsx";
+import { PageFrame } from "../layout/page-frame.tsx";
 
 /** In place of an audience page before the person has an Organization. */
 export const NeedsOrganization = ({
@@ -10,15 +10,17 @@ export const NeedsOrganization = ({
   description?: string;
   title: string;
 }) => (
-  <PageColumn>
-    <div className="flex max-w-[34rem] flex-col gap-3">
-      <h1 className="font-display text-display font-semibold text-kumo-strong">
-        {title}
-      </h1>
-      <p className="text-base text-(--mq-body)">{description}</p>
+  <PageFrame>
+    <div className="mq-capped">
+      <div className="flex max-w-[34rem] flex-col gap-3">
+        <h1 className="font-display text-display font-semibold text-kumo-strong">
+          {title}
+        </h1>
+        <p className="text-base text-(--mq-body)">{description}</p>
+      </div>
+      <LinkButton className="mt-6" href="/" variant="primary">
+        Go to Home
+      </LinkButton>
     </div>
-    <LinkButton className="mt-6" href="/" variant="primary">
-      Go to Home
-    </LinkButton>
-  </PageColumn>
+  </PageFrame>
 );
