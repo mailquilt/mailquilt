@@ -1,11 +1,46 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
+import { Predicate } from "effect";
 
+import { authClient } from "./auth/auth-client.ts";
 import { Crash } from "./layout/crash.tsx";
 import { routeTree } from "./routeTree.gen";
 
+const RETRIES = 3;
+
+const sessionEnded = (error: Error) =>
+  Predicate.isTagged(error, "SignInRequired");
+
+const checkSessionIfEnded = (error: Error) => {
+  if (sessionEnded(error)) {
+    authClient.$store.notify("$sessionSignal");
+  }
+};
+
+/**
+ * The dashboard's one query client. A request the API refuses with
+ * `SignInRequired` isn't retried, and has the session checked again, so a
+ * session that ended anywhere sends the person to sign in through
+ * `SignedInOnly` instead of leaving a page or form to report a failure.
+ */
+export const createQueryClient = () =>
+  new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: (failures, error) => !sessionEnded(error) && failures < RETRIES,
+      },
+    },
+    mutationCache: new MutationCache({ onError: checkSessionIfEnded }),
+    queryCache: new QueryCache({ onError: checkSessionIfEnded }),
+  });
+
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  const queryClient = createQueryClient();
 
   const router = createTanStackRouter({
     routeTree,

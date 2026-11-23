@@ -1,5 +1,10 @@
 import { Sidebar } from "@cloudflare/kumo";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+  useQuery,
+} from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -19,9 +24,11 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { callApi } from "../api.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { authClient } from "../auth/auth-client.ts";
 import { SignInForm } from "../auth/sign-in-form.tsx";
+import { createQueryClient } from "../router.tsx";
 import { SignedInOnly, SignedOutOnly, useAccount } from "./session-gates.tsx";
 
 const api = setupServer();
@@ -42,6 +49,30 @@ const Home = () => {
   );
 };
 
+const Organizations = () => {
+  const list = useQuery({
+    queryFn: ({ signal }) =>
+      callApi((client) => client.organizations.list(), signal),
+    queryKey: ["organizations"],
+  });
+
+  const create = useMutation({
+    mutationFn: () =>
+      callApi((client) =>
+        client.organizations.create({ payload: { name: "Acme Weekly" } })
+      ),
+  });
+
+  return (
+    <>
+      <p>{list.isSuccess ? "Organizations loaded" : "Loading organizations"}</p>
+      <button onClick={() => create.mutate()} type="button">
+        Create organization
+      </button>
+    </>
+  );
+};
+
 const renderAt = (path: string, queryClient = new QueryClient()) => {
   const root = createRootRoute({ component: Outlet });
 
@@ -56,6 +87,15 @@ const renderAt = (path: string, queryClient = new QueryClient()) => {
         ),
         getParentRoute: () => root,
         path: "/",
+      }),
+      createRoute({
+        component: () => (
+          <SignedInOnly>
+            <Organizations />
+          </SignedInOnly>
+        ),
+        getParentRoute: () => root,
+        path: "/organizations",
       }),
       createRoute({
         component: () => (
@@ -181,6 +221,45 @@ describe("session gates", () => {
     ).resolves.toBeDefined();
     expect(queryClient.getQueryData(["organizations"])).toBeUndefined();
   });
+
+  it.each([
+    { listed: false, request: "a page's load" },
+    { listed: true, request: "a save" },
+  ])(
+    "sends the person to sign in when $request finds their session has ended",
+    async ({ listed }) => {
+      let signedIn = true;
+
+      const sessionEnded = () => {
+        signedIn = false;
+
+        return HttpResponse.json({ _tag: "SignInRequired" }, { status: 401 });
+      };
+
+      api.use(
+        http.get("*/api/auth/get-session", () =>
+          HttpResponse.json(signedIn ? SESSION : null)
+        ),
+        http.get("*/api/organizations", () =>
+          listed ? HttpResponse.json([]) : sessionEnded()
+        ),
+        http.post("*/api/organizations", sessionEnded)
+      );
+
+      renderAt("/organizations", createQueryClient());
+
+      if (listed) {
+        await screen.findByText("Organizations loaded");
+        fireEvent.click(
+          screen.getByRole("button", { name: "Create organization" })
+        );
+      }
+
+      await expect(
+        screen.findByRole("button", { name: "Sign in" })
+      ).resolves.toBeDefined();
+    }
+  );
 
   it("offers a retry instead of signing the person out when the session check fails", async () => {
     let available = false;
