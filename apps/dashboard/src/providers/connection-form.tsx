@@ -53,18 +53,18 @@ const WHOLE_NUMBER = /^\d+$/u;
 
 const ENCRYPTION = [
   {
-    description: "Port 587. Your provider may call this TLS.",
+    description: "Usually port 587. Your provider may call this TLS.",
     label: "STARTTLS",
     value: "starttls",
   },
   {
-    description: "Port 465. Your provider may call this SSL.",
+    description: "Usually port 465. Your provider may call this SSL.",
     label: "TLS",
     value: "tls",
   },
   {
     description:
-      "Port 25. Not encrypted, so only for a relay on your own network.",
+      "Usually port 25. Not encrypted, so only for a relay on your own network.",
     label: "None",
     value: "none",
   },
