@@ -314,6 +314,17 @@ const PageWrap = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+const SkipLink = () => {
+  const { isMobile, openMobile } = useSidebar();
+
+  // WARNING: the skip link sits outside the page it skips to, so it has to go inert with the page while the full-screen navigation covers it, or Tab from the account menu wraps to it and leaves focus nowhere.
+  return (
+    <a className="mq-skip" href="#main" inert={isMobile && openMobile}>
+      Skip to content
+    </a>
+  );
+};
+
 /**
  * Everything a signed-in person sees: the page set as one light block into
  * the plain ink frame. The frame holds the logo, the Organization, the
@@ -332,9 +343,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       mobileBreakpoint={1024}
       variant="inset"
     >
-      <a className="mq-skip" href="#main">
-        Skip to content
-      </a>
+      <SkipLink />
       <Sidebar className="mq-frame" fullScreenOnMobile>
         <Sidebar.Header className="mq-frame-head">
           <FrameHeader />

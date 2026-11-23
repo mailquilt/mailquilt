@@ -162,6 +162,27 @@ describe("app shell", () => {
     await expect.poll(() => menu.getAttribute("aria-expanded")).toBe("false");
   });
 
+  it("keeps Skip to content out of reach while the full-screen navigation covers the page", async () => {
+    window.happyDOM?.setViewport({ height: 844, width: 390 });
+    api.use(...signedIn, ...quietOrganization);
+
+    renderShell();
+
+    const menu = await screen.findByRole(
+      "button",
+      { name: "Open navigation" },
+      { timeout: 3000 }
+    );
+
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+
+    expect(skip.closest("[inert]")).toBeNull();
+
+    fireEvent.click(menu);
+
+    await expect.poll(() => skip.closest("[inert]")).not.toBeNull();
+  });
+
   it("gives focus back to the menu button when the navigation's Close button closes it", async () => {
     window.happyDOM?.setViewport({ height: 844, width: 390 });
     api.use(...signedIn, ...quietOrganization);
