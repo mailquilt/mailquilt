@@ -1,4 +1,5 @@
 import { Banner, Button } from "@cloudflare/kumo";
+import { WarningIcon } from "@phosphor-icons/react";
 import { Navigate, useNavigate } from "@tanstack/react-router";
 import { Predicate } from "effect";
 
@@ -43,6 +44,7 @@ export const SetupPage = () => {
         <div className="flex flex-col gap-5">
           <Banner
             description="If it was you in another tab, sign in. Otherwise, ask the person who deployed this Mailquilt."
+            icon={<WarningIcon />}
             role="alert"
             title="Someone else just finished setup."
             variant="alert"
@@ -50,7 +52,6 @@ export const SetupPage = () => {
           <Button
             className="w-full justify-center"
             onClick={() => goToSignIn({ justSetUp: false })}
-            size="lg"
             variant="primary"
           >
             Sign in
@@ -79,7 +80,7 @@ export const SetupPage = () => {
             problem={setUp.isError ? UNREACHABLE_MESSAGE : null}
             submitLabel="Create admin account"
           />
-          <p className="mt-7 text-base text-kumo-subtle">
+          <p className="mt-5 text-base text-pretty text-kumo-subtle">
             Whoever finishes setup first becomes the admin, so finish it now.
           </p>
         </>

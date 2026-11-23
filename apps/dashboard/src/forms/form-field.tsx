@@ -33,7 +33,7 @@ export const FormField = ({
   description,
   field,
   label,
-  size = "lg",
+  size,
   ...inputProps
 }: InputProps & {
   addon?: React.ReactNode;

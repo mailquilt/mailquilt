@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { SetupSteps, useSetupProgress } from "../../home/setup-steps.tsx";
-import { PageColumn } from "../../layout/page-column.tsx";
+import { PageFrame } from "../../layout/page-frame.tsx";
 import { PageAreaLoading } from "../../layout/page-states.tsx";
 import { useAccount } from "../../layout/session-gates.tsx";
 
@@ -16,21 +16,21 @@ const Home = () => {
   }
 
   return (
-    <PageColumn>
-      <header className="mb-11 flex flex-col gap-4">
-        <p className="text-base text-kumo-subtle">
-          Welcome to Mailquilt, {firstName(account.name)}.
+    <PageFrame>
+      <div className="mx-auto max-w-[40rem] pt-6 max-sm:pt-1">
+        <p className="mb-3 text-base text-kumo-subtle">
+          Welcome, {firstName(account.name)}.
         </p>
-        <h1 className="font-display text-display-xl font-semibold text-balance text-kumo-strong">
-          Your first campaign, in five steps.
+        <h1 className="font-display text-display-lg font-semibold text-balance text-kumo-strong max-sm:text-3xl max-sm:leading-8.5">
+          Your first campaign <span className="mq-tone">in five steps</span>
         </h1>
-        <p className="max-w-[34rem] text-base text-(--mq-body)">
+        <p className="mt-3.5 max-w-[36rem] text-base text-pretty text-(--mq-body)">
           Work down the list in order. What you’ll need for each step is noted,
           so you can gather it now.
         </p>
-      </header>
-      <SetupSteps />
-    </PageColumn>
+        <SetupSteps />
+      </div>
+    </PageFrame>
   );
 };
 

@@ -21,6 +21,9 @@
   --text-display-xl--line-height: 1;
   --text-display-lg: 2.5rem;
   --text-display-lg--line-height: 1.05;
+  /* A signed-out page's title on phones. */
+  --text-display-md: 2rem;
+  --text-display-md--line-height: 1.125;
   --text-display: 1.75rem;
   --text-display--line-height: 1.12;
   --text-display-sm: 1.25rem;
@@ -560,7 +563,12 @@ aside.mq-frame {
   }
 }
 
-/* Waiting for what the frame needs: already on its ink, with a light loader. */
+/* Every signed-out page: the quilt's sashing shows through the seam around the light block. */
+.mq-auth {
+  background: var(--mq-quilt-sashing);
+}
+
+/* A whole-page wait: already on the ink every page arrives on, with a light loader. */
 .mq-frame-loading {
   --color-kumo-brand: var(--mq-frame-text);
   background: var(--mq-frame);
@@ -912,6 +920,19 @@ aside.mq-frame {
 @keyframes mq-appear {
   to {
     opacity: 1;
+  }
+}
+
+/* Home's next step lifts off its slot once, a moment after the page opens: the one lift. */
+@media (prefers-reduced-motion: no-preference) {
+  .mq-lift {
+    animation: mq-lift 640ms var(--ease-out-strong) 260ms both;
+  }
+}
+
+@keyframes mq-lift {
+  from {
+    translate: 0 0;
   }
 }
 

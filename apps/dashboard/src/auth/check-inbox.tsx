@@ -101,7 +101,6 @@ const ResendLink = ({ email }: { email: string }) => {
         disabled={waiting}
         loading={send.isPending}
         onClick={() => send.mutate(email, { onSettled: countdown.restart })}
-        size="lg"
         variant="secondary"
       >
         {waiting
@@ -125,7 +124,6 @@ const Sent = ({ email }: { email: string }) => {
           className="w-full justify-center"
           href={inbox.url(email)}
           rel="noopener noreferrer"
-          size="lg"
           target="_blank"
           variant="primary"
         >

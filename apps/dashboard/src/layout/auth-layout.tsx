@@ -27,14 +27,16 @@ const CostLabelAtSesListPrice = () => (
 );
 
 /**
- * Every signed-out page: the form on the left, and the Flying Geese quilt on
- * the right with the cost label sewn on. Phones get a band of the quilt.
+ * Every signed-out page: one light block, the same one signed-in pages sit
+ * in, set into the Flying Geese quilt with the frame's 8px seam, and the
+ * form centred in it. The cost label is sewn onto the quilt beside it.
+ * Phones and tablets get a band of the quilt above the block.
  */
 export const AuthLayout = ({ children }: { children: React.ReactNode }) => (
-  <div className="grid min-h-svh grid-rows-[auto_minmax(0,1fr)] bg-kumo-base lg:grid-cols-2 lg:grid-rows-1 xl:grid-cols-[minmax(0,37.5rem)_minmax(0,1fr)]">
-    <FlyingGeeseQuilt className="h-20 w-full lg:hidden" />
-    <div className="flex flex-col px-6 pt-10 pb-8 lg:px-18 lg:pt-12">
-      <div className="mx-auto flex w-full max-w-auth-form flex-1 flex-col lg:mx-0">
+  <div className="mq-auth grid min-h-svh grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[minmax(0,37.5rem)_minmax(0,1fr)] lg:grid-rows-1">
+    <FlyingGeeseQuilt className="h-24 w-full sm:h-40 lg:hidden" />
+    <div className="relative z-1 -mt-3 flex flex-col rounded-t-xl bg-kumo-base px-5 pt-9 pb-7 sm:mx-2 sm:px-10 lg:m-2 lg:mr-0 lg:rounded-xl lg:px-18 lg:pt-12">
+      <div className="mx-auto flex w-full max-w-auth-form flex-1 flex-col">
         <header>
           <Link
             aria-label="Mailquilt home"
@@ -44,7 +46,7 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => (
             <MailquiltLogo className="h-7 w-auto" />
           </Link>
         </header>
-        <main className="flex flex-1 items-start pt-14 pb-14 lg:items-center lg:py-12">
+        <main className="flex flex-1 items-start pt-12 pb-12 lg:items-center">
           <div className="w-full">
             <HealthStatus bannerClassName="mb-8" />
             {children}
@@ -65,7 +67,7 @@ export const AuthLayout = ({ children }: { children: React.ReactNode }) => (
     </div>
     <aside className="relative hidden overflow-hidden lg:block">
       <FlyingGeeseQuilt className="absolute inset-0 size-full" />
-      <div className="absolute right-10 bottom-14 left-10">
+      <div className="absolute right-10 bottom-14 left-10 flex justify-end">
         <CostLabelAtSesListPrice />
       </div>
     </aside>
@@ -80,12 +82,12 @@ export const AuthHeading = ({
   children: React.ReactNode;
   description?: React.ReactNode;
 }) => (
-  <div className="mb-9 flex flex-col gap-3">
-    <h1 className="font-display text-display-lg font-semibold text-balance text-kumo-strong">
+  <div className="mb-8 flex flex-col gap-3">
+    <h1 className="font-display text-display-lg font-semibold text-balance text-kumo-strong max-sm:text-display-md">
       {children}
     </h1>
     {description ? (
-      <p className="text-base text-kumo-subtle">{description}</p>
+      <p className="text-base text-pretty text-kumo-subtle">{description}</p>
     ) : null}
   </div>
 );

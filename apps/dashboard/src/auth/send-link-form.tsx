@@ -61,7 +61,6 @@ export const SendLinkForm = ({
       <Button
         className="w-full justify-center"
         loading={send.isPending}
-        size="lg"
         type="submit"
         variant="primary"
       >

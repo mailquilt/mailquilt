@@ -68,7 +68,6 @@ export const CreateOrganizationForm = ({
               label="Organization name"
               placeholder="Acme Weekly"
               ref={fieldRef}
-              size={layout === "step" ? "lg" : "base"}
             />
           )}
         </form.Field>
@@ -77,7 +76,6 @@ export const CreateOrganizationForm = ({
             <Button
               className="w-full justify-center sm:w-auto"
               loading={create.isPending}
-              size="lg"
               type="submit"
               variant="primary"
             >

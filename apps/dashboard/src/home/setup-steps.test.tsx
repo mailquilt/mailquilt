@@ -117,6 +117,22 @@ describe("setup steps", () => {
     ).toBeNull();
   });
 
+  it("points to contacts and lists while the next step isn't built yet", async () => {
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK]))
+    );
+
+    renderWithOrganizations(<SetupSteps />);
+
+    const contacts = await screen.findByRole("link", { name: "add contacts" });
+
+    expect(contacts.getAttribute("href")).toBe("/contacts");
+    expect(
+      screen.getByRole("link", { name: "make lists" }).getAttribute("href")
+    ).toBe("/lists");
+  });
+
   it("says the setup didn't load, rather than guessing the next step", async () => {
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),

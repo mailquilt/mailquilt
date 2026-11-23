@@ -5,14 +5,13 @@ import { PatchLoader } from "./empty-state.tsx";
 
 /**
  * The whole page while what it needs is still loading. Pages wait here
- * rather than drawing a guess and changing it a moment later. `onFrame`
- * draws it on the frame's ink, for a wait that only ever leads to the
- * signed-in frame, so the frame's arrival changes nothing on screen.
+ * rather than drawing a guess and changing it a moment later. It is drawn on
+ * the frame's ink, because every page it leads to is ink around a light
+ * block (the signed-in frame, or the quilt on signed-out pages), so the first
+ * load never flashes white.
  */
-export const PageLoading = ({ onFrame = false }: { onFrame?: boolean }) => (
-  <div
-    className={`flex min-h-svh items-center justify-center ${onFrame ? "mq-frame-loading" : "bg-kumo-base"}`}
-  >
+export const PageLoading = () => (
+  <div className="mq-frame-loading flex min-h-svh items-center justify-center">
     <output aria-label="Loading">
       <PatchLoader />
     </output>
@@ -47,7 +46,6 @@ export const PageLoadFailed = ({
     <Button
       className="w-full justify-center"
       onClick={onRetry}
-      size="lg"
       variant="primary"
     >
       Try again

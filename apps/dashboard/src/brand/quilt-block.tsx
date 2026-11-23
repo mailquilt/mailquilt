@@ -22,16 +22,20 @@ export const QuiltSlot = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export type StepState = "done" | "next" | "later";
+export type StepState = "done" | "next" | "waiting" | "later";
 
 const BLOCK =
-  "flex size-10 items-center justify-center rounded-quilt font-display text-base font-semibold";
+  "absolute inset-0 flex items-center justify-center rounded-quilt font-display text-base font-semibold";
+
+const SLOT =
+  "absolute inset-0 rounded-quilt-slot border-2 border-dashed border-(--mq-logo-slot)";
 
 /**
  * A setup step as a block of the logo. Done is a solid ink block with a
- * check; next is the orange envelope block lifted off its dashed slot, as in
- * the logo; later is a quiet grey block. Decorative: the step's text says
- * the same in words.
+ * check; next is the orange envelope block, which lifts off its dashed slot
+ * once (already lifted with reduced motion); a next step that isn't built
+ * yet is only its slot; later is a quiet grey block. Decorative: the step's
+ * text says the same in words.
  */
 export const StepBlock = ({
   number,
@@ -40,36 +44,39 @@ export const StepBlock = ({
   number: number;
   state: StepState;
 }) => {
+  let mark: React.ReactNode = (
+    <span className={`${BLOCK} bg-kumo-tint text-kumo-subtle`}>{number}</span>
+  );
+
   if (state === "done") {
-    return (
-      <span
-        aria-hidden="true"
-        className={`${BLOCK} bg-(--mq-block-ink) text-kumo-inverse`}
-      >
+    mark = (
+      <span className={`${BLOCK} bg-(--mq-block-ink) text-kumo-inverse`}>
         <CheckIcon className="size-5" weight="bold" />
       </span>
     );
-  }
-
-  if (state === "next") {
-    return (
-      <span aria-hidden="true" className="relative block size-10">
-        <span className="absolute inset-0 rounded-quilt-slot border-2 border-dashed border-(--mq-logo-slot)" />
+  } else if (state === "next") {
+    mark = (
+      <>
+        <span className={SLOT} />
         <span
-          className={`${BLOCK} absolute inset-0 translate-x-1.5 -translate-y-1.5 bg-(--mq-accent) text-white`}
+          className={`${BLOCK} mq-lift translate-x-1.5 -translate-y-1.5 bg-(--mq-accent) text-white`}
         >
           {number}
         </span>
-      </span>
+      </>
+    );
+  } else if (state === "waiting") {
+    mark = (
+      <>
+        <span className={SLOT} />
+        <span className={`${BLOCK} text-kumo-subtle`}>{number}</span>
+      </>
     );
   }
 
   return (
-    <span
-      aria-hidden="true"
-      className={`${BLOCK} bg-kumo-tint text-kumo-subtle`}
-    >
-      {number}
+    <span aria-hidden="true" className="relative block size-10 max-sm:size-8">
+      {mark}
     </span>
   );
 };

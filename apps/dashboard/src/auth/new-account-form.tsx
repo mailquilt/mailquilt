@@ -1,4 +1,5 @@
 import { Banner, Button } from "@cloudflare/kumo";
+import { WarningCircleIcon } from "@phosphor-icons/react";
 import {
   EmailAddress,
   MAX_PASSWORD_LENGTH,
@@ -54,7 +55,14 @@ export const NewAccountForm = ({
       noValidate
       onSubmit={(event) => submitForm(event, form)}
     >
-      {problem ? <Banner role="alert" title={problem} variant="error" /> : null}
+      {problem ? (
+        <Banner
+          icon={<WarningCircleIcon />}
+          role="alert"
+          title={problem}
+          variant="error"
+        />
+      ) : null}
       <form.Field name="name">
         {(field) => (
           <FormField
@@ -88,7 +96,6 @@ export const NewAccountForm = ({
       <Button
         aria-busy={busy}
         className="mt-1 w-full justify-center"
-        size="lg"
         type="submit"
         variant="primary"
       >
