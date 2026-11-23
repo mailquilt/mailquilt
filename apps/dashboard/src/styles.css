@@ -722,6 +722,8 @@ aside.mq-frame {
 /* One gutter for the whole page; edge-to-edge tables and rows line up with it. */
 .mq-page-body {
   --gutter: 2.5rem;
+  /* How wide a form's sections grow; the form's sticky foot lines up with it. */
+  --mq-form-width: 60rem;
   padding-inline: var(--gutter);
 }
 
@@ -1439,7 +1441,7 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
   display: grid;
   grid-template-columns: 16rem minmax(0, 35rem);
   gap: 1rem 3rem;
-  max-width: 60rem;
+  max-width: var(--mq-form-width);
   border-top: 1px solid var(--color-kumo-hairline);
   padding-block: 1.75rem;
 }
@@ -1459,7 +1461,10 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
 /*
  * Cancel and Connect stay in reach at the foot of a long form, across the
  * page block's full width. It reaches into PageFrame's bottom padding
- * (4rem, 3rem on phones), so it sits on the block's lower edge.
+ * (4rem, 3rem on phones), so it sits on the block's lower edge. Its
+ * contents stop where the form's sections do, so the buttons end on the
+ * dividers' right edge rather than at the far edge of a wide window: the end
+ * padding grows by however much the form (the 100%) is wider than them.
  */
 .mq-form-foot {
   position: sticky;
@@ -1475,6 +1480,9 @@ html[data-theme="mailquilt"]:has(.mq-selbar:not([data-leaving])) {
   border-radius: 0 0 0.75rem 0.75rem;
   background: color-mix(in srgb, var(--color-kumo-base) 92%, transparent);
   padding: 0.875rem var(--gutter);
+  padding-inline-end: calc(
+    var(--gutter) + max(0px, 100% - var(--mq-form-width))
+  );
   backdrop-filter: blur(8px);
 }
 
