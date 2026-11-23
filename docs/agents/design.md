@@ -66,7 +66,7 @@ Run this on every UI change, and explain each finding in plain words: what a use
    - Text contrast is at least 4.5:1; icons and borders at least 3:1.
    - Targets are at least 24 px.
    - Motion respects reduced motion. Decorative graphics are hidden from screen readers.
-3. **Responsive:** the widths above, with no sideways scroll. A page that reads as one column, such as a form, settings or Providers, is capped at the form width and centred on wide screens, never left-aligned with an empty gap on the right. Tables keep the page's full width.
+3. **Responsive:** the widths above, with no sideways scroll. A page that reads as one column, such as a form or settings, is capped at the form width and centred on wide screens, never left-aligned with an empty gap on the right. Table pages, such as Contacts, Lists and Providers, keep the page's full width.
 4. **Theming:** light and dark both use design tokens. No hard-coded colours or one-off sizes; add a token instead.
 5. **Reuse and structure:**
    - Repeated markup or logic becomes one component or hook.

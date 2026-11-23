@@ -1,6 +1,6 @@
 import { Button } from "@cloudflare/kumo";
 
-import { PageColumn } from "../layout/page-column.tsx";
+import { PageFrame } from "../layout/page-frame.tsx";
 import { useOrganizationsStatus } from "./organizations.tsx";
 
 /**
@@ -14,28 +14,30 @@ export const OrganizationsUnavailable = () => {
   const { retry, retrying } = useOrganizationsStatus();
 
   return (
-    <PageColumn>
-      <div className="flex max-w-[34rem] flex-col gap-3" role="alert">
-        <h1 className="font-display text-display font-semibold text-balance text-kumo-strong">
-          Your organizations didn’t load
-        </h1>
-        <p className="text-base text-(--mq-body)">
-          Nothing in your account has changed. Check your connection, then try
-          again.
-        </p>
+    <PageFrame>
+      <div className="mq-capped">
+        <div className="flex max-w-[34rem] flex-col gap-3" role="alert">
+          <h1 className="font-display text-display font-semibold text-balance text-kumo-strong">
+            Your organizations didn’t load
+          </h1>
+          <p className="text-base text-(--mq-body)">
+            Nothing in your account has changed. Check your connection, then try
+            again.
+          </p>
+        </div>
+        <Button
+          aria-disabled={retrying || undefined}
+          className="mt-6"
+          onClick={() => {
+            if (!retrying) {
+              retry();
+            }
+          }}
+          variant="primary"
+        >
+          {retrying ? "Trying again…" : "Try again"}
+        </Button>
       </div>
-      <Button
-        aria-disabled={retrying || undefined}
-        className="mt-6"
-        onClick={() => {
-          if (!retrying) {
-            retry();
-          }
-        }}
-        variant="primary"
-      >
-        {retrying ? "Trying again…" : "Try again"}
-      </Button>
-    </PageColumn>
+    </PageFrame>
   );
 };

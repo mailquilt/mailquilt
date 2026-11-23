@@ -104,8 +104,8 @@ describe("providers page", () => {
     ]);
     renderPage();
 
-    const postmark = await screen.findByRole("article", { name: "Postmark" });
-    const relay = screen.getByRole("article", { name: "Office relay" });
+    const postmark = await screen.findByRole("row", { name: /^Postmark/u });
+    const relay = screen.getByRole("row", { name: /^Office relay/u });
 
     expect(within(postmark).getByText("Acme News")).toBeTruthy();
     expect(postmark.textContent).toContain("news@acme.example");
@@ -366,7 +366,7 @@ describe("providers page", () => {
       "Mailquilt couldn’t confirm that Postmark was deleted. Try again."
     );
     expect(
-      screen.getByRole("article", { hidden: true, name: "Postmark" })
+      screen.getByRole("row", { hidden: true, name: /^Postmark/u })
     ).toBeTruthy();
   });
 
