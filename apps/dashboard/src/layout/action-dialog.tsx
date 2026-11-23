@@ -181,7 +181,7 @@ export const ActionDialog = ({
         onOpenChangeComplete={settle}
         open={open}
       >
-        <LayerDialog.Content size="sm" verticalAlign="center">
+        <LayerDialog.Content verticalAlign="center">
           <LayerDialog.Title>
             <span className="block font-display text-display-sm font-semibold text-balance text-kumo-strong">
               {title}
