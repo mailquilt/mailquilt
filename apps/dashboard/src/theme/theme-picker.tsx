@@ -54,7 +54,10 @@ export const ThemePicker = ({
 
   return (
     <DropdownMenu.Sub>
-      <DropdownMenu.SubTrigger icon={current.icon}>
+      <DropdownMenu.SubTrigger
+        aria-label={`Appearance: ${current.label}`}
+        icon={current.icon}
+      >
         <span className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
           Appearance <span className="text-kumo-subtle">{current.short}</span>
         </span>

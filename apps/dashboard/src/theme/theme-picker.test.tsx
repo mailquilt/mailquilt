@@ -14,7 +14,7 @@ declare global {
 
 const openAppearance = (current: string) =>
   fireEvent.click(
-    screen.getByRole("menuitem", { name: `Appearance ${current}` })
+    screen.getByRole("menuitem", { name: `Appearance: ${current}` })
   );
 
 const renderOpenMenu = () =>
@@ -58,7 +58,7 @@ describe("theme picker", () => {
 
   it("keeps the chosen theme after a reload, and shows it on the Appearance row", async () => {
     renderOpenMenu();
-    openAppearance("Device");
+    openAppearance("Match my device");
 
     fireEvent.click(await screen.findByRole("menuitemradio", { name: "Dark" }));
     reloadPage();
@@ -71,7 +71,7 @@ describe("theme picker", () => {
   it("follows the device setting only while matching the device is chosen", async () => {
     setDeviceColorScheme("dark");
     renderOpenMenu();
-    openAppearance("Device");
+    openAppearance("Match my device");
 
     fireEvent.click(
       await screen.findByRole("menuitemradio", { name: "Light" })
