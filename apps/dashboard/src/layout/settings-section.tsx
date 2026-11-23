@@ -3,7 +3,8 @@ import { useId } from "react";
 /**
  * One part of a settings or form page: what it's for on the left, its
  * fields on the right, a hairline between parts. One column below 1024px.
- * `footer`, such as a part's own Save button, sits under its fields.
+ * `footer`, such as a part's own Save button, sits under its fields at
+ * their right edge, as every form's and dialog's action does.
  */
 export const SettingsSection = ({
   about,
@@ -33,7 +34,9 @@ export const SettingsSection = ({
       </div>
       <div className="flex min-w-0 flex-col gap-5">
         {children}
-        {footer === undefined ? null : <div className="flex">{footer}</div>}
+        {footer === undefined ? null : (
+          <div className="flex justify-end">{footer}</div>
+        )}
       </div>
     </section>
   );

@@ -529,7 +529,7 @@ export const ConnectionForm = ({
         </form.Field>
         {failure}
         {nested ? (
-          <div className="flex">{submit}</div>
+          <div className="flex justify-end">{submit}</div>
         ) : (
           <div className="mq-form-end">
             <form.Subscribe
