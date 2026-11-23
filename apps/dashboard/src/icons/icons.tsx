@@ -59,18 +59,32 @@ const hugeicon = (icon: IconSvgElement, name: string) => {
       { alt, children, className, color, mirrored, size, weight, ...props },
       ref
     ) => {
-      const context = useContext(IconContext);
+      const {
+        className: contextClassName,
+        color: contextColor,
+        mirrored: contextMirrored,
+        size: contextSize,
+        weight: contextWeight,
+        ...contextProps
+      } = useContext(IconContext);
+
+      const classes = className ?? contextClassName;
 
       return (
         <HugeiconsIcon
+          {...contextProps}
           {...props}
           aria-hidden={alt ? undefined : true}
-          color={color ?? context.color ?? "currentColor"}
+          color={color ?? contextColor ?? "currentColor"}
           icon={icon}
           ref={ref}
-          size={size ?? context.size ?? "1em"}
-          strokeWidth={STROKE[weight ?? context.weight ?? "regular"]}
-          className={mirrored ? `${className ?? ""} -scale-x-100` : className}
+          size={size ?? contextSize ?? "1em"}
+          strokeWidth={STROKE[weight ?? contextWeight ?? "regular"]}
+          className={
+            mirrored || contextMirrored
+              ? `${classes ?? ""} -scale-x-100`
+              : classes
+          }
         >
           {alt ? <title>{alt}</title> : null}
           {children}
