@@ -95,9 +95,9 @@ export const AccountMenu = ({ account }: { account: Account }) => {
         ) : null}
         {account.instanceAdmin ? (
           <>
-            <DropdownMenu.LinkItem href="/instance" icon={GearSixIcon}>
+            <DropdownMenu.Item href="/instance" icon={GearSixIcon}>
               Instance settings
-            </DropdownMenu.LinkItem>
+            </DropdownMenu.Item>
             <DropdownMenu.Separator />
           </>
         ) : null}

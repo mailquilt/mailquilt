@@ -1,16 +1,24 @@
-import { Sidebar } from "@cloudflare/kumo";
+import { LinkProvider, Sidebar } from "@cloudflare/kumo";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  createMemoryHistory,
+  createRootRoute,
+  createRouter,
+  RouterProvider,
+} from "@tanstack/react-router";
 import {
   cleanup,
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { RouterLink } from "../layout/router-link.tsx";
 import { AccountMenu } from "./account-menu.tsx";
 
 const api = setupServer();
@@ -18,16 +26,30 @@ const api = setupServer();
 const renderAccountMenu = ({
   instanceAdmin = false,
   sidebarOpen = true,
-} = {}) =>
+} = {}) => {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routeTree: createRootRoute({
+      component: () => (
+        <LinkProvider component={RouterLink}>
+          <Sidebar.Provider defaultOpen={sidebarOpen}>
+            <AccountMenu
+              account={{ email: "ada@example.com", instanceAdmin, name: "Ada" }}
+            />
+          </Sidebar.Provider>
+        </LinkProvider>
+      ),
+    }),
+  });
+
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <Sidebar.Provider defaultOpen={sidebarOpen}>
-        <AccountMenu
-          account={{ email: "ada@example.com", instanceAdmin, name: "Ada" }}
-        />
-      </Sidebar.Provider>
+      <RouterProvider router={router} />
     </QueryClientProvider>
   );
+
+  return router;
+};
 
 describe("account menu", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
@@ -38,24 +60,28 @@ describe("account menu", () => {
 
   afterAll(() => api.close());
 
-  it("offers Instance settings to the instance admin only", async () => {
+  it("offers Instance settings to the instance admin only, without reloading the app", async () => {
     renderAccountMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
 
     expect(
       within(await screen.findByRole("menu")).queryByText("Instance settings")
     ).toBeNull();
 
     cleanup();
-    renderAccountMenu({ instanceAdmin: true });
-    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    const router = renderAccountMenu({ instanceAdmin: true });
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", { name: "Instance settings" })
+    );
 
-    expect(
-      within(await screen.findByRole("menu"))
-        .getByText("Instance settings")
-        .closest("a")
-        ?.getAttribute("href")
-    ).toBe("/instance");
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/instance")
+    );
   });
 
   it("signs the person out", async () => {
@@ -70,7 +96,9 @@ describe("account menu", () => {
     );
 
     renderAccountMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 
     await expect.poll(() => signedOut).toBe(true);
@@ -78,7 +106,9 @@ describe("account menu", () => {
 
   it("names who is signed in only when the collapsed sidebar hides it", async () => {
     renderAccountMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
 
     expect(
       within(await screen.findByRole("menu")).queryByText("ada@example.com")
@@ -86,7 +116,9 @@ describe("account menu", () => {
 
     cleanup();
     renderAccountMenu({ sidebarOpen: false });
-    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
 
     expect(
       within(await screen.findByRole("menu")).getByText("ada@example.com")
@@ -101,7 +133,9 @@ describe("account menu", () => {
     );
 
     renderAccountMenu();
-    fireEvent.click(screen.getByRole("button", { name: "Account: Ada" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Account: Ada" })
+    );
     fireEvent.click(await screen.findByRole("menuitem", { name: "Sign out" }));
 
     await expect(
