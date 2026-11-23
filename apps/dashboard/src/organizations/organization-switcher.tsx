@@ -1,30 +1,27 @@
-import {
-  DropdownMenu,
-  useKumoToastManager,
-  useSidebar,
-} from "@cloudflare/kumo";
+import { DropdownMenu, useSidebar } from "@cloudflare/kumo";
 import { CaretUpDownIcon } from "@phosphor-icons/react";
-import { useId, useRef, useState } from "react";
+import { useId, useRef } from "react";
 
-import { ActionDialog } from "../layout/action-dialog.tsx";
+import { ActionDialog, useDialog } from "../layout/action-dialog.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import { CreateOrganizationForm } from "./create-organization-form.tsx";
 import { NewPatchSlot, OrganizationPatch } from "./organization-patch.tsx";
 import { useCreateOrganization, useOrganizations } from "./organizations.tsx";
-import { RoleBadge, ROLE_LABELS } from "./roles.tsx";
+import { ROLE_LABELS } from "./roles.tsx";
 
 const MENU_ROW = "gap-2.5 py-1";
 
 /**
- * The Organization this tab works in, at the top of the sidebar, with the
- * person's role in it. Its menu switches to another one or creates a new one.
+ * The Organization this tab works in, at the top of the frame, with the
+ * person's role in it under its name. Its menu switches to another one or creates a new one.
  * Hidden until the person has an Organization: the home page asks them to
  * name their first.
  */
 export const OrganizationSwitcher = () => {
   const { active, organizations, switchTo } = useOrganizations();
-  const { isMobile, state } = useSidebar();
-  const toasts = useKumoToastManager();
-  const [creating, setCreating] = useState(false);
+  const { isMobile, setOpenMobile, state } = useSidebar();
+  const toasts = useConfirmationToast();
+  const creating = useDialog();
   const create = useCreateOrganization();
   const formId = useId();
   const switcherButton = useRef<HTMLButtonElement>(null);
@@ -41,16 +38,17 @@ export const OrganizationSwitcher = () => {
         <DropdownMenu.Trigger
           ref={switcherButton}
           aria-label={`Organization: ${active.name}, ${ROLE_LABELS[active.role]}`}
-          className="flex min-h-8.5 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-3 text-left text-sm group-data-[state=collapsed]/sidebar:justify-center group-data-[state=collapsed]/sidebar:px-0 hover:bg-kumo-tint focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kumo-focus data-popup-open:bg-kumo-tint"
+          className="mq-frame-button"
         >
-          <OrganizationPatch className="size-4" organizationId={active.id} />
-          <span className="min-w-0 flex-1 truncate font-semibold text-kumo-strong group-data-[state=collapsed]/sidebar:hidden">
-            {active.name}
+          <OrganizationPatch className="size-6" organizationId={active.id} />
+          <span className="flex min-w-0 flex-1 flex-col text-sm leading-4 group-data-[state=collapsed]/sidebar:hidden">
+            <span className="truncate font-semibold text-kumo-strong">
+              {active.name}
+            </span>
+            <span className="truncate text-xs text-kumo-subtle">
+              {ROLE_LABELS[active.role]}
+            </span>
           </span>
-          <RoleBadge
-            className="group-data-[state=collapsed]/sidebar:hidden"
-            role={active.role}
-          />
           <CaretUpDownIcon
             aria-hidden="true"
             className="size-4 shrink-0 text-kumo-subtle group-data-[state=collapsed]/sidebar:hidden"
@@ -75,7 +73,18 @@ export const OrganizationSwitcher = () => {
                   closeOnClick
                   className={MENU_ROW}
                   key={organization.id}
-                  onClick={() => switchTo(organization.id)}
+                  onClick={() => {
+                    switchTo(organization.id);
+
+                    if (isMobile) {
+                      setOpenMobile(false);
+                      requestAnimationFrame(() =>
+                        document
+                          .querySelector<HTMLElement>("#main")
+                          ?.focus({ preventScroll: true })
+                      );
+                    }
+                  }}
                   value={organization.id}
                 >
                   <OrganizationPatch
@@ -100,7 +109,7 @@ export const OrganizationSwitcher = () => {
             className={MENU_ROW}
             onClick={() => {
               create.reset();
-              setCreating(true);
+              creating.setOpen(true);
             }}
           >
             <NewPatchSlot className="size-6" />
@@ -117,8 +126,10 @@ export const OrganizationSwitcher = () => {
         finalFocus={switcherButton}
         formId={formId}
         initialFocus={nameField}
-        onOpenChange={setCreating}
-        open={creating}
+        key={creating.key}
+        onExited={creating.handleExited}
+        onOpenChange={creating.handleOpenChange}
+        open={creating.open}
         title="New organization"
       >
         <CreateOrganizationForm
@@ -127,7 +138,7 @@ export const OrganizationSwitcher = () => {
           id={formId}
           layout="dialog"
           onCreated={(created) => {
-            setCreating(false);
+            creating.setOpen(false);
             toasts.add({
               description: "You’re working in it now.",
               title: `Created ${created.name}`,

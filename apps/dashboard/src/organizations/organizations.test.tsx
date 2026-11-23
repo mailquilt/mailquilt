@@ -16,7 +16,24 @@ import { AppShell } from "../layout/app-shell.tsx";
 import { SignedInOnly } from "../layout/session-gates.tsx";
 import { ACME, renderWithOrganizations } from "./test-organizations.tsx";
 
-const api = setupServer();
+const api = setupServer(
+  http.get("*/health", () => HttpResponse.json({ database: "connected" })),
+  http.get("*/api/organizations/:organizationId/contacts", () =>
+    HttpResponse.json({
+      contacts: [],
+      next: null,
+      previous: null,
+      start: 0,
+      total: 0,
+    })
+  ),
+  http.get("*/api/organizations/:organizationId/lists", () =>
+    HttpResponse.json([])
+  ),
+  http.get("*/api/organizations/:organizationId/provider-connections", () =>
+    HttpResponse.json([])
+  )
+);
 
 const SESSION = {
   session: { expiresAt: "2026-12-01T00:00:00.000Z", id: "s", userId: "u" },
@@ -87,7 +104,7 @@ describe("organizations", () => {
     ).toBeNull();
   });
 
-  it("tries again, showing progress, and fills the page once organizations load", async () => {
+  it("tries again, showing progress and keeping keyboard focus, and fills the page once organizations load", async () => {
     let available = false;
     let listed = false;
     api.use(
@@ -107,11 +124,16 @@ describe("organizations", () => {
     const retry = await screen.findByRole("button", { name: "Try again" });
 
     available = true;
+    retry.focus();
     fireEvent.click(retry);
 
-    await expect(
-      screen.findByRole("button", { name: /Trying again…/u })
-    ).resolves.toBeDefined();
+    const trying = await screen.findByRole("button", {
+      name: /Trying again…/u,
+    });
+
+    expect(trying.getAttribute("aria-disabled")).toBe("true");
+    expect(trying).toHaveProperty("disabled", false);
+    expect(document.activeElement).toBe(trying);
 
     listed = true;
 

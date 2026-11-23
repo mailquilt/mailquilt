@@ -1,10 +1,4 @@
-import {
-  Banner,
-  Button,
-  Link,
-  Radio,
-  useKumoToastManager,
-} from "@cloudflare/kumo";
+import { Banner, Button, Link, Radio } from "@cloudflare/kumo";
 import { CheckIcon } from "@phosphor-icons/react";
 import { SignUpPolicySchema } from "@repo/domain";
 import type {
@@ -16,9 +10,10 @@ import { useLocation } from "@tanstack/react-router";
 import { Predicate, Schema } from "effect";
 import { useId, useState } from "react";
 
-import { TableLoadFailed } from "../audience/table-card.tsx";
+import { LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import {
   ConnectionForm,
   serverFailureMessage,
@@ -75,7 +70,7 @@ const DoneBlock = () => (
 
 const SignUpSection = ({ current }: { current: SignUpPolicy }) => {
   const update = useUpdateSignUp();
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const [edited, setEdited] = useState<SignUpPolicy | null>(null);
   const chosen = edited ?? current;
 
@@ -181,7 +176,7 @@ const SystemMailerSection = ({
   mailer: SystemMailerSettings | null;
 }) => {
   const update = useUpdateSystemMailer();
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
 
   const description =
     "Mailquilt sends its own emails through this server, such as the link that confirms a new account’s address. Campaigns never use it.";
@@ -264,8 +259,10 @@ const Settings = ({ settings }: { settings: InstanceSettings }) => {
  */
 export const InstanceSettingsPage = () => {
   const settings = useInstanceSettings();
+  const [retrying, setRetrying] = useState(false);
 
-  if (settings.isPending) {
+  // WARNING: a query with no data goes back to pending when it retries, so while Try again runs the failure stays up, keeping the button and its focus, rather than the loader replacing it.
+  if (settings.isPending && !retrying) {
     return <PageAreaLoading label="Loading instance settings" />;
   }
 
@@ -282,10 +279,14 @@ export const InstanceSettingsPage = () => {
             ? "Only the person who runs this Mailquilt can see or change its settings."
             : "These apply to everyone on this Mailquilt. Only you can see them, as its admin."}
         </p>
-        {settings.isError && !notAdmin ? (
-          <TableLoadFailed
-            onRetry={() => settings.refetch()}
-            retrying={settings.isFetching}
+        {(settings.isError || retrying) && !notAdmin ? (
+          <LoadFailed
+            onRetry={async () => {
+              setRetrying(true);
+              await settings.refetch();
+              setRetrying(false);
+            }}
+            retrying={retrying || settings.isFetching}
             title="Instance settings didn’t load"
           />
         ) : null}

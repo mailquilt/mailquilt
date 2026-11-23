@@ -1,17 +1,11 @@
 import { Sidebar, useSidebar } from "@cloudflare/kumo";
-import {
-  GlobeSimpleIcon,
-  HouseSimpleIcon,
-  LayoutIcon,
-  ListBulletsIcon,
-  ListIcon,
-  PaperPlaneTiltIcon,
-  PlugsConnectedIcon,
-  SidebarSimpleIcon,
-  UsersIcon,
-} from "@phosphor-icons/react";
-import { useLocation } from "@tanstack/react-router";
+import { ListIcon, SidebarSimpleIcon } from "@phosphor-icons/react";
+import type { OrganizationId } from "@repo/domain";
+import { Link, useLocation, useRouter } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 
+import { useContactPage, useLists } from "../audience/audience-api.ts";
+import { formatCount } from "../audience/format.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import { HealthStatus } from "../health/health-status.tsx";
@@ -22,215 +16,369 @@ import {
   useOrganizations,
   useOrganizationsStatus,
 } from "../organizations/organizations.tsx";
+import { useProviderConnections } from "../providers/providers-api.ts";
 import { useAccount } from "./session-gates.tsx";
 
-interface DimmedSection {
+const NavBlock = ({ state }: { state: "page" | "current" | "soon" }) => (
+  <span aria-hidden="true" className="mq-nav-block" data-state={state} />
+);
+
+type CountedPage = "contacts" | "lists" | "providers";
+
+interface NavItem {
   readonly label: string;
-  readonly items: readonly {
-    readonly icon: React.ComponentType<{ className?: string }>;
-    readonly label: string;
-  }[];
+  readonly href?: string;
+  readonly counted?: CountedPage;
 }
 
-const SEND: DimmedSection = {
-  items: [
-    { icon: PaperPlaneTiltIcon, label: "Campaigns" },
-    { icon: LayoutIcon, label: "Templates" },
-  ],
-  label: "Send",
+const NAV: readonly {
+  readonly label?: string;
+  readonly items: readonly NavItem[];
+}[] = [
+  { items: [{ href: "/", label: "Home" }] },
+  {
+    items: [
+      { counted: "contacts", href: "/contacts", label: "Contacts" },
+      { counted: "lists", href: "/lists", label: "Lists" },
+    ],
+    label: "Audience",
+  },
+  { items: [{ label: "Campaigns" }, { label: "Templates" }], label: "Send" },
+  {
+    items: [
+      { counted: "providers", href: "/providers", label: "Providers" },
+      { label: "Domains" },
+    ],
+    label: "Deliverability",
+  },
+];
+
+type NavCounts = Partial<Record<CountedPage, number>>;
+
+const isCurrent = (pathname: string, href: string) =>
+  href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+const Navigation = ({ counts }: { counts: NavCounts }) => {
+  const { pathname } = useLocation();
+
+  return (
+    <nav aria-label="Main">
+      {NAV.map((group, index) => (
+        <Sidebar.Group key={group.label ?? index}>
+          {group.label === undefined ? null : (
+            <Sidebar.GroupLabel>{group.label}</Sidebar.GroupLabel>
+          )}
+          <Sidebar.Menu>
+            {group.items.map((item) => {
+              if (item.href === undefined) {
+                return (
+                  <Sidebar.MenuButton
+                    className="mq-nav-soon"
+                    disabled
+                    icon={<NavBlock state="soon" />}
+                    key={item.label}
+                  >
+                    <span className="flex flex-1 items-center justify-between gap-2">
+                      {item.label}
+                      <Sidebar.MenuBadge>Soon</Sidebar.MenuBadge>
+                    </span>
+                  </Sidebar.MenuButton>
+                );
+              }
+
+              const current = isCurrent(pathname, item.href);
+
+              const count =
+                item.counted === undefined ? undefined : counts[item.counted];
+
+              const shownCount =
+                count === undefined || count === 0
+                  ? undefined
+                  : formatCount(count);
+
+              return (
+                <Sidebar.MenuButton
+                  active={current}
+                  aria-label={
+                    shownCount === undefined
+                      ? undefined
+                      : `${item.label}, ${shownCount}`
+                  }
+                  href={item.href}
+                  icon={<NavBlock state={current ? "current" : "page"} />}
+                  key={item.label}
+                  tooltip={item.label}
+                >
+                  {shownCount === undefined ? (
+                    item.label
+                  ) : (
+                    <span className="flex flex-1 items-center justify-between gap-2">
+                      {item.label}
+                      <span className="mq-fade-in text-xs text-kumo-subtle tabular-nums">
+                        {shownCount}
+                      </span>
+                    </span>
+                  )}
+                </Sidebar.MenuButton>
+              );
+            })}
+          </Sidebar.Menu>
+        </Sidebar.Group>
+      ))}
+    </nav>
+  );
 };
 
-const AUDIENCE = [
-  { href: "/contacts", icon: UsersIcon, label: "Contacts" },
-  { href: "/lists", icon: ListBulletsIcon, label: "Lists" },
-] as const;
+const OrganizationNavigation = ({
+  organizationId,
+}: {
+  organizationId: OrganizationId;
+}) => {
+  const contacts = useContactPage(organizationId, {});
+  const lists = useLists(organizationId);
+  const providers = useProviderConnections(organizationId);
 
-const NAV_ITEM_FOCUS =
-  "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-kumo-focus";
+  return (
+    <Navigation
+      counts={{
+        contacts: contacts.data?.total,
+        lists: lists.data?.length,
+        providers: providers.data?.length,
+      }}
+    />
+  );
+};
 
-const SoonBadge = () => (
-  <span className="rounded-sm bg-kumo-tint px-1.5 text-xs font-medium text-kumo-subtle">
-    Soon
-  </span>
+const HomeLink = ({ className }: { className: string }) => (
+  <Link aria-label="Mailquilt home" className="rounded-md" to="/">
+    <MailquiltLogo className={className} />
+  </Link>
 );
 
-const SectionComingSoon = ({ section }: { section: DimmedSection }) => (
-  <Sidebar.Group>
-    <Sidebar.GroupLabel>
-      <span className="flex items-center justify-between gap-2">
-        {section.label}
-        <SoonBadge />
-      </span>
-    </Sidebar.GroupLabel>
-    <Sidebar.Menu>
-      {section.items.map((item) => (
-        <Sidebar.MenuButton
-          className="cursor-default opacity-45 hover:bg-transparent"
-          disabled
-          icon={item.icon}
-          key={item.label}
-          tooltip={`${item.label} is coming soon`}
-        >
-          {item.label}
-        </Sidebar.MenuButton>
-      ))}
-    </Sidebar.Menu>
-  </Sidebar.Group>
-);
-
-const SidebarHeaderControls = () => {
+const FrameHeader = () => {
   const { isMobile, state } = useSidebar();
 
   if (isMobile) {
     return (
       <>
-        <MailquiltLogo className="h-[22px] w-auto" />
-        <Sidebar.Close className="ml-auto" />
+        <HomeLink className="h-5 w-auto" />
+        <Sidebar.Close className="mq-frame-close ml-auto" />
       </>
     );
   }
 
-  if (state === "collapsed") {
-    return (
-      <Sidebar.Trigger className="group/expand mx-auto size-9">
-        <MailquiltMark className="size-6 group-hover/expand:hidden group-focus-visible/expand:hidden" />
-        <SidebarSimpleIcon
-          aria-hidden="true"
-          className="hidden size-5 group-hover/expand:block group-focus-visible/expand:block"
-        />
-      </Sidebar.Trigger>
-    );
-  }
+  const collapsed = state === "collapsed";
 
   return (
     <>
-      <MailquiltLogo className="h-[22px] w-auto" />
-      <Sidebar.Trigger className="ml-auto" />
+      {collapsed ? null : <HomeLink className="h-[22px] w-auto" />}
+      <Sidebar.Trigger
+        className={collapsed ? "group/expand size-9" : "ml-auto"}
+      >
+        {collapsed ? (
+          <MailquiltMark className="size-6 group-hover/expand:hidden group-focus-visible/expand:hidden" />
+        ) : null}
+        <SidebarSimpleIcon
+          aria-hidden="true"
+          className={
+            collapsed
+              ? "hidden size-5 group-hover/expand:block group-focus-visible/expand:block"
+              : "size-5"
+          }
+        />
+      </Sidebar.Trigger>
     </>
   );
 };
 
-const MobileBarOpeningSidebarSheet = () => {
+const RailQuilt = () => {
+  const width = 152;
+  const height = 76;
+  const sashing = 56;
+  const left = (column: number) => sashing * (column + 1) + width * column;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="mq-rail-quilt"
+      focusable="false"
+      preserveAspectRatio="xMidYMax slice"
+      viewBox="0 0 480 560"
+    >
+      {[0, 1].map((column) => (
+        <g key={column}>
+          <rect
+            className="fill-(--mq-quilt-sky)"
+            height="560"
+            width={width}
+            x={left(column)}
+            y="0"
+          />
+          {Array.from({ length: 8 }, (_, row) => {
+            const top = row * height - height / 2;
+
+            return (
+              <polygon
+                className={
+                  row % 2
+                    ? "fill-(--mq-quilt-goose)"
+                    : "fill-(--mq-quilt-goose-alt)"
+                }
+                key={row}
+                points={`${left(column)},${top + height} ${left(column) + width / 2},${top} ${left(column) + width},${top + height}`}
+              />
+            );
+          })}
+        </g>
+      ))}
+    </svg>
+  );
+};
+
+const FrameBar = () => {
   const { isMobile, openMobile, toggleSidebar } = useSidebar();
   const { active } = useOrganizations();
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+
+  // WARNING: the closed navigation is inert, so its Close button (or anything else in it) can't keep focus; when focus is lost as it closes, it goes back to the button that opened it, as Escape does.
+  useEffect(() => {
+    if (openMobile) {
+      wasOpen.current = true;
+
+      return;
+    }
+
+    if (!wasOpen.current) {
+      return;
+    }
+
+    wasOpen.current = false;
+
+    const frame = requestAnimationFrame(() => {
+      const focus = document.activeElement;
+
+      if (
+        focus === null ||
+        focus === document.body ||
+        focus.closest('[data-sidebar="sidebar"][data-mobile]')
+      ) {
+        menuButton.current?.focus();
+      }
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [openMobile]);
 
   if (!isMobile) {
     return null;
   }
 
   return (
-    <div className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-kumo-hairline bg-kumo-base/95 px-4 backdrop-blur">
+    <div className="mq-frame-bar">
+      <HomeLink className="h-5 w-auto" />
+      {active ? (
+        <p className="ml-auto flex min-w-0 items-center gap-2 text-sm font-medium text-kumo-strong">
+          <OrganizationPatch className="size-4.5" organizationId={active.id} />
+          <span className="truncate">{active.name}</span>
+        </p>
+      ) : null}
       <button
         aria-expanded={openMobile}
         aria-label="Open navigation"
-        className="flex size-10 items-center justify-center rounded-lg text-kumo-default hover:bg-kumo-tint focus-visible:outline-2 focus-visible:outline-kumo-focus"
+        className="mq-frame-icon-button"
         onClick={toggleSidebar}
+        ref={menuButton}
         type="button"
       >
         <ListIcon aria-hidden="true" className="size-5" />
       </button>
-      <MailquiltLogo className="h-5 w-auto shrink-0" />
-      {active ? (
-        <p className="ml-auto flex min-w-0 items-center gap-2 text-base font-medium text-kumo-strong">
-          <OrganizationPatch className="size-5" organizationId={active.id} />
-          <span className="truncate">{active.name}</span>
-        </p>
-      ) : null}
+    </div>
+  );
+};
+
+const PageWrap = ({ children }: { children: React.ReactNode }) => {
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
+  const router = useRouter();
+
+  // WARNING: with the full-screen navigation there is no backdrop left to tap, so going to any page has to close it, and focus moves to the page (once it's no longer inert), since the link that had it is gone.
+  useEffect(
+    () =>
+      router.subscribe("onResolved", () => {
+        const fromNavigation = document.activeElement?.closest(
+          '[data-sidebar="sidebar"][data-mobile]'
+        );
+
+        setOpenMobile(false);
+
+        if (fromNavigation) {
+          requestAnimationFrame(() =>
+            document
+              .querySelector<HTMLElement>("#main")
+              ?.focus({ preventScroll: true })
+          );
+        }
+      }),
+    [router, setOpenMobile]
+  );
+
+  return (
+    <div className="mq-page-wrap" inert={isMobile && openMobile}>
+      {children}
     </div>
   );
 };
 
 /**
- * Everything a signed-in person sees: the sidebar with the logo, navigation
- * and their account, and the page beside it. Sections are dimmed until their
- * feature exists, so the structure is learnable from the first day. Pages own
- * their own layout.
+ * Everything a signed-in person sees: the page set as one light block into
+ * the ink quilt frame, the same quilt they signed in through. The frame
+ * holds the logo, the Organization, the navigation and their account; it
+ * collapses to icons on desktop. Below 1024px it becomes the bar at the top,
+ * and the navigation opens full screen. Pages own their own layout.
  */
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
-  const { pathname } = useLocation();
   const account = useAccount();
+  const { active } = useOrganizations();
   const { status } = useOrganizationsStatus();
 
   return (
-    <Sidebar.Provider className="h-svh">
-      <Sidebar>
-        <Sidebar.Header className="border-b-0 pt-2 pr-3 pl-5 group-data-[state=collapsed]/sidebar:px-0">
-          <SidebarHeaderControls />
+    <Sidebar.Provider
+      className="mq-frame-wrapper"
+      mobileBreakpoint={1024}
+      variant="inset"
+    >
+      <a className="mq-skip" href="#main">
+        Skip to content
+      </a>
+      <Sidebar className="mq-frame" fullScreenOnMobile>
+        <Sidebar.Header className="mq-frame-head">
+          <FrameHeader />
         </Sidebar.Header>
         <Sidebar.Content>
-          <div className="mb-2 border-b border-kumo-hairline pb-2 empty:hidden">
+          <div className="pb-3 empty:hidden">
             <OrganizationSwitcher />
           </div>
-          <nav aria-label="Main">
-            <Sidebar.Group>
-              <Sidebar.Menu>
-                <Sidebar.MenuButton
-                  active={pathname === "/"}
-                  className={NAV_ITEM_FOCUS}
-                  href="/"
-                  icon={HouseSimpleIcon}
-                  tooltip="Home"
-                >
-                  Home
-                </Sidebar.MenuButton>
-              </Sidebar.Menu>
-            </Sidebar.Group>
-            <SectionComingSoon section={SEND} />
-            <Sidebar.Group>
-              <Sidebar.GroupLabel>Audience</Sidebar.GroupLabel>
-              <Sidebar.Menu>
-                {AUDIENCE.map((item) => (
-                  <Sidebar.MenuButton
-                    active={pathname.startsWith(item.href)}
-                    className={NAV_ITEM_FOCUS}
-                    href={item.href}
-                    icon={item.icon}
-                    key={item.href}
-                    tooltip={item.label}
-                  >
-                    {item.label}
-                  </Sidebar.MenuButton>
-                ))}
-              </Sidebar.Menu>
-            </Sidebar.Group>
-            <Sidebar.Group>
-              <Sidebar.GroupLabel>Deliverability</Sidebar.GroupLabel>
-              <Sidebar.Menu>
-                <Sidebar.MenuButton
-                  active={pathname.startsWith("/providers")}
-                  className={NAV_ITEM_FOCUS}
-                  href="/providers"
-                  icon={PlugsConnectedIcon}
-                  tooltip="Providers"
-                >
-                  Providers
-                </Sidebar.MenuButton>
-                <Sidebar.MenuButton
-                  className="cursor-default opacity-45 hover:bg-transparent"
-                  disabled
-                  icon={GlobeSimpleIcon}
-                  tooltip="Domains is coming soon"
-                >
-                  <span className="flex flex-1 items-center justify-between gap-2">
-                    Domains
-                    <SoonBadge />
-                  </span>
-                </Sidebar.MenuButton>
-              </Sidebar.Menu>
-            </Sidebar.Group>
-          </nav>
+          {active ? (
+            <OrganizationNavigation
+              key={active.id}
+              organizationId={active.id}
+            />
+          ) : (
+            <Navigation counts={{}} />
+          )}
         </Sidebar.Content>
-        <Sidebar.Footer className="h-auto py-2.5 group-data-[state=collapsed]/sidebar:justify-center">
+        <RailQuilt />
+        <Sidebar.Footer className="mq-frame-foot">
           <AccountMenu account={account} />
         </Sidebar.Footer>
       </Sidebar>
-      <div className="relative flex min-w-0 flex-1 flex-col overflow-y-auto bg-kumo-base">
-        <MobileBarOpeningSidebarSheet />
-        <HealthStatus bannerClassName="m-6 md:mx-12" />
-        <main className="flex min-h-0 flex-1 flex-col">
+      <PageWrap>
+        <FrameBar />
+        <main className="mq-page" id="main" tabIndex={-1}>
+          <HealthStatus bannerClassName="mx-4 mt-4 sm:mx-7 lg:mx-10 lg:mt-6" />
           {status === "failed" ? <OrganizationsUnavailable /> : children}
         </main>
-      </div>
+      </PageWrap>
     </Sidebar.Provider>
   );
 };

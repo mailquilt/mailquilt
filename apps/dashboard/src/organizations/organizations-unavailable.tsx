@@ -25,9 +25,13 @@ export const OrganizationsUnavailable = () => {
         </p>
       </div>
       <Button
+        aria-disabled={retrying || undefined}
         className="mt-6"
-        loading={retrying}
-        onClick={retry}
+        onClick={() => {
+          if (!retrying) {
+            retry();
+          }
+        }}
         variant="primary"
       >
         {retrying ? "Trying again…" : "Try again"}

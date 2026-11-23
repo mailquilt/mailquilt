@@ -25,6 +25,8 @@ import { Array as Arr } from "effect";
 import type { DateTime } from "effect";
 import { useMemo, useRef, useState } from "react";
 
+import { useDialog } from "../layout/action-dialog.tsx";
+import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { AddContactDialog } from "./add-contact-dialog.tsx";
@@ -38,7 +40,7 @@ import {
   STATUS_LABELS,
   SubscriptionStatusLabel,
 } from "./subscription-status.tsx";
-import { TableCard, TableEmpty, TableLoadFailed } from "./table-card.tsx";
+import { TableCard } from "./table-card.tsx";
 
 const ALL_CONTACTS = "all";
 
@@ -380,7 +382,7 @@ const NoContacts = ({
 
   if (list === undefined) {
     return (
-      <TableEmpty
+      <EmptyState
         actions={
           <Button
             icon={PlusIcon}
@@ -399,7 +401,7 @@ const NoContacts = ({
 
   if (status === undefined) {
     return (
-      <TableEmpty
+      <EmptyState
         actions={
           <>
             <Button onClick={onShowAll} variant="secondary">
@@ -415,7 +417,7 @@ const NoContacts = ({
   }
 
   return (
-    <TableEmpty
+    <EmptyState
       actions={
         <Button onClick={onShowAll} variant="secondary">
           Show everyone on {list.name}
@@ -451,7 +453,7 @@ const ContactsTable = ({
   shownList: List | undefined;
 }) => {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [addingToList, setAddingToList] = useState({ key: 0, open: false });
+  const addingToList = useDialog();
   const addToListButton = useRef<HTMLButtonElement>(null);
 
   const columns = useMemo(
@@ -484,9 +486,7 @@ const ContactsTable = ({
         </span>
         <Button
           disabled={lists.length === 0}
-          onClick={() =>
-            setAddingToList(({ key }) => ({ key: key + 1, open: true }))
-          }
+          onClick={() => addingToList.setOpen(true)}
           ref={addToListButton}
           variant="secondary"
         >
@@ -583,7 +583,8 @@ const ContactsTable = ({
           finalFocus={addToListButton}
           lists={lists}
           key={addingToList.key}
-          onOpenChange={(open) => setAddingToList(({ key }) => ({ key, open }))}
+          onExited={addingToList.handleExited}
+          onOpenChange={addingToList.handleOpenChange}
           open={addingToList.open}
           organization={organization}
         />
@@ -608,10 +609,9 @@ export const ContactsPage = ({
 }) => {
   const lists = useLists(organization.id);
   const page = useContactPage(organization.id, search);
-  const [adding, setAdding] = useState({ key: 0, open: false });
+  const adding = useDialog();
 
-  const startAdding = () =>
-    setAdding(({ key }) => ({ key: key + 1, open: true }));
+  const startAdding = () => adding.setOpen(true);
 
   const addContactButton = useRef<HTMLButtonElement>(null);
   const [shownSearch, setShownSearch] = useState(search);
@@ -651,7 +651,7 @@ export const ContactsPage = ({
     if (page.data === null) {
       return (
         <TableCard>
-          <TableEmpty
+          <EmptyState
             actions={
               <Button onClick={() => onSearch({})} variant="secondary">
                 Show all contacts
@@ -667,7 +667,7 @@ export const ContactsPage = ({
     if (lists.data === undefined || page.data === undefined) {
       return (
         <TableCard>
-          <TableLoadFailed
+          <LoadFailed
             onRetry={retry}
             retrying={lists.isFetching || page.isFetching}
             title="Your contacts didn’t load"
@@ -718,7 +718,8 @@ export const ContactsPage = ({
         finalFocus={addContactButton}
         lists={lists.data ?? []}
         key={adding.key}
-        onOpenChange={(open) => setAdding(({ key }) => ({ key, open }))}
+        onExited={adding.handleExited}
+        onOpenChange={adding.handleOpenChange}
         open={adding.open}
         organization={organization}
         preselected={list === undefined ? [] : [list.id]}

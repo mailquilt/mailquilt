@@ -3,7 +3,7 @@ import { CaretLeftIcon } from "@phosphor-icons/react";
 import type { Organization, ProviderConnectionId } from "@repo/domain";
 import { Link, useNavigate } from "@tanstack/react-router";
 
-import { TableLoadFailed } from "../audience/table-card.tsx";
+import { LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import {
@@ -114,7 +114,7 @@ export const EditPage = ({
     if (connections.data === undefined) {
       return (
         <section className="rounded-xl border border-kumo-fill bg-kumo-base">
-          <TableLoadFailed
+          <LoadFailed
             onRetry={() => connections.refetch()}
             retrying={connections.isFetching}
             title="The connection didn’t load"

@@ -242,14 +242,15 @@ const senderOf = ({ from }: ProviderConnection) =>
  * accepted it, or why not in the server's own words, with what to fix.
  * `intro` replaces the description when it opens by itself, right after the
  * connection was made or saved. While it sends again, the last result stays,
- * dimmed, so nothing jumps. Mount it afresh for each opening (a new `key`),
- * so it starts without the last result.
+ * dimmed, so nothing jumps. Give it `useDialog`'s `key` and `handleExited`, so
+ * each opening starts without the last result.
  */
 export const TestEmailDialog = ({
   connection,
   defaultTo,
   finalFocus,
   intro,
+  onExited,
   onOpenChange,
   open,
   organization,
@@ -258,6 +259,8 @@ export const TestEmailDialog = ({
   defaultTo: string;
   finalFocus?: React.RefObject<HTMLElement | null>;
   intro?: string;
+  /** `useDialog`'s `handleExited`, so it starts fresh after each close. */
+  onExited?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organization: Organization;
@@ -298,6 +301,7 @@ export const TestEmailDialog = ({
       finalFocus={finalFocus}
       formId={formId}
       initialFocus={sendTo}
+      onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
       title="Send a test email"

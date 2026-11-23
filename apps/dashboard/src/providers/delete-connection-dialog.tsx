@@ -1,8 +1,9 @@
-import { Banner, useKumoToastManager } from "@cloudflare/kumo";
+import { Banner } from "@cloudflare/kumo";
 import type { Organization, ProviderConnection } from "@repo/domain";
 import { useId } from "react";
 
 import { ActionDialog } from "../layout/action-dialog.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import { useDeleteConnection } from "./providers-api.ts";
 
 /**
@@ -13,6 +14,7 @@ export const DeleteConnectionDialog = ({
   connection,
   finalFocus,
   onDeleted,
+  onExited,
   onOpenChange,
   open,
   organization,
@@ -21,12 +23,14 @@ export const DeleteConnectionDialog = ({
   finalFocus?: React.RefObject<HTMLElement | null>;
   /** Called once the connection is gone, while its card and this dialog go with it. */
   onDeleted: (name: string) => void;
+  /** `useDialog`'s `handleExited`, so it starts fresh after each close. */
+  onExited?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organization: Organization;
 }) => {
   const remove = useDeleteConnection(organization.id);
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const formId = useId();
 
   // WARNING: the deletion removes this card, and this dialog with it, before mutate's own callbacks would run; mutateAsync's promise still settles.
@@ -51,6 +55,7 @@ export const DeleteConnectionDialog = ({
       destructive
       finalFocus={finalFocus}
       formId={formId}
+      onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
       title={`Delete ${connection.name}?`}

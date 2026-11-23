@@ -1,6 +1,6 @@
 import { Drawer } from "@base-ui/react/drawer";
-import { Button, LayerDialog } from "@cloudflare/kumo";
-import { useSyncExternalStore } from "react";
+import { Button, Dialog } from "@cloudflare/kumo";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const DESKTOP = "(min-width: 640px)";
 
@@ -25,7 +25,41 @@ const DISMISSALS_HELD_WHILE_BUSY = new Set([
 ]);
 
 const SHEET_MOTION =
-  "duration-450 ease-sheet data-[swiping]:duration-0 motion-reduce:transition-none";
+  "duration-420 ease-sheet data-[ending-style]:duration-260 data-[swiping]:duration-0 motion-reduce:transition-none";
+
+/**
+ * A dialog's open state and the `key` to give it. The key moves on once a
+ * close has finished, so the next opening is a fresh mount, with its form
+ * empty, that is still closed when it mounts and so animates in. Moving the
+ * key in the same render that opens it would mount the dialog already open,
+ * and it would appear without its entrance; keying it by `open` would
+ * unmount it as it closes, without its exit. `openOnMount` opens it by
+ * itself, just after the page draws, with its entrance.
+ */
+export const useDialog = (openOnMount = false) => {
+  const [open, setOpen] = useState(false);
+  const [key, setKey] = useState(0);
+  const opensItself = useRef(openOnMount);
+
+  // WARNING: a dialog that is open when it first mounts appears without its entrance, so one that opens by itself opens just after.
+  useEffect(() => {
+    if (!opensItself.current) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setOpen(true));
+
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  return {
+    handleExited: () => setKey((current) => current + 1),
+    handleOpenChange: setOpen,
+    key,
+    open,
+    setOpen,
+  };
+};
 
 interface ActionDialogProps {
   readonly open: boolean;
@@ -40,25 +74,80 @@ interface ActionDialogProps {
   readonly formId: string;
   /** While the action runs: the button shows progress and nothing closes the dialog. */
   readonly busy: boolean;
-  /** The action can't be undone, such as a delete: its button is drawn in the danger colour. */
+  /** The action can't be undone, such as a delete: its button is drawn in the danger colour, and a click outside doesn't close it. */
   readonly destructive?: boolean;
   /** On desktop, focused once the dialog has opened, such as its only field. */
   readonly initialFocus?: React.RefObject<HTMLElement | null>;
   /** Focused when it closes, such as the control that opened it, also when it opened by itself. */
   readonly finalFocus?: React.RefObject<HTMLElement | null>;
+  /** Called once a close has finished: `useDialog`'s `handleExited`. */
+  readonly onExited?: () => void;
   readonly children: React.ReactNode;
 }
 
+const Actions = ({
+  action,
+  actionFirst,
+  actionLabel,
+  busy,
+  Close,
+  destructive,
+  dismissLabel,
+  formId,
+}: {
+  action: React.RefObject<HTMLButtonElement | null>;
+  actionFirst: boolean;
+  actionLabel: string;
+  busy: boolean;
+  Close: typeof Dialog.Close | typeof Drawer.Close;
+  destructive: boolean;
+  dismissLabel: string;
+  formId: string;
+}) => {
+  const cancel = (
+    <Close
+      disabled={busy}
+      key="cancel"
+      render={
+        <Button
+          className="max-sm:w-full max-sm:justify-center"
+          variant="secondary"
+        />
+      }
+    >
+      {dismissLabel}
+    </Close>
+  );
+
+  const submit = (
+    <Button
+      className="max-sm:w-full max-sm:justify-center"
+      form={formId}
+      key="action"
+      loading={busy}
+      ref={action}
+      type="submit"
+      variant={destructive ? "destructive" : "primary"}
+    >
+      {actionLabel}
+    </Button>
+  );
+
+  return actionFirst ? [submit, cancel] : [cancel, submit];
+};
+
 /**
- * A dialog with one action and a button that closes it, Cancel unless told otherwise. From 640px wide, Kumo's own
- * breakpoint, it is Kumo's
- * `LayerDialog`: the content on a raised card and the actions on the frame
- * around it, centred. On phones it is a sheet from the bottom edge: one
- * surface, the buttons full width where a thumb rests, clear of the home
- * indicator, and closed by swiping down. Kumo's own phone layout keeps the
- * desktop card inside the drawer, so the sheet is built on the same Base UI
- * Drawer instead. On phones the sheet itself takes focus as it opens, so the
- * keyboard doesn't cover it mid-slide; the person taps the field.
+ * A dialog with one action and a button that closes it, Cancel unless told
+ * otherwise. From 640px wide, Kumo's own breakpoint, it is Kumo's `Dialog`,
+ * centred, over the dark scrim (`styles.css`), with Cancel beside the action
+ * at the bottom right; a destructive one is Kumo's `alertdialog`. On phones
+ * it is a sheet from the bottom edge, rounded at the top, with the action
+ * above Cancel, both full width and clear of the home indicator, and closed
+ * by swiping down. Kumo's `Dialog` stays a floating card on phones, so the
+ * sheet is built on Base UI's Drawer. On phones the sheet itself takes focus
+ * as it opens, so the keyboard doesn't cover it mid-slide; the person taps
+ * the field. Give it `useDialog`'s `key` and `handleExited` so it animates in
+ * and out and starts fresh each time.
  */
 export const ActionDialog = ({
   actionLabel,
@@ -70,6 +159,7 @@ export const ActionDialog = ({
   finalFocus,
   formId,
   initialFocus,
+  onExited,
   onOpenChange,
   open,
   title,
@@ -80,109 +170,134 @@ export const ActionDialog = ({
     isDesktopWhilePrerendering
   );
 
+  const holder = useRef<HTMLDivElement>(null);
+  const action = useRef<HTMLButtonElement>(null);
+
+  // WARNING: Kumo's loading Button disables itself, and the browser then drops keyboard focus to the page behind the dialog, a moment after this effect runs. So focus moves off the action onto the dialog first, while busy, and back to the action afterwards if nothing else took it (a failure, or Send again).
+  useEffect(() => {
+    const node = holder.current;
+
+    if (!node) {
+      return;
+    }
+
+    if (
+      busy &&
+      (document.activeElement === action.current ||
+        !node.contains(document.activeElement))
+    ) {
+      node.focus();
+    }
+
+    if (!busy && document.activeElement === node) {
+      action.current?.focus();
+    }
+  }, [busy]);
+
+  const handleOpenChange = (
+    nextOpen: boolean,
+    details: { reason: string; cancel: () => void }
+  ) => {
+    if (!nextOpen && busy && DISMISSALS_HELD_WHILE_BUSY.has(details.reason)) {
+      details.cancel();
+
+      return;
+    }
+
+    onOpenChange(nextOpen);
+  };
+
+  const actions = {
+    action,
+    actionLabel,
+    busy,
+    destructive,
+    dismissLabel,
+    formId,
+  };
+
   if (isDesktop) {
+    // WARNING: Kumo's Dialog takes no initialFocus or finalFocus, so focus moves once the open or close has finished.
+    const settle = (isOpen: boolean) => {
+      (isOpen ? initialFocus : finalFocus)?.current?.focus();
+
+      if (!isOpen) {
+        onExited?.();
+      }
+    };
+
+    const root = destructive
+      ? ({ role: "alertdialog" } as const)
+      : ({ disablePointerDismissal: busy, role: "dialog" } as const);
+
     return (
-      <LayerDialog.Root
-        dismissDisabled={busy}
-        onOpenChange={onOpenChange}
-        onOpenChangeComplete={(isOpen) => {
-          if (isOpen) {
-            initialFocus?.current?.focus();
-          } else {
-            finalFocus?.current?.focus();
-          }
-        }}
+      <Dialog.Root
+        {...root}
+        onOpenChange={handleOpenChange}
+        onOpenChangeComplete={settle}
         open={open}
       >
-        <LayerDialog.Content size="sm" verticalAlign="center">
-          <LayerDialog.Title>
-            <span className="font-display text-display-sm font-semibold text-kumo-strong">
+        <Dialog
+          className="top-1/2 z-61 -translate-y-1/2 p-6 sm:top-1/2"
+          size={destructive ? "base" : "lg"}
+        >
+          <div className="outline-none" ref={holder} tabIndex={-1}>
+            <Dialog.Title className="font-display text-display-sm font-semibold text-balance text-kumo-strong">
               {title}
-            </span>
-          </LayerDialog.Title>
-          <LayerDialog.Description>{description}</LayerDialog.Description>
-          <LayerDialog.Body>{children}</LayerDialog.Body>
-          <LayerDialog.Actions dismissLabel={dismissLabel}>
-            <LayerDialog.Action
-              form={formId}
-              loading={busy}
-              type="submit"
-              variant={destructive ? "destructive" : "primary"}
-            >
-              {actionLabel}
-            </LayerDialog.Action>
-          </LayerDialog.Actions>
-        </LayerDialog.Content>
-      </LayerDialog.Root>
+            </Dialog.Title>
+            <Dialog.Description className="mt-1.5 text-base text-pretty text-kumo-subtle">
+              {description}
+            </Dialog.Description>
+            <div className="mt-5 empty:hidden">{children}</div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Actions {...actions} actionFirst={false} Close={Dialog.Close} />
+            </div>
+          </div>
+        </Dialog>
+      </Dialog.Root>
     );
   }
 
   return (
     <Drawer.Root
       disablePointerDismissal={busy}
-      onOpenChange={(nextOpen, details) => {
-        if (
-          !nextOpen &&
-          busy &&
-          DISMISSALS_HELD_WHILE_BUSY.has(details.reason)
-        ) {
-          details.cancel();
-
-          return;
+      onOpenChange={handleOpenChange}
+      onOpenChangeComplete={(isOpen) => {
+        if (!isOpen) {
+          onExited?.();
         }
-
-        onOpenChange(nextOpen);
       }}
       open={open}
     >
       <Drawer.Portal>
         <Drawer.Backdrop
-          className={`fixed inset-0 bg-kumo-recessed opacity-80 transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 ${SHEET_MOTION}`}
+          className={`fixed inset-0 z-60 bg-(--mq-scrim) transition-opacity data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 ${SHEET_MOTION}`}
         />
         <Drawer.Viewport
-          className="fixed inset-0 flex items-end"
+          className="fixed inset-0 z-61 flex items-end"
           data-base-ui-swipe-ignore={busy ? "" : undefined}
         >
           <Drawer.Popup
+            className={`flex max-h-[calc(100svh-3rem)] w-full [transform:translate3d(0,var(--drawer-swipe-movement-y,0px),0)] flex-col rounded-t-2xl bg-kumo-base shadow-sheet transition-transform outline-none data-[ending-style]:[transform:translate3d(0,100%,0)] data-[starting-style]:[transform:translate3d(0,100%,0)] ${SHEET_MOTION}`}
             finalFocus={finalFocus}
-            className={`flex max-h-[90dvh] w-full [transform:translate3d(0,var(--drawer-swipe-movement-y,0px),0)] flex-col rounded-t-2xl bg-kumo-base shadow-quilt-label transition-transform outline-none data-[ending-style]:[transform:translate3d(0,100%,0)] data-[starting-style]:[transform:translate3d(0,100%,0)] ${SHEET_MOTION}`}
+            ref={holder}
           >
-            <div aria-hidden="true" className="flex justify-center pt-2 pb-4">
-              <span className="h-1 w-9 rounded-full bg-kumo-fill" />
-            </div>
-            <Drawer.Content className="flex min-h-0 flex-col overflow-y-auto px-5 pb-sheet-bottom">
-              <Drawer.Title className="font-display text-display-sm font-semibold text-kumo-strong">
+            <span
+              aria-hidden="true"
+              className="mx-auto mt-2 block h-1 w-9 shrink-0 rounded-full bg-kumo-line"
+            />
+            <Drawer.Content className="flex min-h-0 flex-col overflow-y-auto px-4 pt-3.5 pb-2">
+              <Drawer.Title className="font-display text-display-sm font-semibold text-balance text-kumo-strong">
                 {title}
               </Drawer.Title>
-              <Drawer.Description className="mt-1.5 text-base text-(--mq-body)">
+              <Drawer.Description className="mt-1.5 text-base text-pretty text-kumo-subtle">
                 {description}
               </Drawer.Description>
-              <div className="mt-5">{children}</div>
-              <div className="mt-6 flex flex-col gap-2">
-                <Button
-                  className="h-11 w-full justify-center text-lg"
-                  form={formId}
-                  loading={busy}
-                  size="lg"
-                  type="submit"
-                  variant={destructive ? "destructive" : "primary"}
-                >
-                  {actionLabel}
-                </Button>
-                <Drawer.Close
-                  disabled={busy}
-                  render={
-                    <Button
-                      className="h-11 w-full justify-center text-lg"
-                      size="lg"
-                      variant="ghost"
-                    />
-                  }
-                >
-                  {dismissLabel}
-                </Drawer.Close>
-              </div>
+              <div className="mt-5 empty:hidden">{children}</div>
             </Drawer.Content>
+            <div className="flex flex-col gap-2 px-4 pt-3 pb-sheet-bottom">
+              <Actions {...actions} actionFirst Close={Drawer.Close} />
+            </div>
           </Drawer.Popup>
         </Drawer.Viewport>
       </Drawer.Portal>

@@ -1,4 +1,4 @@
-import { Banner, Checkbox, useKumoToastManager } from "@cloudflare/kumo";
+import { Banner, Checkbox } from "@cloudflare/kumo";
 import { ContactEmail, ListIdSchema } from "@repo/domain";
 import type { List, ListId, Organization } from "@repo/domain";
 import { useForm } from "@tanstack/react-form";
@@ -8,6 +8,7 @@ import { useId, useRef } from "react";
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
 import { ActionDialog } from "../layout/action-dialog.tsx";
+import { useConfirmationToast } from "../layout/toast.tsx";
 import { useCreateContact } from "./audience-api.ts";
 import { formatCount } from "./format.ts";
 
@@ -23,11 +24,12 @@ const listNames = (lists: readonly List[], ids: readonly ListId[]) =>
  * Adds one Contact, optionally subscribed to Lists, which start as
  * `preselected` (the List the table is filtered by). An address the
  * Organization already has is reported on the field, whatever its case.
- * Mount it afresh for each opening (a new `key`), so it starts empty.
+ * Give it `useDialog`'s `key` and `handleExited`, so each opening starts empty.
  */
 export const AddContactDialog = ({
   finalFocus,
   lists,
+  onExited,
   onOpenChange,
   open,
   organization,
@@ -35,13 +37,15 @@ export const AddContactDialog = ({
 }: {
   finalFocus?: React.RefObject<HTMLElement | null>;
   lists: readonly List[];
+  /** `useDialog`'s `handleExited`, so it starts fresh after each close. */
+  onExited?: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
   organization: Organization;
   preselected: readonly ListId[];
 }) => {
   const create = useCreateContact(organization.id);
-  const toasts = useKumoToastManager();
+  const toasts = useConfirmationToast();
   const formId = useId();
   const emailField = useRef<HTMLInputElement>(null);
 
@@ -102,6 +106,7 @@ export const AddContactDialog = ({
       finalFocus={finalFocus}
       formId={formId}
       initialFocus={emailField}
+      onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
       title="Add a contact"
