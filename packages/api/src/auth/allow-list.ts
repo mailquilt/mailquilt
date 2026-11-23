@@ -30,6 +30,7 @@ export const DISABLED_AUTH_PATHS = [
   "/callback/:id",
   "/change-email",
   "/change-password",
+  // WARNING: deleting a user cascades to their memberships and can leave an Organization with no owner; fix #115 before allowing /delete-user.
   "/delete-user",
   "/delete-user/callback",
   "/error",
