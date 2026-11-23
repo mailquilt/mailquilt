@@ -100,6 +100,7 @@ export const useInstanceSettings = () =>
     queryKey: SETTINGS_KEY,
     retry: (failures, error) =>
       !Predicate.isTagged(error, "InstanceAdminRequired") &&
+      !Predicate.isTagged(error, "SignInRequired") &&
       failures < SETTINGS_RETRIES,
   });
 
