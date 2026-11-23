@@ -18,7 +18,8 @@ const MAX_API_BODY_SIZE = ByteSize.kibibytes(64);
  * allow list. The ports its use cases call are request requirements: each
  * runtime provides them per request. A request body larger than 64 KiB is
  * refused with 413, before anyone is signed in: at once when its
- * `Content-Length` says so, or else once 64 KiB of it have been read.
+ * `Content-Length` says so, or else as soon as more than 64 KiB of it has
+ * arrived.
  */
 export const ApiLive = Layer.mergeAll(
   HttpApiBuilder.layer(MailquiltApi).pipe(
