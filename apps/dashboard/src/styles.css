@@ -1082,7 +1082,7 @@ aside.mq-frame {
   }
 }
 
-/* ---------- Tables: in one bordered card, two-line rows on phones ---------- */
+/* ---------- Tables: in one bordered card, stacked rows on phones ---------- */
 
 /* An open region (a one-column page's states): full width inside the page block. */
 .mq-bleed {
@@ -1200,7 +1200,7 @@ aside.mq-frame {
 }
 
 /*
- * Phones: rows restack into two-line items instead of scrolling sideways.
+ * Phones: rows restack into lines instead of scrolling sideways.
  * The rows keep role="row" and "cell", since changing display drops table
  * semantics in some browsers.
  */
@@ -1274,6 +1274,12 @@ aside.mq-frame {
 
   .mq-stack [data-area="sub"] {
     grid-area: sub;
+  }
+
+  .mq-table.mq-stack tbody tr > [data-area="foot"] {
+    grid-column: 1 / -1;
+    justify-self: start;
+    padding-top: 0.25rem !important;
   }
 
   .mq-stack [data-area="hide"] {

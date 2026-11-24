@@ -246,7 +246,7 @@ const COLUMN_CLASSES = {
 };
 
 const AREAS = {
-  actions: "side",
+  actions: "foot",
   name: "main",
   security: "hide",
   sendsAs: "sub",
