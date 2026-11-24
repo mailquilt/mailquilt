@@ -87,6 +87,7 @@ const COLUMNS = helper.columns([
     id: "status",
   }),
   helper.accessor((row) => row.listName, {
+    cell: ({ getValue }) => <span title={getValue()}>{getValue()}</span>,
     header: "List",
     id: "list",
   }),
@@ -114,7 +115,7 @@ const COLUMNS = helper.columns([
   }),
   helper.display({
     cell: ({ row }) => (
-      <span className="text-sm text-kumo-subtle">
+      <span className="line-clamp-2 text-sm text-kumo-subtle">
         {row.original.listName}, {dateOf(row.original.campaign).line}
       </span>
     ),

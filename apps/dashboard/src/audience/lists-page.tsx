@@ -66,7 +66,7 @@ const listColumns = (biggest: number) =>
           >
             {row.original.name}
           </Link>
-          <span className="mt-2.5 block max-sm:hidden lg:hidden">
+          <span className="mt-2.5 block max-sm:hidden xl:hidden">
             <MakeUp biggest={biggest} list={row.original} />
           </span>
         </>
@@ -149,8 +149,8 @@ const listColumns = (biggest: number) =>
 
 const COLUMN_CLASSES = {
   created: "whitespace-nowrap max-xl:hidden",
-  makeUp: "w-[32%] max-lg:hidden",
-  name: "mq-name-with-bar max-w-[24rem] truncate whitespace-nowrap max-xl:max-w-64",
+  makeUp: "w-[32%] max-xl:hidden",
+  name: "mq-name-with-bar max-w-[24rem] wrap-anywhere max-xl:max-w-64 xl:truncate xl:whitespace-nowrap",
   open: "w-8",
   pending: NUMBER,
   subscribed: NUMBER,
