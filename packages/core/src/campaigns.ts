@@ -10,10 +10,11 @@ import type {
   NoSubscribedContacts,
   ProviderConnectionId,
   ProviderConnectionNotFound,
+  SendFailureReason,
   Sender,
 } from "@repo/domain";
 import { SendFailed } from "@repo/domain";
-import { Array as Arr, Context, Effect, Option, pipe } from "effect";
+import { Array as Arr, Context, Effect, Option, pipe, Ref } from "effect";
 import type { Types } from "effect";
 
 import { CurrentOrganization } from "./current-organization.ts";
@@ -118,10 +119,11 @@ export class Campaigns extends Context.Service<
       CurrentOrganization
     >;
     /**
-     * Records what the Provider did for each recipient, writes a `sent`
-     * delivery event for each email it accepted, and marks the Campaign
-     * `sent` once none of its recipients are still queued, all in one
-     * transaction.
+     * Records what the Provider did for each recipient still queued, adds
+     * them to the Campaign's counts and writes a `sent` delivery event for
+     * each email it accepted, in one statement. Then, in a statement of its
+     * own, marks the Campaign `sent` once none of its recipients are still
+     * queued; with no outcomes, only that runs.
      */
     readonly recordOutcomes: (
       id: CampaignId,
@@ -191,6 +193,15 @@ export const sendCampaign = (id: CampaignId) =>
     );
   });
 
+const SERVER_FAILURES = new Set<SendFailureReason>([
+  "auth",
+  "blocked",
+  "host-not-found",
+  "tls",
+  "unavailable",
+  "unreachable",
+]);
+
 const NO_CONNECTION = new SendFailed({
   detail: "The Campaign's provider connection was deleted.",
   reason: "failed",
@@ -207,8 +218,12 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
       message.batch
     );
 
-    if (Option.isNone(found) || found.value.recipients.length === 0) {
+    if (Option.isNone(found)) {
       return;
+    }
+
+    if (found.value.recipients.length === 0) {
+      return yield* campaigns.recordOutcomes(message.campaignId, []);
     }
 
     const batch = found.value;
@@ -244,10 +259,27 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
       return sent;
     };
 
+    const serverFailure = yield* Ref.make(Option.none<SendFailed>());
+
+    const sendOrSkip = (to: string) =>
+      Effect.flatMap(Ref.get(serverFailure), (earlier) =>
+        Option.match(earlier, {
+          onNone: () =>
+            sendTo(to).pipe(
+              Effect.tapError((failed) =>
+                SERVER_FAILURES.has(failed.reason)
+                  ? Ref.set(serverFailure, Option.some(failed))
+                  : Effect.void
+              )
+            ),
+          onSome: Effect.fail,
+        })
+      );
+
     const outcomes = yield* pipe(
       batch.recipients,
       Effect.forEach((recipient) =>
-        sendTo(recipient.email).pipe(
+        sendOrSkip(recipient.email).pipe(
           Effect.match({
             onFailure: (failed) =>
               ({
@@ -271,8 +303,10 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
  * Does the work one queue message asks for. For a Campaign batch: sends to
  * the recipients in it that are still queued, one email each, through the
  * Campaign's Provider Connection, and records what happened to each. A
- * Provider refusing one recipient doesn't stop the others, and a batch
- * delivered again sends only to those still queued.
+ * Provider refusing one recipient doesn't stop the others; once its server
+ * can't be reached or refuses the connection, the rest of the batch is
+ * recorded with that failure without trying them. A batch delivered again
+ * sends only to those still queued.
  */
 export const handleQueueMessage = (message: QueueMessage) =>
   sendCampaignBatch(message);

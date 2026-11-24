@@ -2,12 +2,18 @@
   "type": "diff",
   "version": "10",
   "dialect": "postgres",
-  "id": "ed6b1402-1c0c-4b44-8ff9-bf188fc61270",
-  "prevIds": ["19bf3863-0d1b-4359-8b79-acea6212dc0e"],
+  "id": "f6bec74f-cbde-4b13-b137-10872b8a1d8e",
+  "prevIds": [
+    "19bf3863-0d1b-4359-8b79-acea6212dc0e"
+  ],
   "footprints": [
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "public", "campaign_recipients"],
+      "statementTarget": [
+        "table",
+        "public",
+        "campaign_recipients"
+      ],
       "writes": [
         "s|tbl|public.campaign_recipients",
         "n|tbl|public.campaign_recipients",
@@ -16,11 +22,17 @@
         "n|type|public.campaign_recipients",
         "n|rel|public.campaign_recipients_pkey"
       ],
-      "reads": ["n|sch|public"]
+      "reads": [
+        "n|sch|public"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "public", "campaigns"],
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
       "writes": [
         "s|tbl|public.campaigns",
         "n|tbl|public.campaigns",
@@ -30,11 +42,17 @@
         "n|rel|public.campaigns_pkey",
         "n|rel|public.campaigns_organization_id_id_key"
       ],
-      "reads": ["n|sch|public"]
+      "reads": [
+        "n|sch|public"
+      ]
     },
     {
       "statementType": "create_table",
-      "statementTarget": ["table", "public", "delivery_events"],
+      "statementTarget": [
+        "table",
+        "public",
+        "delivery_events"
+      ],
       "writes": [
         "s|tbl|public.delivery_events",
         "n|tbl|public.delivery_events",
@@ -43,7 +61,9 @@
         "n|type|public.delivery_events",
         "n|rel|public.delivery_events_pkey"
       ],
-      "reads": ["n|sch|public"]
+      "reads": [
+        "n|sch|public"
+      ]
     },
     {
       "statementType": "create_index",
@@ -88,7 +108,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "public", "campaign_recipients"],
+      "statementTarget": [
+        "table",
+        "public",
+        "campaign_recipients"
+      ],
       "writes": [
         "s|fk|public.campaign_recipients.campaign_recipients_campaign_fkey",
         "n|fk|public.campaign_recipients.campaign_recipients_campaign_fkey",
@@ -109,7 +133,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "public", "campaigns"],
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
       "writes": [
         "s|fk|public.campaigns.campaigns_organization_id_organizations_id_fkey",
         "n|fk|public.campaigns.campaigns_organization_id_organizations_id_fkey",
@@ -128,7 +156,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "public", "campaigns"],
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
       "writes": [
         "s|fk|public.campaigns.campaigns_list_fkey",
         "n|fk|public.campaigns.campaigns_list_fkey",
@@ -149,7 +181,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "public", "campaigns"],
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
       "writes": [
         "s|fk|public.campaigns.campaigns_provider_connection_fkey",
         "n|fk|public.campaigns.campaigns_provider_connection_fkey",
@@ -170,7 +206,11 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": ["table", "public", "delivery_events"],
+      "statementTarget": [
+        "table",
+        "public",
+        "delivery_events"
+      ],
       "writes": [
         "s|fk|public.delivery_events.delivery_events_campaign_fkey",
         "n|fk|public.delivery_events.delivery_events_campaign_fkey",
@@ -543,6 +583,54 @@
       "row": {
         "schema": "public",
         "table": "campaigns",
+        "name": "recipients_total",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "recipients_sent",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "recipients_failed",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
         "name": "sending_started_at",
         "type": "timestamp with time zone",
         "typeSchema": null,
@@ -774,10 +862,16 @@
         "table": "campaign_recipients",
         "name": "campaign_recipients_campaign_fkey",
         "nameExplicit": true,
-        "columns": ["organization_id", "campaign_id"],
+        "columns": [
+          "organization_id",
+          "campaign_id"
+        ],
         "schemaTo": "public",
         "tableTo": "campaigns",
-        "columnsTo": ["organization_id", "id"],
+        "columnsTo": [
+          "organization_id",
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -790,10 +884,14 @@
         "table": "campaigns",
         "name": "campaigns_organization_id_organizations_id_fkey",
         "nameExplicit": false,
-        "columns": ["organization_id"],
+        "columns": [
+          "organization_id"
+        ],
         "schemaTo": "public",
         "tableTo": "organizations",
-        "columnsTo": ["id"],
+        "columnsTo": [
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -806,10 +904,16 @@
         "table": "campaigns",
         "name": "campaigns_list_fkey",
         "nameExplicit": true,
-        "columns": ["organization_id", "list_id"],
+        "columns": [
+          "organization_id",
+          "list_id"
+        ],
         "schemaTo": "public",
         "tableTo": "lists",
-        "columnsTo": ["organization_id", "id"],
+        "columnsTo": [
+          "organization_id",
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "NO ACTION",
         "entityType": "fks"
@@ -822,10 +926,16 @@
         "table": "campaigns",
         "name": "campaigns_provider_connection_fkey",
         "nameExplicit": true,
-        "columns": ["organization_id", "provider_connection_id"],
+        "columns": [
+          "organization_id",
+          "provider_connection_id"
+        ],
         "schemaTo": "public",
         "tableTo": "provider_connections",
-        "columnsTo": ["organization_id", "id"],
+        "columnsTo": [
+          "organization_id",
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "SET NULL",
         "entityType": "fks"
@@ -838,10 +948,16 @@
         "table": "delivery_events",
         "name": "delivery_events_campaign_fkey",
         "nameExplicit": true,
-        "columns": ["organization_id", "campaign_id"],
+        "columns": [
+          "organization_id",
+          "campaign_id"
+        ],
         "schemaTo": "public",
         "tableTo": "campaigns",
-        "columnsTo": ["organization_id", "id"],
+        "columnsTo": [
+          "organization_id",
+          "id"
+        ],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -853,7 +969,10 @@
         "schema": "public",
         "table": "campaign_recipients",
         "name": "campaign_recipients_pkey",
-        "columns": ["campaign_id", "contact_id"],
+        "columns": [
+          "campaign_id",
+          "contact_id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -864,7 +983,10 @@
         "schema": "public",
         "table": "delivery_events",
         "name": "delivery_events_pkey",
-        "columns": ["occurred_at", "id"],
+        "columns": [
+          "occurred_at",
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -875,7 +997,9 @@
         "schema": "public",
         "table": "campaigns",
         "name": "campaigns_pkey",
-        "columns": ["id"],
+        "columns": [
+          "id"
+        ],
         "nameExplicit": false,
         "entityType": "pks"
       }
@@ -887,7 +1011,10 @@
         "table": "campaigns",
         "name": "campaigns_organization_id_id_key",
         "nameExplicit": true,
-        "columns": ["organization_id", "id"],
+        "columns": [
+          "organization_id",
+          "id"
+        ],
         "nullsNotDistinct": false,
         "entityType": "uniques"
       }

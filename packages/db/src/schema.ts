@@ -316,6 +316,9 @@ export const providerConnections = pgTable(
  * List through one Provider Connection. Deleting that Provider Connection
  * leaves the Campaign without one (`provider_connection_id` null), so a draft
  * asks for another and a send in progress stops at its next batch.
+ * `recipients_*` count the Contacts it goes to, fixed when it starts sending,
+ * and how many were sent it or failed so far, kept with each batch's outcomes
+ * so reading them never counts recipient rows.
  */
 export const campaigns = pgTable(
   "campaigns",
@@ -332,6 +335,9 @@ export const campaigns = pgTable(
     providerConnectionId: text("provider_connection_id"),
     html: text("html").notNull(),
     status: text("status").notNull().default("draft"),
+    recipientsTotal: integer("recipients_total").notNull().default(0),
+    recipientsSent: integer("recipients_sent").notNull().default(0),
+    recipientsFailed: integer("recipients_failed").notNull().default(0),
     sendingStartedAt: timestamp("sending_started_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: createdAt(),

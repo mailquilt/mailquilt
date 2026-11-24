@@ -412,6 +412,83 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
       })
   );
 
+  test.effect(
+    "stops trying a batch once the Provider's server can't be reached, and records the rest as failed with why",
+    () =>
+      Effect.gen(function* serverUnreachable() {
+        const owner = yield* draftCampaign;
+
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(
+          owner,
+          ["ada@example.com", "alan@example.com", "grace@example.com"],
+          [list.id]
+        );
+
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const outbox = yield* SmtpOutbox;
+
+        yield* outbox.failNextSend(
+          new SendFailed({
+            detail: "Connection timed out",
+            reason: "unreachable",
+          })
+        );
+        yield* (yield* QueueWorker).deliverAll;
+
+        const sent = yield* client.campaigns.get({ params: campaignParams });
+
+        const sql = yield* SqlClient.SqlClient;
+
+        const reasons = yield* sql<{ readonly failure_detail: string }>`
+          select distinct failure_detail from campaign_recipients
+          where campaign_id = ${campaign.id}`;
+
+        assert.strictEqual(sent.status, "sent");
+        assert.deepStrictEqual(
+          { ...sent.recipients },
+          {
+            failed: 3,
+            sent: 0,
+            total: 3,
+          }
+        );
+        assert.isEmpty(yield* sentTo(campaign.subject));
+        assert.deepStrictEqual(
+          reasons.map((row) => row.failure_detail),
+          ["Connection timed out"]
+        );
+      })
+  );
+
+  test.effect(
+    "finishes a Campaign whose last batch was recorded but not yet marked sent when its message comes again",
+    () =>
+      Effect.gen(function* recordedButNotFinished() {
+        const owner = yield* draftCampaign;
+
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* worker.deliverAll;
+
+        const sql = yield* SqlClient.SqlClient;
+
+        yield* sql`update campaigns set status = 'sending', sent_at = null where id = ${campaign.id}`;
+        yield* worker.deliver(message ?? assert.fail());
+
+        const finished = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(finished.status, "sent");
+        assert.lengthOf(yield* sentTo(campaign.subject), 1);
+      })
+  );
+
   test.effect("sends a batch delivered twice only once", () =>
     Effect.gen(function* deliveredTwice() {
       const owner = yield* draftCampaign;

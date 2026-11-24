@@ -35,16 +35,9 @@ const decodeCampaign = Schema.decodeUnknownEffect(Campaign);
 
 const decodePage = Schema.decodeUnknownEffect(CampaignPage);
 
-const recipientsWithStatus = (status?: string) =>
-  sql<number>`(select count(*) from ${campaignRecipients} where ${campaignRecipients.campaignId} = ${campaigns.id}${
-    status === undefined
-      ? sql``
-      : sql` and ${campaignRecipients.status} = ${status}`
-  })::int`;
-
 const summaryColumns = {
   createdAt: campaigns.createdAt,
-  failed: recipientsWithStatus("failed"),
+  failed: campaigns.recipientsFailed,
   fromEmail: campaigns.fromEmail,
   fromName: campaigns.fromName,
   id: campaigns.id,
@@ -52,11 +45,11 @@ const summaryColumns = {
   providerConnectionId: campaigns.providerConnectionId,
   replyTo: campaigns.replyTo,
   sendingStartedAt: campaigns.sendingStartedAt,
-  sent: recipientsWithStatus("sent"),
+  sent: campaigns.recipientsSent,
   sentAt: campaigns.sentAt,
   status: campaigns.status,
   subject: campaigns.subject,
-  total: recipientsWithStatus(),
+  total: campaigns.recipientsTotal,
 };
 
 const campaignColumns = { ...summaryColumns, html: campaigns.html };
@@ -389,11 +382,18 @@ export const CampaignsLive = Layer.effect(
                   and r.contact_id = outcome.contact_id
                   and r.status = 'queued'
                 returning r.organization_id, r.campaign_id, r.contact_id, r.status, r.provider_message_id
+              ),
+              events as (
+                insert into delivery_events (organization_id, campaign_id, contact_id, kind, provider_message_id)
+                select organization_id, campaign_id, contact_id, 'sent', provider_message_id
+                from recorded
+                where status = 'sent'
               )
-              insert into delivery_events (organization_id, campaign_id, contact_id, kind, provider_message_id)
-              select organization_id, campaign_id, contact_id, 'sent', provider_message_id
-              from recorded
-              where status = 'sent'
+              update ${campaigns}
+              set recipients_sent = recipients_sent + (select count(*) from recorded where status = 'sent'),
+                recipients_failed = recipients_failed + (select count(*) from recorded where status = 'failed'),
+                updated_at = now()
+              where organization_id = ${organization} and id = ${id}
             `);
           }
 
@@ -404,7 +404,7 @@ export const CampaignsLive = Layer.effect(
               and(
                 inOrganization(organization, id),
                 eq(campaigns.status, "sending"),
-                sql`not exists (select 1 from ${campaignRecipients} where ${campaignRecipients.campaignId} = ${id} and ${campaignRecipients.status} = 'queued')`
+                sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} >= ${campaigns.recipientsTotal}`
               )
             );
         }).pipe(Effect.orDie),
@@ -464,6 +464,12 @@ export const CampaignsLive = Layer.effect(
               if (recipients === 0) {
                 return yield* new NoSubscribedContacts();
               }
+
+              yield* db
+                .update(campaigns)
+                .set({ recipientsTotal: recipients })
+                .where(inOrganization(organization, id))
+                .pipe(Effect.orDie);
 
               yield* enqueue(Math.ceil(recipients / batchSize));
 

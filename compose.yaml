@@ -4,7 +4,7 @@
 #
 #   AUTH_SECRET        at least 32 random characters: openssl rand -base64 32
 #   ENCRYPTION_KEYS    1:<32 random bytes, base64>: echo "1:$(openssl rand -base64 32)"
-#   POSTGRES_PASSWORD  any strong password
+#   POSTGRES_PASSWORD  letters and digits only, as it goes into a connection URL: openssl rand -hex 32
 #   APP_URL            where people open Mailquilt, such as https://mail.example.com
 
 services:
