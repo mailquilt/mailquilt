@@ -378,10 +378,10 @@ const NoContacts = ({
       <EmptyState
         actions={
           <>
+            {add}
             <Button onClick={onShowAll} variant="secondary">
               Show all contacts
             </Button>
-            {add}
           </>
         }
         description="Select contacts in All contacts and choose Add to list, or add a new contact straight to this list."
