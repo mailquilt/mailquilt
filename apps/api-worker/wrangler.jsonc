@@ -12,6 +12,22 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/health", "/api/*"],
   },
+  // A Campaign's batches. Create the queue once with `wrangler queues create
+  // mailquilt`. Each delivery is one batch of up to 100 emails, so it has a
+  // consumer invocation, and its 15-minute limit, to itself (ADR 0014). One
+  // consumer runs at a time, as pg-boss does on Node, so a send never opens
+  // more than one connection to the Provider's server.
+  "queues": {
+    "producers": [{ "binding": "QUEUE", "queue": "mailquilt" }],
+    "consumers": [
+      { "queue": "mailquilt", "max_batch_size": 1, "max_concurrency": 1 },
+    ],
+  },
+  // Every minute: forward queue messages a request couldn't (ADR 0014).
+  // Every day at 03:00 UTC: make delivery events' coming monthly partitions.
+  "triggers": {
+    "crons": ["* * * * *", "0 3 * * *"],
+  },
   // AUTH_SECRET and ENCRYPTION_KEYS are secrets: `wrangler secret put
   // AUTH_SECRET`, or `.dev.vars` for `wrangler dev`. So is
   // SYSTEM_MAILER_SMTP_PASSWORD, when the System Mailer is set here rather
@@ -19,6 +35,12 @@
   "vars": {
     "APP_URL": "http://localhost:8787",
   },
+  // Create the config with its query cache off, or reads come back up to a
+  // minute old: `wrangler hyperdrive create mailquilt --caching-disabled
+  // --connection-string=…`.
+  // `pnpm --filter api-worker deploy` applies migrations before deploying,
+  // through DATABASE_URL: a direct connection to the database Hyperdrive
+  // points at.
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",

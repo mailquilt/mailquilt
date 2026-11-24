@@ -6,14 +6,17 @@ The policy has one switch, `blockPrivateNetworks`. With it on, only public addre
 
 The guard is built on `effect/net`'s `AddressResolver` and `Dns`, so tests give it a static zone and each runtime gives it the platform's resolver.
 
+On Workers, SMTP connects by the host name after the guard has checked it (#11). Cloudflare's `connect()` starts TLS only on a socket opened by name: one opened to the checked address closes right after STARTTLS, so on Workers the rule above would leave only unencrypted SMTP. The check still refuses a host that resolves to a blocked address, and Cloudflare resolves the name again when connecting. A second answer can't lead anywhere the check would refuse, because a deployed Worker reaches only the public internet (`wrangler dev` can reach the local network): from production, `connect()` to loopback, `10.0.0.1`, `172.16.0.1`, `192.168.1.1` and `169.254.169.254` fails, and there is no metadata service to reach.
+
 ## Considered Options
 
+- **On Workers, keep connecting to the checked address and allow only unencrypted SMTP there:** keeps one rule everywhere, but credentials and email would cross the internet in plaintext, and most Providers refuse that.
 - **Check the host, then let the client library resolve it again:** simpler, but the second lookup can return a private address after the first returned a public one.
 - **Check at save time only:** DNS changes after the save, so the check has to run on every connection.
 - **Block private networks on self-hosted installs too:** breaks the common case of a relay on the same network, so it is a setting instead.
 
 ## Consequences
 
-- An adapter takes the guard as a requirement and connects to the address it returns. Outgoing webhooks, RSS fetches and image imports do the same when they arrive, and follow redirects only through the guard again.
+- An adapter takes the guard as a requirement and connects to the address it returns, except on Workers, where it connects by name after the check. Outgoing webhooks, RSS fetches and image imports do the same when they arrive, and follow redirects only through the guard again.
 - A host that resolves to several addresses connects to the first, without trying the others. The operating system's resolver usually sorts addresses this machine can't reach, such as IPv6 without IPv6 connectivity, last. If that proves wrong in practice, the adapter can try the next checked address when connecting fails.
 - Hosts are checked on each send, not cached, so a lookup is part of every connection.

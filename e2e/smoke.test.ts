@@ -3,6 +3,10 @@ import type { Page } from "@playwright/test";
 
 const MAILPIT_URL = process.env.MAILPIT_URL ?? "http://localhost:8325";
 
+const MAILPIT_SMTP_HOST = process.env.MAILPIT_SMTP_HOST ?? "mailpit";
+
+const MAILPIT_SMTP_PORT = process.env.MAILPIT_SMTP_PORT ?? "1025";
+
 const ADMIN = {
   email: "grace@acme.example",
   name: "Grace",
@@ -32,8 +36,8 @@ const createOrganization = async (page: Page) => {
 const connectMailpit = async (page: Page) => {
   await page.goto("/providers/new");
   await page.getByLabel("Name", { exact: true }).fill("Mailpit");
-  await page.getByLabel("Host", { exact: true }).fill("mailpit");
-  await page.getByLabel("Port", { exact: true }).fill("1025");
+  await page.getByLabel("Host", { exact: true }).fill(MAILPIT_SMTP_HOST);
+  await page.getByLabel("Port", { exact: true }).fill(MAILPIT_SMTP_PORT);
   await page.getByRole("radio", { name: "None" }).check();
   await page
     .getByRole("checkbox", { name: "This server doesn’t need a sign-in" })

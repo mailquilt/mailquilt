@@ -9,7 +9,7 @@ How Mailquilt is built so the same code runs fully on Cloudflare or anywhere Doc
 | Entry app | `apps/api-worker` | `apps/server` (one Node process) |
 | Database | Postgres through Hyperdrive, or a serverless Postgres such as Neon | Postgres in the compose file |
 | Storage | R2 | Any S3-compatible store (R2, S3, MinIO) |
-| Queue | Cloudflare Queues | pg-boss on Postgres |
+| Queue | Cloudflare Queues, fed from an outbox table ([ADR 0014](adr/0014-queued-work-acts-in-the-organization-its-message-names.md)) | pg-boss on Postgres |
 | Scheduler | Cron Triggers | pg-boss cron |
 | Rate limiting | Workers rate-limiting binding (coarse, per IP) + Postgres counters (precise) | In-memory (coarse, per IP) + Postgres counters (precise); Redis adapter only if several replicas or measured load need it |
 | Inbound bounces | Email Workers handler | Provider webhooks; bounce-mailbox polling (P2) |

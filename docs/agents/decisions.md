@@ -21,7 +21,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Until the plain-text part and footer (#13) and unsubscribe (#12), a Campaign is sent as its HTML only (#10).
 - Until retries (#17), a Contact the Provider refuses is recorded as `failed` with the Provider's words and isn't tried again; the others still get it. When the server itself fails (unreachable, TLS, sign-in, blocked, no such host), the rest of that batch is recorded with the same failure without trying them, so one dead server can't hold the queue for a minute per Contact. A Campaign is `sent` once none of its recipients are still queued (#10).
 - Deleting a Provider Connection leaves its Campaigns without one: a draft can't be sent until another is chosen, and a Campaign still sending records the Contacts it hadn't reached as `failed` (#10).
-- Until Cloudflare Queues (#11), sending a Campaign on Workers answers 500 and leaves it a draft (#10).
+- On Workers, a send's queue messages go into the `queue_outbox` table in its transaction and are forwarded to Cloudflare Queues when the request ends, and every minute by a Cron Trigger for any left behind. One consumer runs at a time, as pg-boss works on Node, and takes one batch per invocation, one email at a time, so a batch has the 15-minute limit to itself and holds one SMTP and one database connection of the Worker's 6 (ADR 0014, #11). Sending works on Workers Free: on a deployed Worker, one batch of 100 went out in one invocation in 226 seconds and 874 ms of CPU, so its host lookups and SMTP connections didn't meet Free's 50-subrequest limit (#11).
 
 ## Providers
 
@@ -35,7 +35,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - A test email goes to any address the member types, through the connection's default sender, at most 10 every 10 minutes per person across Organizations. When the Provider refuses it, the API answers 502 `SendFailed` with the Provider's own words, so the member can fix the settings (#9).
 - A Provider Connection can be edited and deleted. An edit that leaves credentials out keeps them; `null` removes them. Changing the host, port or encryption while keeping saved credentials is refused (`CredentialsRequired`), so a member can't send someone else's password to a server they control or unencrypted (#9).
 - A DNS lookup that fails (timeout, server failure) is reported as `unreachable` with the resolver's reason; only a name with no address is `host-not-found` (#9).
-- Until the Workers SMTP adapter (#11), an SMTP Provider Connection can be saved on Cloudflare, and sending through it fails with `SendFailed` reason `unavailable` (#9).
+- SMTP on Workers is the same Nodemailer adapter, over workerd's `node:net` and `node:tls`, which run on `connect()`. After the outbound guard checks the host, a Worker connects to it by name, because Cloudflare starts TLS only on a socket opened by name (ADR 0010); TLS from the start opens a TLS socket by name, since Nodemailer's own fails there. Cloudflare checks the certificate against that name. Workers can't trust extra certificates and block port 25, and a certificate the name doesn't match fails as `unreachable` with Cloudflare's own words ("proxy request failed", "Connection closed unexpectedly") rather than `tls` (#11).
 
 ## The install
 
@@ -45,12 +45,13 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - The System Mailer sends through SMTP, with the same adapter and outbound guard as Provider Connections. Its saved credentials are sealed and write-only, and only go to the server they were entered for, as a Provider Connection's do (#7).
 - `SYSTEM_MAILER_*` environment variables win over the System Mailer saved on the settings page, which then can't be changed (409 `SystemMailerFromEnvironment`). Some set but not all that are needed stops the app on Node; a Worker answers 500 to every request instead, saying why in its log (#7).
 - An account email that can't be sent, including when the saved System Mailer can't be read, is logged with its subject and the failure's reason, never the address or the server's reply, which often quotes it. Sign-up still succeeds (#7).
-- On Node the System Mailer answers at once and sends afterwards, so sign-up takes as long for a new address as for one with an account. On Workers it sends before answering, which is safe only while SMTP fails at once there; #11 must keep it so (#7).
+- On Node the System Mailer answers at once and sends afterwards, so sign-up takes as long for a new address as for one with an account. On Workers it sends before answering, which is safe only while SMTP fails at once there, so the System Mailer still doesn't send on Workers, though Provider Connections do (#7, #11).
 - A new password is 8 to 128 characters, the most Better Auth signs in with, so setup can't make an instance admin who can never sign in (#7).
 
 ## Data
 
 - Postgres is the only database, including on Cloudflare (ADR 0001).
+- On Cloudflare, Hyperdrive's query cache is off (`--caching-disabled`). With it on, reads are served up to a minute old: a Campaign that started sending still reads as a draft, and so would a session that was signed out (#11).
 - IDs are a type prefix plus a UUIDv7 in the TypeID format, such as `org_01h455vb4pex5vsknk084sn02q`. They're part of the public API (ADR 0006).
 - Every repository method for tenant data requires `CurrentOrganization` from the request context, which only `asMemberOf` provides after checking membership. There's no unscoped query path for tenant data, and Postgres row-level security isn't used (ADR 0007).
 - The Organization a request acts in is named in its path, not stored on the session, so two tabs can work in two Organizations. The dashboard remembers each tab's choice (ADR 0007, #6).
@@ -69,7 +70,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Better Auth sits behind our own allow list of endpoints. `disabledPaths` is only a second layer, and plugins we don't use aren't installed.
 - Better Auth's rate limiter uses our `RateLimiter` port in every environment. Its in-memory store is never used.
 - The client IP is read only from the configured header: `cf-connecting-ip` on Cloudflare, the proxy's header on Docker.
-- Every outbound request to a user-chosen address goes through the outbound guard, and connects to the address it checked (ADR 0010). It's always on for hosted; self-hosted installs allow private networks and loopback by default. Cloud metadata, link-local and reserved addresses are always refused (#9).
+- Every outbound request to a user-chosen address goes through the outbound guard, and connects to the address it checked (ADR 0010), except SMTP on Workers, which connects by name after the check because Cloudflare starts TLS only on a socket opened by name (#11). It's always on for hosted; self-hosted installs allow private networks and loopback by default. Cloud metadata, link-local and reserved addresses are always refused (#9).
 - Secrets at rest are sealed with AES-256-GCM under `ENCRYPTION_KEYS`, bound to their row; the app doesn't start without valid keys (ADR 0009, #9).
 - On the hosted service, public pages are served from a domain that never receives cookies, and open and click tracking requires the Organization's own tracking domain.
 - Redis isn't used. A Redis rate limiter is added only if several replicas or measured Postgres load need it.

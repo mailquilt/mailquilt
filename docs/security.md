@@ -106,7 +106,7 @@ All of these go through one outbound guard:
 - SNS certificate fetches
 - SMTP hosts
 
-The guard blocks private, link-local, loopback and cloud metadata addresses. It checks every address after DNS resolution, and the connection goes to the address it checked, so a second DNS answer can't redirect it ([ADR 0010](adr/0010-outbound-connections-go-to-the-address-the-guard-checked.md)). It limits redirects, timeouts and response size.
+The guard blocks private, link-local, loopback and cloud metadata addresses. It checks every address after DNS resolution, and the connection goes to the address it checked, so a second DNS answer can't redirect it ([ADR 0010](adr/0010-outbound-connections-go-to-the-address-the-guard-checked.md)). On Workers, SMTP connects by name after the check, because Cloudflare starts TLS only on a socket opened by name; a deployed Worker reaches only the public internet (`wrangler dev` can reach the local network), so a second answer can't lead anywhere the check would have refused. It limits redirects, timeouts and response size.
 
 - **Hosted:** always on.
 - **Self-hosted:** private networks and loopback are allowed by default (internal SMTP relays are normal), and `BLOCK_PRIVATE_NETWORKS=true` turns the block on. Cloud metadata, link-local and reserved addresses are refused either way.

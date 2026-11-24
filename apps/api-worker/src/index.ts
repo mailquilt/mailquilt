@@ -1,22 +1,33 @@
 import { ApiLive, authConfigLayer } from "@repo/api";
-import { SystemMailerConfigFromEnv, SystemMailerLive } from "@repo/core";
 import {
+  createDeliveryEventPartitions,
+  SystemMailerConfigFromEnv,
+  SystemMailerLive,
+} from "@repo/core";
+import {
+  consumeQueueBatch,
+  forwardOutboxTo,
   postgresPortsLive,
   providePerRequest,
-  QueueUnavailable,
+  SmtpProviderLive,
   SmtpProviderUnavailable,
 } from "@repo/runtime-cloudflare";
+import type { QueueBinding } from "@repo/runtime-cloudflare";
 import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
 import { HttpRouter, HttpServer } from "effect/http";
 
 interface Env {
   readonly HYPERDRIVE: Hyperdrive;
+  /** The Cloudflare Queue a Campaign's batches are sent through. */
+  readonly QUEUE: QueueBinding;
   /** Where the dashboard is served, such as `https://mail.example.com`. */
   readonly APP_URL: string;
   /** A secret, set with `wrangler secret put AUTH_SECRET` (`.dev.vars` locally). */
   readonly AUTH_SECRET: string;
   /** Keys that seal Provider Connection credentials, a secret like AUTH_SECRET (ADR 0009). Unset, every request fails saying so. */
   readonly ENCRYPTION_KEYS?: string;
+  /** `true` stops SMTP connections to private networks and loopback too (ADR 0010). */
+  readonly BLOCK_PRIVATE_NETWORKS?: string;
   /**
    * The System Mailer, optional: `SYSTEM_MAILER_SMTP_HOST`, `_PORT`,
    * `_SECURITY`, `SYSTEM_MAILER_FROM_EMAIL` and the optional `_FROM_NAME`,
@@ -28,21 +39,27 @@ interface Env {
     | undefined;
 }
 
-const systemMailerConfig = (env: Env) =>
-  SystemMailerConfigFromEnv.pipe(
-    Layer.provide(
-      ConfigProvider.layer(
-        ConfigProvider.fromEnv({
-          env: Object.fromEntries(
-            Object.entries(env).filter(
-              (entry): entry is [string, string] =>
-                entry[0].startsWith("SYSTEM_MAILER_") &&
-                typeof entry[1] === "string"
-            )
-          ),
-        })
-      )
-    )
+const EVERY_DAY_AT_3_UTC = "0 3 * * *";
+
+const configFromEnv = (env: Env) =>
+  ConfigProvider.layer(
+    ConfigProvider.fromEnv({
+      env: Object.fromEntries(
+        Object.entries(env).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string"
+        )
+      ),
+    })
+  );
+
+const smtpProviderLive = (env: Env) =>
+  SmtpProviderLive.pipe(Layer.provide(configFromEnv(env)));
+
+const postgresPorts = (env: Env) =>
+  postgresPortsLive(
+    env.HYPERDRIVE,
+    Redacted.make(env.ENCRYPTION_KEYS ?? ""),
+    env.QUEUE
   );
 
 // WARNING: trust only `cf-connecting-ip`, which Cloudflare sets itself; a client can forge any other IP header.
@@ -56,29 +73,41 @@ const authConfigLive = (env: Env) =>
 const makeApp = (env: Env) =>
   HttpRouter.toWebHandler(
     ApiLive.pipe(
-      // WARNING: a Worker's connections close with its response, so account emails are sent before it; with SMTP here (#11), keep sign-up's answer from waiting on them.
       providePerRequest(
-        SystemMailerLive.pipe(
-          Layer.provideMerge(
-            postgresPortsLive(
-              env.HYPERDRIVE,
-              Redacted.make(env.ENCRYPTION_KEYS ?? "")
-            )
+        Layer.mergeAll(
+          SystemMailerLive.pipe(
+            Layer.provideMerge(postgresPorts(env)),
+            // WARNING: a Worker's connections close with its response, so an account email would be sent before sign-up answers, and its timing would reveal who has an account.
+            Layer.provide(SmtpProviderUnavailable),
+            Layer.provide(SystemMailerConfigFromEnv),
+            Layer.provide(configFromEnv(env))
           ),
-          Layer.provide(SmtpProviderUnavailable),
-          Layer.provide(systemMailerConfig(env))
+          smtpProviderLive(env)
         )
       ),
       HttpRouter.provideRequest(
         Layer.mergeAll(
           authConfigLive(env),
-          QueueUnavailable,
-          SmtpProviderUnavailable,
-          systemMailerConfig(env)
+          SystemMailerConfigFromEnv.pipe(Layer.provide(configFromEnv(env)))
         )
       ),
       Layer.provide(HttpServer.layerServices),
       Layer.provide(Layer.effectDiscard(Effect.logInfo("Runtime built")))
+    )
+  );
+
+const runWithPorts = <A, E>(
+  env: Env,
+  effect: Effect.Effect<
+    A,
+    E,
+    | Layer.Success<ReturnType<typeof postgresPorts>>
+    | Layer.Success<ReturnType<typeof smtpProviderLive>>
+  >
+) =>
+  Effect.runPromise(
+    effect.pipe(
+      Effect.provide(Layer.mergeAll(postgresPorts(env), smtpProviderLive(env)))
     )
   );
 
@@ -90,5 +119,18 @@ export default {
     app ??= makeApp(env);
 
     return app.handler(request);
+  },
+
+  async queue(batch, env) {
+    await runWithPorts(env, consumeQueueBatch(batch));
+  },
+
+  async scheduled(controller, env) {
+    await runWithPorts(
+      env,
+      controller.cron === EVERY_DAY_AT_3_UTC
+        ? createDeliveryEventPartitions
+        : forwardOutboxTo(env.QUEUE).pipe(Effect.asVoid)
+    );
   },
 } satisfies ExportedHandler<Env>;

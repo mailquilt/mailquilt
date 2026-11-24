@@ -27,6 +27,10 @@ export { OrganizationsLive } from "./organizations.ts";
 
 export { ProviderConnectionsLive } from "./provider-connections.ts";
 
+export { forwardQueueOutbox, QueueOutboxLive } from "./queue-outbox.ts";
+
+export type { EncodedQueueMessage } from "./queue-outbox.ts";
+
 export { RateLimiterLive } from "./rate-limiter.ts";
 
 /**

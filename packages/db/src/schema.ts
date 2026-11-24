@@ -438,3 +438,14 @@ export const deliveryEvents = pgTable(
     check("delivery_events_kind_check", sql`${table.kind} in ('sent')`),
   ]
 );
+
+/**
+ * Queue messages waiting to be handed to a queue that can't join a Postgres
+ * transaction, such as Cloudflare Queues. They're written in the transaction
+ * that queues them, so they exist only if it commits, then forwarded and
+ * deleted (ADR 0014). Each `message` is a `QueueMessage` encoded as JSON.
+ */
+export const queueOutbox = pgTable("queue_outbox", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  message: jsonb("message").notNull(),
+});
