@@ -1072,6 +1072,11 @@ aside.mq-frame {
     animation: none;
   }
 
+  /* Still nothing for 300ms, then the loader appears at once instead of fading in. */
+  .mq-loader {
+    animation-duration: 0s;
+  }
+
   .mq-loader-patch i {
     animation: none;
     opacity: 0.6;
