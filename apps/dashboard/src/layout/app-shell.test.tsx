@@ -84,6 +84,13 @@ const renderShell = () =>
     </LinkProvider>
   );
 
+// WARNING: the loading frame's own menu button is inert, which happy-dom ignores, so wait for the loaded bar, which names the Organization.
+const loadedMenuButton = async () => {
+  await screen.findAllByText(ACME.name, {}, { timeout: 3000 });
+
+  return screen.getByRole("button", { name: "Open navigation" });
+};
+
 describe("app shell", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
@@ -152,6 +159,40 @@ describe("app shell", () => {
     expect(screen.getByRole("link", { name: "Home" })).toBeDefined();
   });
 
+  it("draws the frame with its navigation while the session and Organizations load, and adds the Organization and account once they have", async () => {
+    let listed = false;
+    api.use(
+      http.get("*/api/auth/get-session", () => HttpResponse.json(SESSION)),
+      http.get("*/api/organizations", async () => {
+        await vi.waitUntil(() => listed, { timeout: 5000 });
+
+        return HttpResponse.json([ACME]);
+      }),
+      ...quietOrganization
+    );
+
+    renderShell();
+
+    await expect
+      .poll(() => screen.queryByRole("link", { name: "Contacts" }))
+      .not.toBeNull();
+    expect(screen.getByText("Loading")).toBeDefined();
+    expect(
+      screen.queryByRole("button", { name: /^Organization:/u })
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Account:/u })).toBeNull();
+
+    listed = true;
+
+    await expect(
+      screen.findByRole(
+        "button",
+        { name: /^Organization: Acme Newsletter/u },
+        { timeout: 3000 }
+      )
+    ).resolves.toBeDefined();
+  });
+
   it("closes the full-screen navigation once a page is chosen", async () => {
     window.happyDOM?.setViewport({ height: 844, width: 390 });
     api.use(
@@ -167,11 +208,7 @@ describe("app shell", () => {
 
     renderShell();
 
-    const menu = await screen.findByRole(
-      "button",
-      { name: "Open navigation" },
-      { timeout: 3000 }
-    );
+    const menu = await loadedMenuButton();
 
     fireEvent.click(menu);
     expect(menu.getAttribute("aria-expanded")).toBe("true");
@@ -187,11 +224,7 @@ describe("app shell", () => {
 
     renderShell();
 
-    const menu = await screen.findByRole(
-      "button",
-      { name: "Open navigation" },
-      { timeout: 3000 }
-    );
+    const menu = await loadedMenuButton();
 
     const skip = screen.getByRole("link", { name: "Skip to content" });
 
@@ -217,11 +250,7 @@ describe("app shell", () => {
 
     renderShell();
 
-    const menu = await screen.findByRole(
-      "button",
-      { name: "Open navigation" },
-      { timeout: 3000 }
-    );
+    const menu = await loadedMenuButton();
 
     fireEvent.click(menu);
 
@@ -243,13 +272,7 @@ describe("app shell", () => {
 
     renderShell();
 
-    fireEvent.click(
-      await screen.findByRole(
-        "button",
-        { name: "Open navigation" },
-        { timeout: 3000 }
-      )
-    );
+    fireEvent.click(await loadedMenuButton());
     fireEvent.click(
       screen.getByRole("button", { name: /^Organization: Acme Newsletter/u })
     );

@@ -3,7 +3,8 @@ import { Navigate } from "@tanstack/react-router";
 import { createContext, useContext, useEffect } from "react";
 
 import { authClient } from "../auth/auth-client.ts";
-import { PageLoadFailed, PageLoading } from "./page-states.tsx";
+import { FrameLoading } from "./frame.tsx";
+import { PageLoadFailed } from "./page-states.tsx";
 
 export interface Account {
   readonly id: string;
@@ -46,7 +47,7 @@ export const SignedInOnly = ({ children }: { children: React.ReactNode }) => {
   }, [queryClient, signedOut]);
 
   if (isPending) {
-    return <PageLoading />;
+    return <FrameLoading />;
   }
 
   if (!session && error) {
