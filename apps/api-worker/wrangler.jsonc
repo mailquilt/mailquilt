@@ -17,7 +17,6 @@
   // consumer invocation, and its 15-minute limit, to itself (ADR 0014). One
   // consumer runs at a time, as pg-boss does on Node, so a send never opens
   // more than one connection to the Provider's server.
-  // Sending needs Workers Paid; Free allows 50 subrequests per invocation.
   "queues": {
     "producers": [{ "binding": "QUEUE", "queue": "mailquilt" }],
     "consumers": [

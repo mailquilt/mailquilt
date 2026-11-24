@@ -1,5 +1,5 @@
 import { connect, isIP } from "node:net";
-import { rootCertificates } from "node:tls";
+import { connect as tlsConnect, rootCertificates } from "node:tls";
 import type { ConnectionOptions } from "node:tls";
 
 import { OutboundGuard, SmtpProvider } from "@repo/core";
@@ -130,9 +130,28 @@ const tlsOptions = (host: string, options: SmtpProviderOptions) => {
   return tls;
 };
 
-const openedByName = (host: string, port: number) => {
+const openedByName = (
+  server: SmtpSettings["server"],
+  port: number,
+  options: SmtpProviderOptions
+) => {
+  const host = server.host.replace(TRAILING_DOT, "");
+
+  // WARNING: on Workers, Nodemailer's TLS from the start fails, whether it opens the socket or upgrades a fresh one; a TLS socket opened by name works.
   const getSocket: SMTPTransportGetSocket = (_options, handOver) => {
-    handOver(null, { connection: connect(port, host) });
+    handOver(
+      null,
+      server.security === "tls"
+        ? {
+            connection: tlsConnect({
+              ...tlsOptions(server.host, options),
+              host,
+              port,
+            }),
+            secured: true,
+          }
+        : { connection: connect(port, host) }
+    );
   };
 
   return getSocket;
@@ -154,7 +173,7 @@ const transportFor = (
     connectionTimeout: Duration.toMillis(CONNECTION_TIMEOUT),
     getSocket:
       options.connectByHostName === true
-        ? openedByName(server.host.replace(TRAILING_DOT, ""), address.port)
+        ? openedByName(server, address.port, options)
         : undefined,
     greetingTimeout: Duration.toMillis(GREETING_TIMEOUT),
     host: NetAddress.formatIp(address.address),
