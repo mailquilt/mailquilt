@@ -2,7 +2,7 @@
 
 Accepted limits, and rules a review doesn't raise again unless something has changed since, such as a bug report or a new feature that depends on them. A pull request that changes one of these says so, gives the reason and updates this page.
 
-The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), tenant endpoints that name the Organization in the path (0007), long collections paged by ID (0008), secrets sealed under versioned keys bound to their row (0009), outbound connections going to the address the guard checked (0010), the install set up once with settings only its instance admin can reach (0011), and a page reading only the search its route decodes (0012). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
+The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers bring their own Provider (0002), ports provided per request (0003), API routes under `/api` (0004), and Better Auth per request on the `SqlClient` (0005), IDs in the TypeID format (0006), tenant endpoints that name the Organization in the path (0007), long collections paged by ID (0008), secrets sealed under versioned keys bound to their row (0009), outbound connections going to the address the guard checked (0010), the install set up once with settings only its instance admin can reach (0011), a page reading only the search its route decodes (0012), every dashboard icon coming from one module (0013), and queued work acting in the Organization its message names (0014). The overall design is in `docs/architecture.md`, and the security controls are in `docs/security.md`. The entries below came out of the planning on 2026-11-21 unless an issue is named.
 
 ## Consent and sending
 
@@ -16,6 +16,12 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - A Sending Domain that fails DKIM or has no DMARC record blocks a send. SPF alignment problems and `p=none` only warn.
 - Every Campaign message has `List-Unsubscribe` and `List-Unsubscribe-Post`, a plain-text part and the Organization's postal address.
 - Double opt-in is on by default for hosted signup forms, and an owner can turn it off for a List.
+- Until several Lists and exclusions (#15), a Campaign targets one List. Sending it fixes who it goes to in one query, in the same transaction that moves it to `sending`, and queues one message per 100 of them; a send with nobody subscribed is refused (`NoSubscribedContacts`) and leaves a draft (#10).
+- A Campaign's HTML is at most 50,000 characters, because the API refuses request bodies over 64 KiB and JSON escapes every quote in it (#10).
+- Until the plain-text part and footer (#13) and unsubscribe (#12), a Campaign is sent as its HTML only (#10).
+- Until retries (#17), a Contact the Provider refuses is recorded as `failed` with the Provider's words and isn't tried again; the others still get it. A Campaign is `sent` once none of its recipients are still queued (#10).
+- Deleting a Provider Connection leaves its Campaigns without one: a draft can't be sent until another is chosen, and a Campaign still sending records the Contacts it hadn't reached as `failed` (#10).
+- Until Cloudflare Queues (#11), sending a Campaign on Workers answers 500 and leaves it a draft (#10).
 
 ## Providers
 
@@ -55,6 +61,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default. Campaign totals and Contact engagement summaries outlive them.
 - Imports, recipient snapshots and event writes are set-based. There's never a query per Contact.
 - Migrations are expand-then-contract. They run on boot behind an advisory lock in Docker, and in the deploy step on Cloudflare.
+- A Campaign's recipients and delivery events have no TypeID: no endpoint names one, so they're keyed by the Campaign and Contact (recipients) or a sequence and the time (events) (#10).
 - An Organization's data is deleted 30 days after a hosted plan is cancelled.
 
 ## Security

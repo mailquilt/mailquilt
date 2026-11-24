@@ -2,6 +2,7 @@ import { assert, layer } from "@effect/vitest";
 import { MailquiltApi } from "@repo/contract";
 import { OrganizationIdSchema } from "@repo/domain";
 import type {
+  CampaignId,
   ContactId,
   ListId,
   OrganizationId,
@@ -17,6 +18,7 @@ type Client = Effect.Success<typeof signedInClient>;
 
 interface Target {
   readonly organizationId: OrganizationId;
+  readonly campaignId: CampaignId;
   readonly listId: ListId;
   readonly contactId: ContactId;
   readonly providerConnectionId: ProviderConnectionId;
@@ -26,6 +28,12 @@ type TenantCall = (
   client: Client,
   target: Target
 ) => Effect.Effect<unknown, { readonly _tag: string }>;
+
+const intruderCampaign = {
+  from: { email: "intruder@example.com" },
+  html: "<p>Hello</p>",
+  subject: "Intruder",
+} as const;
 
 const intruderConnection = {
   credentials: {
@@ -39,6 +47,34 @@ const intruderConnection = {
 
 // WARNING: every endpoint under /organizations/:organizationId needs a case here; the first test fails until it has one.
 const TENANT_ENDPOINTS = {
+  "GET /api/organizations/:organizationId/campaigns": (
+    client: Client,
+    { organizationId }: Target
+  ) => client.campaigns.list({ params: { organizationId }, query: {} }),
+  "POST /api/organizations/:organizationId/campaigns": (
+    client: Client,
+    { listId, organizationId, providerConnectionId }: Target
+  ) =>
+    client.campaigns.create({
+      params: { organizationId },
+      payload: { ...intruderCampaign, listId, providerConnectionId },
+    }),
+  "GET /api/organizations/:organizationId/campaigns/:campaignId": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) => client.campaigns.get({ params: { campaignId, organizationId } }),
+  "PUT /api/organizations/:organizationId/campaigns/:campaignId": (
+    client: Client,
+    { campaignId, listId, organizationId, providerConnectionId }: Target
+  ) =>
+    client.campaigns.update({
+      params: { campaignId, organizationId },
+      payload: { ...intruderCampaign, listId, providerConnectionId },
+    }),
+  "POST /api/organizations/:organizationId/campaigns/:campaignId/send": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) => client.campaigns.send({ params: { campaignId, organizationId } }),
   "GET /api/organizations/:organizationId": (
     client: Client,
     { organizationId }: Target
@@ -145,7 +181,19 @@ const ownedData = (owner: Client) =>
       },
     });
 
+    const campaign = yield* owner.campaigns.create({
+      params,
+      payload: {
+        from: { email: "news@acme.example" },
+        html: "<p>This week at Acme</p>",
+        listId: list.id,
+        providerConnectionId: connection.id,
+        subject: "This week at Acme",
+      },
+    });
+
     return {
+      campaignId: campaign.id,
       contactId: contact.id,
       listId: list.id,
       organizationId: organization.id,
@@ -342,6 +390,76 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.deepStrictEqual(
             lists.map((list) => [list.id, list.subscriptions.subscribed]),
             [[own.listId, 1]]
+          );
+        })
+    );
+
+    test.effect(
+      "never reaches another Organization's Campaigns, Lists or Provider Connections from its own",
+      () =>
+        Effect.gen(function* foreignCampaigns() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+          const params = { organizationId: own.organizationId };
+          const foreign = { ...params, campaignId: target.campaignId };
+
+          const draft = {
+            ...intruderCampaign,
+            listId: own.listId,
+            providerConnectionId: own.providerConnectionId,
+          };
+
+          const toForeignList = yield* outsider.campaigns
+            .create({ params, payload: { ...draft, listId: target.listId } })
+            .pipe(Effect.flip);
+
+          const throughForeignConnection = yield* outsider.campaigns
+            .create({
+              params,
+              payload: {
+                ...draft,
+                providerConnectionId: target.providerConnectionId,
+              },
+            })
+            .pipe(Effect.flip);
+
+          const read = yield* outsider.campaigns
+            .get({ params: foreign })
+            .pipe(Effect.flip);
+
+          const edit = yield* outsider.campaigns
+            .update({ params: foreign, payload: draft })
+            .pipe(Effect.flip);
+
+          const sent = yield* outsider.campaigns
+            .send({ params: foreign })
+            .pipe(Effect.flip);
+
+          assert.strictEqual(toForeignList._tag, "ListNotFound");
+          assert.strictEqual(
+            throughForeignConnection._tag,
+            "ProviderConnectionNotFound"
+          );
+          assert.strictEqual(read._tag, "CampaignNotFound");
+          assert.strictEqual(edit._tag, "CampaignNotFound");
+          assert.strictEqual(sent._tag, "CampaignNotFound");
+          assert.deepStrictEqual(
+            (yield* outsider.campaigns.list({
+              params,
+              query: {},
+            })).campaigns.map((campaign) => campaign.id),
+            [own.campaignId]
+          );
+          assert.strictEqual(
+            (yield* owner.campaigns.get({
+              params: {
+                campaignId: target.campaignId,
+                organizationId: target.organizationId,
+              },
+            })).status,
+            "draft"
           );
         })
     );

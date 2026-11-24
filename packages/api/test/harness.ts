@@ -2,12 +2,21 @@ import { PgClient } from "@effect/sql-pg";
 import { MailquiltApi } from "@repo/contract";
 import {
   credentialCipherLayer,
+  handleQueueMessage,
   SystemMailerConfig,
   SystemMailerLive,
 } from "@repo/core";
-import type { SmtpProvider, SystemMailer, SystemMailerSmtp } from "@repo/core";
+import type {
+  Queue,
+  QueueMessage,
+  SmtpProvider,
+  SystemMailer,
+  SystemMailerSmtp,
+} from "@repo/core";
 import type { SmtpOutbox, SystemMailerOutbox } from "@repo/core/testing";
 import {
+  InProcessQueueLive,
+  QueueInbox,
   RecordingSmtpProviderLive,
   SystemMailerOutboxLive,
 } from "@repo/core/testing";
@@ -15,9 +24,10 @@ import { DatabaseLive, DatabasePortsLive } from "@repo/db";
 import { migrateDatabase } from "@repo/db/migrate";
 import type { SignUpPolicy } from "@repo/domain";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
-import { Context, Effect, Layer, Option, Redacted } from "effect";
+import { Context, Effect, Layer, Option, pipe, Redacted } from "effect";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
+import type { SqlClient } from "effect/sql";
 
 import { ApiLive, authConfigLayer } from "../src/index.ts";
 
@@ -45,6 +55,19 @@ const TestAuthConfig = authConfigLayer({
 export const TEST_ENCRYPTION_KEYS = Redacted.make(
   "1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
 );
+
+type DatabasePorts =
+  | Layer.Success<typeof DatabasePortsLive>
+  | PgClient.PgClient
+  | SqlClient.SqlClient;
+
+type Fakes =
+  | SystemMailer
+  | SystemMailerOutbox
+  | SmtpProvider
+  | SmtpOutbox
+  | Queue
+  | QueueInbox;
 
 const startPostgres = Effect.acquireRelease(
   Effect.promise(() => new PostgreSqlContainer(POSTGRES_IMAGE).start()),
@@ -77,17 +100,12 @@ export const INSTANCE_ADMIN = {
 } as const;
 
 const appWith = (
-  databaseUrl: string,
-  fakes: Context.Context<
-    SystemMailer | SystemMailerOutbox | SmtpProvider | SmtpOutbox
-  >,
+  databasePorts: Context.Context<DatabasePorts>,
+  fakes: Context.Context<Fakes>,
   options: TestAppOptions
 ) => {
   const ports = Layer.mergeAll(
-    DatabasePortsLive.pipe(
-      Layer.provideMerge(PgClient.layer({ url: Redacted.make(databaseUrl) })),
-      Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS))
-    ),
+    Layer.succeedContext(databasePorts),
     Layer.succeed(
       SystemMailerConfig,
       options.systemMailerConfig ?? Option.none()
@@ -106,6 +124,39 @@ const appWith = (
     ),
     Layer.provide(HttpServer.layerServices)
   );
+};
+
+/**
+ * Does the work the app queued, as the runtime's queue consumer would, with
+ * the same ports the app's requests use.
+ */
+export const QueueWorker = Context.Service<{
+  /** Handles one message. */
+  readonly deliver: (message: QueueMessage) => Effect.Effect<void>;
+  /** Handles every queued message, and any they queue, until none are left. Returns what it handled. */
+  readonly deliverAll: Effect.Effect<readonly QueueMessage[]>;
+}>("test/QueueWorker");
+
+const queueWorker = (ports: Context.Context<DatabasePorts | Fakes>) => {
+  const deliver = (message: QueueMessage) =>
+    handleQueueMessage(message).pipe(Effect.provideContext(ports));
+
+  const inbox = Context.get(ports, QueueInbox);
+
+  const deliverAll = Effect.gen(function* deliverAll() {
+    const handled: QueueMessage[] = [];
+    let messages = yield* inbox.takeAll;
+
+    while (messages.length > 0) {
+      yield* pipe(messages, Effect.forEach(deliver));
+      handled.push(...messages);
+      messages = yield* inbox.takeAll;
+    }
+
+    return handled;
+  });
+
+  return { deliver, deliverAll };
 };
 
 /** The signed-in instance admin's session cookie; empty on a fresh install, which has no instance admin. */
@@ -207,7 +258,20 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
       );
 
       const fakes = yield* Layer.build(
-        Layer.mergeAll(SystemMailerOutboxLive, RecordingSmtpProviderLive)
+        Layer.mergeAll(
+          SystemMailerOutboxLive,
+          RecordingSmtpProviderLive,
+          InProcessQueueLive
+        )
+      );
+
+      const databasePorts = yield* Layer.build(
+        DatabasePortsLive.pipe(
+          Layer.provideMerge(
+            PgClient.layer({ url: Redacted.make(databaseUrl) })
+          ),
+          Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS))
+        )
       );
 
       const database = yield* Layer.build(
@@ -216,7 +280,7 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
 
       const app = yield* Effect.acquireRelease(
         Effect.sync(() =>
-          HttpRouter.toWebHandler(appWith(databaseUrl, fakes, options), {
+          HttpRouter.toWebHandler(appWith(databasePorts, fakes, options), {
             disableLogger: true,
           })
         ),
@@ -235,6 +299,10 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
 
       const context = Context.make(ApiClient, client).pipe(
         Context.add(AppFetch, fetchInProcess),
+        Context.add(
+          QueueWorker,
+          queueWorker(Context.merge(databasePorts, fakes))
+        ),
         Context.merge(fakes),
         Context.merge(database)
       );

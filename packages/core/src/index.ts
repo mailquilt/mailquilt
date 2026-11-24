@@ -1,3 +1,33 @@
+export {
+  Campaigns,
+  createCampaign,
+  getCampaign,
+  handleQueueMessage,
+  listCampaigns,
+  SEND_BATCH_SIZE,
+  sendCampaign,
+  updateCampaign,
+} from "./campaigns.ts";
+
+export type {
+  CampaignBatch,
+  CampaignFilter,
+  QueuedRecipient,
+  RecipientOutcome,
+} from "./campaigns.ts";
+
+export {
+  createDeliveryEventPartitions,
+  DeliveryEventPartitions,
+  PARTITION_MONTHS_AHEAD,
+} from "./delivery-events.ts";
+
+export { asQueuedFor, Queue, QueueMessageSchema } from "./queue.ts";
+
+export type { QueueMessage } from "./queue.ts";
+
+export { SendCampaignBatch } from "./send-campaign-batch.ts";
+
 export { Contacts, createContact, listContacts } from "./contacts.ts";
 
 export type { ContactFilter } from "./contacts.ts";
@@ -68,6 +98,8 @@ export type {
 export { RateLimiter } from "./rate-limiter.ts";
 
 export type { RateLimitDecision, RateLimitRule } from "./rate-limiter.ts";
+
+export { CurrentMembership } from "./current-membership.ts";
 
 export { CurrentOrganization } from "./current-organization.ts";
 

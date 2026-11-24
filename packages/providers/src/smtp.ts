@@ -155,12 +155,19 @@ const messageFor = (email: OutgoingEmail) => {
           ? email.from.email
           : { address: email.from.email, name: email.from.name },
       subject: email.subject,
-      text: email.text,
       to: email.to,
     };
 
+  if (email.text !== undefined) {
+    message.text = email.text;
+  }
+
   if (email.html !== undefined) {
     message.html = email.html;
+  }
+
+  if (email.replyTo !== undefined) {
+    message.replyTo = email.replyTo;
   }
 
   return message;

@@ -10,6 +10,28 @@ export {
 
 export { AddedToList, MAX_CONTACTS_ADDED_AT_ONCE } from "./added-to-list.ts";
 
+export { Campaign } from "./campaign.ts";
+
+export {
+  CampaignDraft,
+  CampaignHtml,
+  CampaignStatusSchema,
+  CampaignSubject,
+  MAX_CAMPAIGN_HTML_LENGTH,
+} from "./campaign-content.ts";
+
+export type { CampaignStatus } from "./campaign-content.ts";
+
+export { CampaignSummary } from "./campaign-summary.ts";
+
+export { CampaignNotDraft } from "./campaign-not-draft.ts";
+
+export { CampaignNotFound } from "./campaign-not-found.ts";
+
+export { CampaignPage } from "./campaign-page.ts";
+
+export { NoSubscribedContacts } from "./no-subscribed-contacts.ts";
+
 export { ContactAlreadyExists } from "./contact-already-exists.ts";
 
 export { ContactNotFound } from "./contact-not-found.ts";
@@ -25,10 +47,12 @@ export { DatabaseUnreachable } from "./database-unreachable.ts";
 export { Health } from "./health.ts";
 
 export {
+  CampaignIdSchema,
   ContactIdSchema,
   encodeTypeId,
   ListIdSchema,
   MemberIdSchema,
+  newCampaignId,
   newContactId,
   newListId,
   newMemberId,
@@ -42,6 +66,7 @@ export {
 } from "./ids.ts";
 
 export type {
+  CampaignId,
   ContactId,
   ListId,
   MemberId,

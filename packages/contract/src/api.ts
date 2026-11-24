@@ -1,5 +1,6 @@
 import { HttpApi } from "effect/http-api";
 
+import { CampaignsApi } from "./campaigns.ts";
 import { ContactsApi } from "./contacts.ts";
 import { InstanceApi } from "./instance.ts";
 import { ListsApi } from "./lists.ts";
@@ -17,6 +18,7 @@ export class MailquiltApi extends HttpApi.make("mailquilt")
   .add(ContactsApi)
   .add(ListsApi)
   .add(ProviderConnectionsApi)
+  .add(CampaignsApi)
   .add(InstanceApi)
   .prefix("/api")
   .add(SystemApi) {}

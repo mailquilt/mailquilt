@@ -15,7 +15,8 @@
     "@repo/core": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/providers": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "pg-boss": "catalog:"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

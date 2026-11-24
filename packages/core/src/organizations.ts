@@ -2,6 +2,7 @@ import type { Organization, OrganizationId, Role, UserId } from "@repo/domain";
 import { OrganizationNotFound } from "@repo/domain";
 import { Context, Effect, Option } from "effect";
 
+import { CurrentMembership } from "./current-membership.ts";
 import { CurrentOrganization } from "./current-organization.ts";
 import { CurrentUser } from "./current-user.ts";
 
@@ -21,8 +22,12 @@ export class Organizations extends Context.Service<
       user: UserId,
       organization: OrganizationId
     ) => Effect.Effect<Option.Option<Role>>;
-    /** The Organization this request acts in. */
-    readonly current: Effect.Effect<Organization, never, CurrentOrganization>;
+    /** The Organization this request acts in, with the signed-in person's role. */
+    readonly current: Effect.Effect<
+      Organization,
+      never,
+      CurrentOrganization | CurrentMembership
+    >;
   }
 >()("@repo/core/Organizations") {}
 
@@ -53,7 +58,7 @@ export const getOrganization = Effect.gen(function* currentOrganization() {
 /**
  * Runs `effect` in the Organization `organizationId`, if the signed-in person
  * is a member of it. Otherwise it fails as if the Organization didn't exist.
- * This is the only place `CurrentOrganization` comes from.
+ * This is the only place a request gets `CurrentOrganization` from.
  */
 export const asMemberOf =
   (organizationId: OrganizationId) =>
@@ -68,9 +73,7 @@ export const asMemberOf =
       }
 
       return yield* effect.pipe(
-        Effect.provideService(CurrentOrganization, {
-          id: organizationId,
-          role: role.value,
-        })
+        Effect.provideService(CurrentOrganization, { id: organizationId }),
+        Effect.provideService(CurrentMembership, { role: role.value })
       );
     });

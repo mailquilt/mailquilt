@@ -1,0 +1,15 @@
+**/node_modules
+**/dist
+**/.turbo
+**/.wrangler
+**/.env
+**/.env.*
+**/.dev.vars*
+.git
+.agents
+.claude
+design-mockups
+apps/docs
+e2e
+**/test-results
+**/playwright-report

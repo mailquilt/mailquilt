@@ -4,6 +4,7 @@ import { HttpIncomingMessage, HttpRouter } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { AuthRoutes } from "./auth/routes.ts";
+import { CampaignsHandlers } from "./campaigns.ts";
 import { ContactsHandlers } from "./contacts.ts";
 import { InstanceHandlers } from "./instance.ts";
 import { ListsHandlers } from "./lists.ts";
@@ -25,6 +26,7 @@ export const ApiLive = Layer.mergeAll(
   HttpApiBuilder.layer(MailquiltApi).pipe(
     Layer.provide(
       Layer.mergeAll(
+        CampaignsHandlers,
         ContactsHandlers,
         InstanceHandlers,
         ListsHandlers,

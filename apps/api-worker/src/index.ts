@@ -3,6 +3,7 @@ import { SystemMailerConfigFromEnv, SystemMailerLive } from "@repo/core";
 import {
   postgresPortsLive,
   providePerRequest,
+  QueueUnavailable,
   SmtpProviderUnavailable,
 } from "@repo/runtime-cloudflare";
 import { ConfigProvider, Effect, Layer, Option, Redacted } from "effect";
@@ -71,6 +72,7 @@ const makeApp = (env: Env) =>
       HttpRouter.provideRequest(
         Layer.mergeAll(
           authConfigLive(env),
+          QueueUnavailable,
           SmtpProviderUnavailable,
           systemMailerConfig(env)
         )

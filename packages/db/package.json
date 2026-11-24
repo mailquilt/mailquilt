@@ -10,7 +10,8 @@
   "scripts": {
     "check-types": "tsc --noEmit",
     "generate": "drizzle-kit generate",
-    "migrate": "node scripts/migrate.ts"
+    "migrate": "node scripts/migrate.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@effect/sql-pg": "catalog:",
@@ -20,9 +21,12 @@
     "effect": "catalog:"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "@repo/typescript-config": "workspace:*",
+    "@testcontainers/postgresql": "catalog:",
     "@types/node": "catalog:",
     "drizzle-kit": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

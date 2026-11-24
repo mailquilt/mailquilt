@@ -23,3 +23,5 @@ export const SystemMailerOutboxLive = Layer.effectContext(
 export { RecordingSmtpProviderLive, SmtpOutbox } from "./smtp-outbox.ts";
 
 export type { RecordedSend } from "./smtp-outbox.ts";
+
+export { InProcessQueueLive, QueueInbox } from "./in-process-queue.ts";
