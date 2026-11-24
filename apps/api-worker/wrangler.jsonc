@@ -36,6 +36,9 @@
   "vars": {
     "APP_URL": "http://localhost:8787",
   },
+  // Create the config with its query cache off, or reads come back up to a
+  // minute old: `wrangler hyperdrive create mailquilt --caching-disabled
+  // --connection-string=…`.
   // `pnpm --filter api-worker deploy` applies migrations before deploying,
   // through DATABASE_URL: a direct connection to the database Hyperdrive
   // points at.

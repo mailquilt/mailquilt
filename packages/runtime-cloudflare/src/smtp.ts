@@ -54,14 +54,15 @@ const OutboundGuardFromConfig = Layer.unwrap(
 /**
  * Sends through SMTP servers with the same Nodemailer adapter as Node, over
  * Workers' `node:net` and `node:tls`, which run on `connect()`. Hosts are
- * looked up with Workers' `node:dns` and checked by the outbound guard
- * (ADR 0010). `BLOCK_PRIVATE_NETWORKS` (off by default) also stops private
+ * looked up with Workers' `node:dns` and checked by the outbound guard, then
+ * connected to by name (ADR 0010). `BLOCK_PRIVATE_NETWORKS` (off by default) also stops private
  * networks and loopback, which Cloudflare's network can't reach anyway
  * outside `wrangler dev`.
  */
-export const SmtpProviderLive = smtpProviderLayer().pipe(
-  Layer.provide(OutboundGuardFromConfig)
-);
+export const SmtpProviderLive = smtpProviderLayer({
+  // WARNING: Cloudflare's connect() starts TLS only on a socket opened by host name; one opened to the checked IP closes right after STARTTLS (ADR 0010).
+  connectByHostName: true,
+}).pipe(Layer.provide(OutboundGuardFromConfig));
 
 /**
  * SMTP for the System Mailer on Workers: sending fails at once. A Worker's

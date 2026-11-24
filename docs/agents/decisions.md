@@ -35,7 +35,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - A test email goes to any address the member types, through the connection's default sender, at most 10 every 10 minutes per person across Organizations. When the Provider refuses it, the API answers 502 `SendFailed` with the Provider's own words, so the member can fix the settings (#9).
 - A Provider Connection can be edited and deleted. An edit that leaves credentials out keeps them; `null` removes them. Changing the host, port or encryption while keeping saved credentials is refused (`CredentialsRequired`), so a member can't send someone else's password to a server they control or unencrypted (#9).
 - A DNS lookup that fails (timeout, server failure) is reported as `unreachable` with the resolver's reason; only a name with no address is `host-not-found` (#9).
-- SMTP on Workers is the same Nodemailer adapter, over workerd's `node:net` and `node:tls`, which run on `connect()`. TLS from the start opens the socket first and upgrades it, because workerd checks a socket it opens itself against the IP rather than the host name. Workers can't trust extra certificates and block port 25, and a certificate the server's name doesn't match fails as `unreachable` with workerd's opaque "internal error" rather than `tls` (#11).
+- SMTP on Workers is the same Nodemailer adapter, over workerd's `node:net` and `node:tls`, which run on `connect()`. After the outbound guard checks the host, a Worker connects to it by name, because Cloudflare starts TLS only on a socket opened by name (ADR 0010). Workers can't trust extra certificates and block port 25, and a certificate the server's name doesn't match fails as `unreachable` with workerd's opaque "internal error" rather than `tls` (#11).
 
 ## The install
 
@@ -51,6 +51,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 ## Data
 
 - Postgres is the only database, including on Cloudflare (ADR 0001).
+- On Cloudflare, Hyperdrive's query cache is off (`--caching-disabled`). With it on, reads are served up to a minute old: a Campaign that started sending still reads as a draft, and so would a session that was signed out (#11).
 - IDs are a type prefix plus a UUIDv7 in the TypeID format, such as `org_01h455vb4pex5vsknk084sn02q`. They're part of the public API (ADR 0006).
 - Every repository method for tenant data requires `CurrentOrganization` from the request context, which only `asMemberOf` provides after checking membership. There's no unscoped query path for tenant data, and Postgres row-level security isn't used (ADR 0007).
 - The Organization a request acts in is named in its path, not stored on the session, so two tabs can work in two Organizations. The dashboard remembers each tab's choice (ADR 0007, #6).
