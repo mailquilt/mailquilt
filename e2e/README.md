@@ -34,6 +34,7 @@ pnpm --filter @repo/db migrate
 Then, in another terminal:
 
 ```sh
+pnpm --filter e2e exec playwright install chromium
 MAILQUILT_URL=http://localhost:8787 MAILPIT_URL=http://localhost:8326 MAILPIT_SMTP_HOST=127.0.0.1 MAILPIT_SMTP_PORT=1026 pnpm --filter e2e smoke
 docker stop mailquilt-smoke-postgres mailquilt-smoke-mailpit
 ```
