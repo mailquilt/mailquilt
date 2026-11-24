@@ -30,13 +30,13 @@ export const CampaignSetupNeeded = ({
       <EmptyState
         actions={
           <>
+            <ConnectButton />
             <LinkButton href="/lists" variant="secondary">
               Go to Lists
             </LinkButton>
-            <ConnectButton />
           </>
         }
-        description="A campaign goes out through your own provider, to the contacts subscribed to a list. Connect a provider and make a list, then come back to write it."
+        description="Connect a provider and make a list, then come back to write it."
         title="Two things before your first campaign"
       />
     );

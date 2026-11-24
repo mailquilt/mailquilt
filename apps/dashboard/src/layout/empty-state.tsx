@@ -75,7 +75,8 @@ export const SlotArt = ({ size = 48 }: { size?: number }) => (
 /**
  * In place of rows or content that isn't there yet, on every page: Kumo's
  * Empty without its box, the quilt picture, what's missing and at most the
- * actions to fill it.
+ * actions to fill it, the main one first. On phones the actions stack at one
+ * width.
  */
 export const EmptyState = ({
   actions,
@@ -90,7 +91,7 @@ export const EmptyState = ({
     <Empty
       contents={
         actions === undefined ? undefined : (
-          <div className="flex flex-wrap justify-center gap-2">{actions}</div>
+          <div className="mq-state-actions">{actions}</div>
         )
       }
       description={description}
@@ -137,17 +138,19 @@ export const LoadFailed = ({
     <div className="mq-state" ref={state} role="alert">
       <Empty
         contents={
-          <Button
-            aria-disabled={retrying || undefined}
-            onClick={() => {
-              if (!retrying) {
-                onRetry();
-              }
-            }}
-            variant="secondary"
-          >
-            {retrying ? "Trying again…" : "Try again"}
-          </Button>
+          <div className="mq-state-actions">
+            <Button
+              aria-disabled={retrying || undefined}
+              onClick={() => {
+                if (!retrying) {
+                  onRetry();
+                }
+              }}
+              variant="secondary"
+            >
+              {retrying ? "Trying again…" : "Try again"}
+            </Button>
+          </div>
         }
         description={description}
         icon={<SlotArt />}
