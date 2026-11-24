@@ -482,7 +482,9 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         yield* sql`update campaigns set status = 'sending', sent_at = null where id = ${campaign.id}`;
         yield* worker.deliver(message ?? assert.fail());
 
-        const finished = yield* client.campaigns.get({ params: campaignParams });
+        const finished = yield* client.campaigns.get({
+          params: campaignParams,
+        });
 
         assert.strictEqual(finished.status, "sent");
         assert.lengthOf(yield* sentTo(campaign.subject), 1);

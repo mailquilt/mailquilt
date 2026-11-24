@@ -1,4 +1,5 @@
 import { CampaignIdSchema, Organization } from "@repo/domain";
+import { focusManager } from "@tanstack/react-query";
 import {
   act,
   cleanup,
@@ -7,7 +8,6 @@ import {
   within,
 } from "@testing-library/react";
 import { Schema } from "effect";
-import { focusManager } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import {
@@ -219,7 +219,9 @@ describe("one campaign's page", () => {
     renderPage();
 
     await confirmSend();
-    await expect(screen.findByText("No one to send to yet")).resolves.toBeDefined();
+    await expect(
+      screen.findByText("No one to send to yet")
+    ).resolves.toBeDefined();
 
     act(() => {
       focusManager.setFocused(false);
