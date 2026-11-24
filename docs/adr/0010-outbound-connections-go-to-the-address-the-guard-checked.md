@@ -6,7 +6,7 @@ The policy has one switch, `blockPrivateNetworks`. With it on, only public addre
 
 The guard is built on `effect/net`'s `AddressResolver` and `Dns`, so tests give it a static zone and each runtime gives it the platform's resolver.
 
-On Workers, SMTP connects by the host name after the guard has checked it (#11). Cloudflare's `connect()` starts TLS only on a socket opened by name: one opened to the checked address closes right after STARTTLS, so on Workers the rule above would leave only unencrypted SMTP. The check still refuses a host that resolves to a blocked address, and Cloudflare resolves the name again when connecting. A second answer can't lead anywhere the check would refuse, because a Worker reaches only the public internet: from production, `connect()` to loopback, `10.0.0.1`, `172.16.0.1`, `192.168.1.1` and `169.254.169.254` fails, and there is no metadata service to reach.
+On Workers, SMTP connects by the host name after the guard has checked it (#11). Cloudflare's `connect()` starts TLS only on a socket opened by name: one opened to the checked address closes right after STARTTLS, so on Workers the rule above would leave only unencrypted SMTP. The check still refuses a host that resolves to a blocked address, and Cloudflare resolves the name again when connecting. A second answer can't lead anywhere the check would refuse, because a deployed Worker reaches only the public internet (`wrangler dev` can reach the local network): from production, `connect()` to loopback, `10.0.0.1`, `172.16.0.1`, `192.168.1.1` and `169.254.169.254` fails, and there is no metadata service to reach.
 
 ## Considered Options
 
