@@ -1,0 +1,12 @@
+# Adds Mailpit, an SMTP server that keeps every email it's sent, for the
+# smoke test (e2e/README.md). A Provider Connection reaches it at
+# mailpit:1025, and its inbox and API are on MAILPIT_PORT (8025 by default).
+
+services:
+  mailpit:
+    image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
