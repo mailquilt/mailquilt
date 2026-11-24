@@ -1,17 +1,23 @@
 import { Layer } from "effect";
 import { SecureRandom } from "effect/crypto";
 
+import { CampaignsLive } from "./campaigns.ts";
 import { ContactsLive } from "./contacts.ts";
 import { DatabaseHealthLive, DatabaseLive } from "./database.ts";
+import { DeliveryEventPartitionsLive } from "./delivery-event-partitions.ts";
 import { InstanceLive } from "./instance.ts";
 import { ListsLive } from "./lists.ts";
 import { OrganizationsLive } from "./organizations.ts";
 import { ProviderConnectionsLive } from "./provider-connections.ts";
 import { RateLimiterLive } from "./rate-limiter.ts";
 
+export { CampaignsLive } from "./campaigns.ts";
+
 export { ContactsLive } from "./contacts.ts";
 
 export { Database, DatabaseHealthLive, DatabaseLive } from "./database.ts";
+
+export { DeliveryEventPartitionsLive } from "./delivery-event-partitions.ts";
 
 export { InstanceLive } from "./instance.ts";
 
@@ -28,8 +34,10 @@ export { RateLimiterLive } from "./rate-limiter.ts";
  * `CredentialCipher`, which each runtime provides.
  */
 export const DatabasePortsLive = Layer.mergeAll(
+  CampaignsLive,
   ContactsLive,
   DatabaseHealthLive,
+  DeliveryEventPartitionsLive,
   InstanceLive,
   ListsLive,
   OrganizationsLive,

@@ -7,6 +7,7 @@ import { useContactPage, useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
+import { useCampaignPage } from "../campaigns/campaigns-api.ts";
 import {
   GlobeHemisphereWestIcon,
   HardDrivesIcon,
@@ -29,7 +30,7 @@ import { useProviderConnections } from "../providers/providers-api.ts";
 import { CrashPlaceContext } from "./crash-place.ts";
 import { useAccount } from "./session-gates.tsx";
 
-type CountedPage = "contacts" | "lists" | "providers";
+type CountedPage = "campaigns" | "contacts" | "lists" | "providers";
 
 interface NavItem {
   readonly label: string;
@@ -62,7 +63,12 @@ const NAV: readonly {
   },
   {
     items: [
-      { icon: MegaphoneIcon, label: "Campaigns" },
+      {
+        counted: "campaigns",
+        href: "/campaigns",
+        icon: MegaphoneIcon,
+        label: "Campaigns",
+      },
       { icon: LayoutIcon, label: "Templates" },
     ],
     label: "Send",
@@ -163,6 +169,7 @@ const OrganizationNavigation = ({
 }: {
   organizationId: OrganizationId;
 }) => {
+  const campaigns = useCampaignPage(organizationId, {});
   const contacts = useContactPage(organizationId, {});
   const lists = useLists(organizationId);
   const providers = useProviderConnections(organizationId);
@@ -170,6 +177,7 @@ const OrganizationNavigation = ({
   return (
     <Navigation
       counts={{
+        campaigns: campaigns.data?.total,
         contacts: contacts.data?.total,
         lists: lists.data?.length,
         providers: providers.data?.length,

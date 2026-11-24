@@ -115,6 +115,18 @@ export const newProviderConnectionId = newId("pcn").pipe(
   Effect.map((id) => ProviderConnectionIdSchema.make(id))
 );
 
+/** A Campaign's ID, `cmp_…`. */
+export const CampaignIdSchema = Schema.String.check(hasPrefix("cmp")).pipe(
+  Schema.brand("CampaignId")
+);
+
+export type CampaignId = typeof CampaignIdSchema.Type;
+
+/** A new Campaign ID. IDs made later sort after earlier ones. */
+export const newCampaignId = newId("cmp").pipe(
+  Effect.map((id) => CampaignIdSchema.make(id))
+);
+
 /** A signed-in person. Better Auth makes these IDs, so they have no prefix. */
 export const UserIdSchema = Schema.String.pipe(Schema.brand("UserId"));
 

@@ -22,7 +22,8 @@ const GREETING_TIMEOUT = Duration.seconds(10);
 
 const SOCKET_TIMEOUT = Duration.seconds(30);
 
-const SEND_TIMEOUT_SECONDS = 60;
+/** The longest one email may take to send, looking up the host included. */
+export const SEND_TIMEOUT_SECONDS = 60;
 
 const TRAILING_DOT = /\.$/u;
 
@@ -155,12 +156,19 @@ const messageFor = (email: OutgoingEmail) => {
           ? email.from.email
           : { address: email.from.email, name: email.from.name },
       subject: email.subject,
-      text: email.text,
       to: email.to,
     };
 
+  if (email.text !== undefined) {
+    message.text = email.text;
+  }
+
   if (email.html !== undefined) {
     message.html = email.html;
+  }
+
+  if (email.replyTo !== undefined) {
+    message.replyTo = email.replyTo;
   }
 
   return message;

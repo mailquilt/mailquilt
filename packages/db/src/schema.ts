@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigserial,
   boolean,
   check,
   foreignKey,
@@ -7,6 +8,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -306,5 +308,133 @@ export const providerConnections = pgTable(
       "provider_connections_credentials_check",
       sql`(${table.credentials} is null) = (${table.credentialsKeyVersion} is null)`
     ),
+  ]
+);
+
+/**
+ * One email (`cmp_…`) holding its own copy of its content, sent once to one
+ * List through one Provider Connection. Deleting that Provider Connection
+ * leaves the Campaign without one (`provider_connection_id` null), so a draft
+ * asks for another and a send in progress stops at its next batch.
+ * `recipients_*` count the Contacts it goes to, fixed when it starts sending,
+ * and how many were sent it or failed so far, kept with each batch's outcomes
+ * so reading them never counts recipient rows.
+ */
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    subject: text("subject").notNull(),
+    fromName: text("from_name"),
+    fromEmail: text("from_email").notNull(),
+    replyTo: text("reply_to"),
+    listId: text("list_id").notNull(),
+    providerConnectionId: text("provider_connection_id"),
+    html: text("html").notNull(),
+    status: text("status").notNull().default("draft"),
+    recipientsTotal: integer("recipients_total").notNull().default(0),
+    recipientsSent: integer("recipients_sent").notNull().default(0),
+    recipientsFailed: integer("recipients_failed").notNull().default(0),
+    sendingStartedAt: timestamp("sending_started_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    unique("campaigns_organization_id_id_key").on(
+      table.organizationId,
+      table.id
+    ),
+    foreignKey({
+      columns: [table.organizationId, table.listId],
+      foreignColumns: [lists.organizationId, lists.id],
+      name: "campaigns_list_fkey",
+    }),
+    // WARNING: the migration narrows this to `on delete set null (provider_connection_id)`, which Drizzle can't declare; a regenerated migration would null `organization_id` too.
+    foreignKey({
+      columns: [table.organizationId, table.providerConnectionId],
+      foreignColumns: [
+        providerConnections.organizationId,
+        providerConnections.id,
+      ],
+      name: "campaigns_provider_connection_fkey",
+    }).onDelete("set null"),
+    check(
+      "campaigns_status_check",
+      sql`${table.status} in ('draft', 'sending', 'sent')`
+    ),
+  ]
+);
+
+/**
+ * The Contacts a Campaign goes to, fixed in one query when it starts sending,
+ * with the address each had then. `batch` groups them into the queue messages
+ * that send them. Each starts `queued`, and becomes `sent`, with the
+ * Provider's message ID, or `failed`, with why.
+ */
+export const campaignRecipients = pgTable(
+  "campaign_recipients",
+  {
+    organizationId: text("organization_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    contactId: text("contact_id").notNull(),
+    email: text("email").notNull(),
+    batch: integer("batch").notNull(),
+    status: text("status").notNull().default("queued"),
+    providerMessageId: text("provider_message_id"),
+    failureReason: text("failure_reason"),
+    failureDetail: text("failure_detail"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.campaignId, table.contactId] }),
+    index("campaign_recipients_campaign_id_batch_idx").on(
+      table.campaignId,
+      table.batch
+    ),
+    foreignKey({
+      columns: [table.organizationId, table.campaignId],
+      foreignColumns: [campaigns.organizationId, campaigns.id],
+      name: "campaign_recipients_campaign_fkey",
+    }).onDelete("cascade"),
+    check(
+      "campaign_recipients_status_check",
+      sql`${table.status} in ('queued', 'sent', 'failed')`
+    ),
+  ]
+);
+
+/**
+ * What happened to each email a Campaign sent, such as `sent`. Partitioned by
+ * month of `occurred_at` in its hand-written migration, which Drizzle can't
+ * declare; `create_delivery_event_partitions` makes the coming months'
+ * partitions, and a scheduled job calls it. Events are dropped a month at a
+ * time, by partition.
+ */
+export const deliveryEvents = pgTable(
+  "delivery_events",
+  {
+    id: bigserial("id", { mode: "number" }),
+    organizationId: text("organization_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    contactId: text("contact_id").notNull(),
+    kind: text("kind").notNull(),
+    providerMessageId: text("provider_message_id"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.occurredAt, table.id] }),
+    index("delivery_events_campaign_id_idx").on(table.campaignId),
+    foreignKey({
+      columns: [table.organizationId, table.campaignId],
+      foreignColumns: [campaigns.organizationId, campaigns.id],
+      name: "delivery_events_campaign_fkey",
+    }).onDelete("cascade"),
+    check("delivery_events_kind_check", sql`${table.kind} in ('sent')`),
   ]
 );

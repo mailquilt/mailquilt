@@ -1,0 +1,41 @@
+# Mailquilt and its Postgres. Set the variables below in a .env file next to
+# this one (or in Coolify), then `docker compose up -d`. Migrations run when
+# the app starts.
+#
+#   AUTH_SECRET        at least 32 random characters: openssl rand -base64 32
+#   ENCRYPTION_KEYS    1:<32 random bytes, base64>: echo "1:$(openssl rand -base64 32)"
+#   POSTGRES_PASSWORD  letters and digits only, as it goes into a connection URL: openssl rand -hex 32
+#   APP_URL            where people open Mailquilt, such as https://mail.example.com
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to at least 32 random characters}
+      ENCRYPTION_KEYS: ${ENCRYPTION_KEYS:?Set ENCRYPTION_KEYS, such as 1:<32 random bytes in base64>}
+      DATABASE_URL: postgres://mailquilt:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/mailquilt
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18.7-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mailquilt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: mailquilt
+    volumes:
+      - postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "mailquilt", "-d", "mailquilt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres:

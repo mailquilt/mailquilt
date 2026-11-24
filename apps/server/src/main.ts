@@ -8,7 +8,12 @@ import {
   SystemMailerConfigFromEnv,
   SystemMailerLive,
 } from "@repo/core";
-import { PostgresPortsLive, SmtpProviderLive } from "@repo/runtime-node";
+import {
+  migrateOnBoot,
+  PostgresPortsLive,
+  QueueWorkersLive,
+  SmtpProviderLive,
+} from "@repo/runtime-node";
 import { Config, Effect, Layer } from "effect";
 import { HttpRouter, HttpServerResponse, HttpStaticServer } from "effect/http";
 
@@ -52,10 +57,21 @@ const PortsLive = SystemMailerAfterResponding.pipe(
 const ServerLive = HttpRouter.serve(
   Layer.mergeAll(
     ApiLive.pipe(
-      HttpRouter.provideRequest(Layer.mergeAll(PortsLive, AuthConfigFromEnv))
+      HttpRouter.provideRequest(
+        Layer.mergeAll(
+          Layer.effectContext(
+            Effect.context<Layer.Success<typeof PortsLive>>()
+          ),
+          AuthConfigFromEnv
+        )
+      )
     ),
     DashboardLive
   )
 ).pipe(Layer.provide(HttpServerLive));
 
-NodeRuntime.runMain(Layer.launch(ServerLive));
+const AppLive = Layer.mergeAll(ServerLive, QueueWorkersLive).pipe(
+  Layer.provide(PortsLive)
+);
+
+NodeRuntime.runMain(migrateOnBoot.pipe(Effect.andThen(Layer.launch(AppLive))));

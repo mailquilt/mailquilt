@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "e2e"
 
 # Every dependency is pinned exactly here; packages refer to it with `catalog:`.
 catalogMode: strict
@@ -43,6 +44,7 @@ catalog:
   "@hugeicons/react": 1.1.10
   "@interfere/landmines": 0.1.1
   "@phosphor-icons/react": 2.1.10
+  "@playwright/test": 1.65.1
   "@shadcn/lint": 0.2.5
   "@tailwindcss/vite": 4.3.5
   "@tanstack/devtools-vite": 0.8.7
@@ -73,6 +75,7 @@ catalog:
   oxfmt: 0.79.0
   oxlint: 1.94.0
   path-to-regexp: 6.3.0
+  pg-boss: 12.38.2
   postcss-selector-parser: 6.1.6
   react: 19.3.1
   react-dom: 19.3.1

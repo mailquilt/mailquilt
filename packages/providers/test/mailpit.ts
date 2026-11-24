@@ -33,6 +33,7 @@ const MessageSummary = Schema.Struct({
 const Message = Schema.Struct({
   From: Schema.Struct({ Address: Schema.String, Name: Schema.String }),
   To: Schema.Array(Schema.Struct({ Address: Schema.String })),
+  ReplyTo: Schema.Array(Schema.Struct({ Address: Schema.String })),
   Subject: Schema.String,
   Text: Schema.String,
   HTML: Schema.String,

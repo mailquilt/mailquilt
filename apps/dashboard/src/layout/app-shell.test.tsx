@@ -43,6 +43,15 @@ const signedIn = [
 ];
 
 const quietOrganization = [
+  http.get(`${ORGANIZATION}/campaigns`, () =>
+    HttpResponse.json({
+      campaigns: [],
+      next: null,
+      previous: null,
+      start: 0,
+      total: 0,
+    })
+  ),
   http.get(`${ORGANIZATION}/lists`, () => HttpResponse.json([])),
   http.get(`${ORGANIZATION}/provider-connections`, () => HttpResponse.json([])),
   http.get(`${ORGANIZATION}/contacts`, () =>
@@ -90,6 +99,15 @@ describe("app shell", () => {
     let providersAnswered = false;
     api.use(
       ...signedIn,
+      http.get(`${ORGANIZATION}/campaigns`, () =>
+        HttpResponse.json({
+          campaigns: [],
+          next: null,
+          previous: null,
+          start: 0,
+          total: 64,
+        })
+      ),
       http.get(`${ORGANIZATION}/lists`, () => {
         listsAnswered = true;
 
@@ -113,6 +131,7 @@ describe("app shell", () => {
     await expect(
       screen.findByRole("link", { name: "Contacts, 12,480" }, { timeout: 3000 })
     ).resolves.toBeDefined();
+    expect(screen.getByRole("link", { name: "Campaigns, 64" })).toBeDefined();
     expect(screen.getByRole("link", { name: "Lists" })).toBeDefined();
     expect(screen.getByRole("link", { name: "Providers" })).toBeDefined();
   });
@@ -122,14 +141,14 @@ describe("app shell", () => {
 
     renderShell();
 
-    const campaigns = await screen.findByRole(
+    const templates = await screen.findByRole(
       "button",
-      { name: "Campaigns Soon" },
+      { name: "Templates Soon" },
       { timeout: 3000 }
     );
 
-    expect(campaigns.hasAttribute("disabled")).toBeTruthy();
-    expect(screen.queryByRole("link", { name: /Campaigns/u })).toBeNull();
+    expect(templates.hasAttribute("disabled")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Templates/u })).toBeNull();
     expect(screen.getByRole("link", { name: "Home" })).toBeDefined();
   });
 

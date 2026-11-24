@@ -6,7 +6,9 @@ import { Fragment } from "react";
  * (`crumbs`), a two-tone display title like the wordmark
  * (what it is in ink, `titleDetail` such as a count in quilt grey), one
  * sentence, and the page's actions on the right. On phones the actions go
- * full width under the sentence.
+ * full width under the sentence. A long title, such as a Campaign's subject,
+ * can run up to the actions (`titleRunsToActions`) rather than wrap at the
+ * sentence's measure.
  */
 export const PageHeader = ({
   actions,
@@ -14,6 +16,7 @@ export const PageHeader = ({
   description,
   title,
   titleDetail,
+  titleRunsToActions = false,
 }: {
   actions?: React.ReactNode;
   /** The pages above this one, such as Providers above "Connect an SMTP server". */
@@ -21,10 +24,11 @@ export const PageHeader = ({
   description: React.ReactNode;
   title: string;
   titleDetail?: React.ReactNode;
+  titleRunsToActions?: boolean;
 }) => (
   <header className="mb-7 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 max-sm:mb-5">
     {crumbs === undefined ? null : (
-      <Breadcrumbs className="-mb-0.5 w-full" size="sm">
+      <Breadcrumbs className="mq-crumbs -mb-0.5 w-full" size="sm">
         {crumbs.map((crumb) => (
           <Fragment key={crumb.href}>
             <Breadcrumbs.Link href={crumb.href}>{crumb.label}</Breadcrumbs.Link>
@@ -34,7 +38,9 @@ export const PageHeader = ({
         <Breadcrumbs.Current>{title}</Breadcrumbs.Current>
       </Breadcrumbs>
     )}
-    <div className="flex max-w-[60ch] min-w-0 flex-col gap-2">
+    <div
+      className={`flex min-w-0 flex-col gap-2 ${titleRunsToActions ? "flex-1 basis-[24rem]" : "max-w-[60ch]"}`}
+    >
       <h1 className="font-display text-display font-semibold text-balance text-kumo-strong max-sm:text-2xl max-sm:leading-7.5">
         {title}
         {titleDetail === undefined ? null : (

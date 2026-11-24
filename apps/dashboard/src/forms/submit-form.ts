@@ -16,7 +16,8 @@ export const submitForm = async (
 
   for (const control of elements) {
     if (
-      control instanceof HTMLInputElement &&
+      (control instanceof HTMLInputElement ||
+        control instanceof HTMLTextAreaElement) &&
       (form.getFieldMeta(control.name)?.errors.length ?? 0) > 0
     ) {
       control.focus();

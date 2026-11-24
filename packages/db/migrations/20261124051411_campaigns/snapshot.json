@@ -1,0 +1,974 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "f6bec74f-cbde-4b13-b137-10872b8a1d8e",
+  "prevIds": ["19bf3863-0d1b-4359-8b79-acea6212dc0e"],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "campaign_recipients"],
+      "writes": [
+        "s|tbl|public.campaign_recipients",
+        "n|tbl|public.campaign_recipients",
+        "e|tbl|public.campaign_recipients",
+        "n|rel|public.campaign_recipients",
+        "n|type|public.campaign_recipients",
+        "n|rel|public.campaign_recipients_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|tbl|public.campaigns",
+        "n|tbl|public.campaigns",
+        "e|tbl|public.campaigns",
+        "n|rel|public.campaigns",
+        "n|type|public.campaigns",
+        "n|rel|public.campaigns_pkey",
+        "n|rel|public.campaigns_organization_id_id_key"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "delivery_events"],
+      "writes": [
+        "s|tbl|public.delivery_events",
+        "n|tbl|public.delivery_events",
+        "e|tbl|public.delivery_events",
+        "n|rel|public.delivery_events",
+        "n|type|public.delivery_events",
+        "n|rel|public.delivery_events_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "campaign_recipients",
+        "campaign_recipients_campaign_id_batch_idx"
+      ],
+      "writes": [
+        "s|idx|public.campaign_recipients_campaign_id_batch_idx",
+        "n|idx|public.campaign_recipients_campaign_id_batch_idx",
+        "e|idx|public.campaign_recipients_campaign_id_batch_idx",
+        "n|rel|public.campaign_recipients_campaign_id_batch_idx"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.campaign_id",
+        "n|col|public.campaign_recipients.batch"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "delivery_events",
+        "delivery_events_campaign_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.delivery_events_campaign_id_idx",
+        "n|idx|public.delivery_events_campaign_id_idx",
+        "e|idx|public.delivery_events_campaign_id_idx",
+        "n|rel|public.delivery_events_campaign_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.delivery_events",
+        "n|sch|public",
+        "n|col|public.delivery_events.campaign_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "campaign_recipients"],
+      "writes": [
+        "s|fk|public.campaign_recipients.campaign_recipients_campaign_fkey",
+        "n|fk|public.campaign_recipients.campaign_recipients_campaign_fkey",
+        "e|fk|public.campaign_recipients.campaign_recipients_campaign_fkey",
+        "n|con|public.campaign_recipients.campaign_recipients_campaign_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.organization_id",
+        "n|col|public.campaign_recipients.campaign_id",
+        "n|col|public.campaigns.organization_id",
+        "n|col|public.campaigns.id",
+        "e|uniqueness|public.campaigns.id.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_organization_id_organizations_id_fkey",
+        "n|fk|public.campaigns.campaigns_organization_id_organizations_id_fkey",
+        "e|fk|public.campaigns.campaigns_organization_id_organizations_id_fkey",
+        "n|con|public.campaigns.campaigns_organization_id_organizations_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.organizations",
+        "n|sch|public",
+        "n|col|public.campaigns.organization_id",
+        "n|col|public.organizations.id",
+        "e|uniqueness|public.organizations.id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_list_fkey",
+        "n|fk|public.campaigns.campaigns_list_fkey",
+        "e|fk|public.campaigns.campaigns_list_fkey",
+        "n|con|public.campaigns.campaigns_list_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.lists",
+        "n|sch|public",
+        "n|col|public.campaigns.organization_id",
+        "n|col|public.campaigns.list_id",
+        "n|col|public.lists.organization_id",
+        "n|col|public.lists.id",
+        "e|uniqueness|public.lists.id.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_provider_connection_fkey",
+        "n|fk|public.campaigns.campaigns_provider_connection_fkey",
+        "e|fk|public.campaigns.campaigns_provider_connection_fkey",
+        "n|con|public.campaigns.campaigns_provider_connection_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|tbl|public.provider_connections",
+        "n|sch|public",
+        "n|col|public.campaigns.organization_id",
+        "n|col|public.campaigns.provider_connection_id",
+        "n|col|public.provider_connections.organization_id",
+        "n|col|public.provider_connections.id",
+        "e|uniqueness|public.provider_connections.id.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "delivery_events"],
+      "writes": [
+        "s|fk|public.delivery_events.delivery_events_campaign_fkey",
+        "n|fk|public.delivery_events.delivery_events_campaign_fkey",
+        "e|fk|public.delivery_events.delivery_events_campaign_fkey",
+        "n|con|public.delivery_events.delivery_events_campaign_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.delivery_events",
+        "n|sch|public",
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.delivery_events.organization_id",
+        "n|col|public.delivery_events.campaign_id",
+        "n|col|public.campaigns.organization_id",
+        "n|col|public.campaigns.id",
+        "e|uniqueness|public.campaigns.id.organization_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "campaign_recipients",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "campaigns",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "delivery_events",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "contact_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "email",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "batch",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'queued'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "provider_message_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "failure_reason",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "failure_detail",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "processed_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "subject",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "from_name",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "from_email",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "reply_to",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "list_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "provider_connection_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "html",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "status",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "'draft'",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "recipients_total",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "recipients_sent",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "recipients_failed",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "sending_started_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "sent_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "updated_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "id",
+        "type": "bigserial",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "campaign_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "contact_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "kind",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "provider_message_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "occurred_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_campaign_id_batch_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "campaign_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "batch",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "delivery_events_campaign_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "campaign_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_campaign_fkey",
+        "nameExplicit": true,
+        "columns": ["organization_id", "campaign_id"],
+        "schemaTo": "public",
+        "tableTo": "campaigns",
+        "columnsTo": ["organization_id", "id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_organization_id_organizations_id_fkey",
+        "nameExplicit": false,
+        "columns": ["organization_id"],
+        "schemaTo": "public",
+        "tableTo": "organizations",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_list_fkey",
+        "nameExplicit": true,
+        "columns": ["organization_id", "list_id"],
+        "schemaTo": "public",
+        "tableTo": "lists",
+        "columnsTo": ["organization_id", "id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_provider_connection_fkey",
+        "nameExplicit": true,
+        "columns": ["organization_id", "provider_connection_id"],
+        "schemaTo": "public",
+        "tableTo": "provider_connections",
+        "columnsTo": ["organization_id", "id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "SET NULL",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "delivery_events_campaign_fkey",
+        "nameExplicit": true,
+        "columns": ["organization_id", "campaign_id"],
+        "schemaTo": "public",
+        "tableTo": "campaigns",
+        "columnsTo": ["organization_id", "id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_pkey",
+        "columns": ["campaign_id", "contact_id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "delivery_events_pkey",
+        "columns": ["occurred_at", "id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_pkey",
+        "columns": ["id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_organization_id_id_key",
+        "nameExplicit": true,
+        "columns": ["organization_id", "id"],
+        "nullsNotDistinct": false,
+        "entityType": "uniques"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_status_check",
+        "value": "\"status\" in ('queued', 'sent', 'failed')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_status_check",
+        "value": "\"status\" in ('draft', 'sending', 'sent')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "delivery_events_kind_check",
+        "value": "\"kind\" in ('sent')",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

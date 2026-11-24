@@ -9,12 +9,16 @@ import type { DateTime, Effect, Option } from "effect";
 
 import type { InvalidNotification } from "./invalid-notification.ts";
 
-/** One email to hand to a Provider. */
+/**
+ * One email to hand to a Provider: its plain text, its HTML, or both, and
+ * where replies go when that isn't the sender.
+ */
 export interface OutgoingEmail {
   readonly from: typeof Sender.Type;
   readonly to: string;
+  readonly replyTo?: string;
   readonly subject: string;
-  readonly text: string;
+  readonly text?: string;
   readonly html?: string;
 }
 

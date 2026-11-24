@@ -15,6 +15,7 @@ export interface ProviderUnderTest {
 const EMAIL = {
   from: { email: "news@acme.example", name: "Acme News" },
   html: "<p>Hello <strong>Ada</strong></p>",
+  replyTo: "replies@acme.example",
   subject: "This week at Acme",
   text: "Hello Ada",
 } as const;
@@ -45,6 +46,7 @@ export const providerContract = <R>(
         Name: EMAIL.from.name,
       });
       assert.deepStrictEqual(email?.To, [{ Address: to }]);
+      assert.deepStrictEqual(email?.ReplyTo, [{ Address: EMAIL.replyTo }]);
       assert.strictEqual(email?.Subject, EMAIL.subject);
       assert.strictEqual(email?.Text.trim(), EMAIL.text);
       assert.include(email?.HTML, EMAIL.html);
