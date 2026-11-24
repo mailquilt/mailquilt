@@ -241,7 +241,7 @@ const ListFilter = ({
 }) => (
   <Select
     aria-label="List"
-    className="min-w-0 max-sm:w-full sm:w-auto"
+    className="min-w-0 max-sm:w-full sm:w-auto sm:max-w-80"
     onValueChange={(value) => onChange(String(value))}
     renderValue={() => (
       <span>
