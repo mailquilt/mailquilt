@@ -51,11 +51,10 @@ const SETUP_STEPS: readonly SetupStep[] = [
     youllNeed: "a CSV exported from your current tool.",
   },
   {
-    about: "Write it, choose who gets it, and send it now or schedule it.",
+    about: "Write it, choose who gets it, and send it.",
     built: false,
     title: "Send your first campaign",
-    youllNeed:
-      "your postal address for the footer, which anti-spam laws require.",
+    youllNeed: "a list with subscribed contacts, and your email as HTML.",
   },
 ];
 
@@ -133,11 +132,15 @@ const NotBuiltYet = () => (
     This step arrives in a later Mailquilt update. Until then, you can{" "}
     <Link className={INLINE_LINK} to="/contacts">
       add contacts
+    </Link>
+    ,{" "}
+    <Link className={INLINE_LINK} to="/lists">
+      make lists
     </Link>{" "}
     and{" "}
     <span className="whitespace-nowrap">
-      <Link className={INLINE_LINK} to="/lists">
-        make lists
+      <Link className={INLINE_LINK} to="/campaigns">
+        send a campaign
       </Link>
       .
     </span>

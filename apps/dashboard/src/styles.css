@@ -760,6 +760,28 @@ aside.mq-frame {
   }
 }
 
+/*
+ * The way back stays on one line. A crumb between the first and the current
+ * page, such as a Campaign's subject above "Edit draft", gives way first,
+ * with an ellipsis; Kumo's links never shrink. With no such crumb, the
+ * current page's name truncates, as Kumo draws it.
+ */
+.mq-crumbs [data-kumo-part="link"]:not(:first-child) {
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.mq-crumbs [data-kumo-part="link"]:not(:first-child) > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mq-crumbs:has([data-kumo-part="link"]:not(:first-child))
+  [aria-current="page"] {
+  flex-shrink: 0;
+}
+
 /* Two-tone titles, like the wordmark: what it is in ink, how many in quilt grey. */
 .mq-tone {
   color: var(--mq-logo-grey);
@@ -977,6 +999,19 @@ aside.mq-frame {
 @keyframes mq-lift {
   from {
     translate: 0 0;
+  }
+}
+
+/* A Campaign going out: its orange block breathes, by opacity only, until it's sent. */
+@media (prefers-reduced-motion: no-preference) {
+  .mq-pulse {
+    animation: mq-pulse 1600ms ease-in-out infinite;
+  }
+}
+
+@keyframes mq-pulse {
+  50% {
+    opacity: 0.45;
   }
 }
 

@@ -1,4 +1,4 @@
-import { Button, Checkbox, Pagination, Select } from "@cloudflare/kumo";
+import { Button, Checkbox, Select } from "@cloudflare/kumo";
 import type {
   Contact,
   ContactId,
@@ -17,10 +17,11 @@ import {
 import type { RowSelectionState } from "@tanstack/react-table";
 import { Array as Arr } from "effect";
 import type { DateTime } from "effect";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
+import { CursorPager } from "../layout/cursor-pager.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
@@ -334,72 +335,6 @@ const StatusFilter = ({
   </Select>
 );
 
-const Pager = ({
-  loading,
-  onPage,
-  page,
-}: {
-  loading: boolean;
-  onPage: (cursor: Pick<ContactSearch, "after" | "before">) => void;
-  page: ContactPage;
-}) => {
-  const { next, previous } = page;
-  const current = previous === null ? 1 : 2;
-  const pager = useRef<HTMLDivElement>(null);
-  const pressed = useRef(false);
-  const atFirst = previous === null;
-  const atLast = next === null;
-
-  // WARNING: Kumo's arrows are plain disabled buttons. Reaching the first or last page turns off the arrow just pressed, and the browser drops focus to the page, so focus moves to the other arrow.
-  useEffect(() => {
-    const focused = document.activeElement;
-
-    const lostFocus =
-      focused === document.body ||
-      (focused instanceof HTMLButtonElement &&
-        focused.disabled &&
-        pager.current?.contains(focused) === true);
-
-    if (pressed.current && (atFirst || atLast) && lostFocus) {
-      pager.current
-        ?.querySelector<HTMLButtonElement>("button:not(:disabled)")
-        ?.focus();
-    }
-
-    pressed.current = false;
-  }, [atFirst, atLast]);
-
-  return (
-    <div ref={pager}>
-      <Pagination
-        hasNextPage={next !== null}
-        labels={{ navigation: "Pages of contacts" }}
-        page={current}
-        setPage={(asked) => {
-          if (loading) {
-            return;
-          }
-
-          pressed.current = true;
-
-          if (asked < current && previous !== null) {
-            onPage({ before: previous });
-          } else if (asked > current && next !== null) {
-            onPage({ after: next });
-          }
-        }}
-      >
-        <Pagination.Info className="tabular-nums">
-          {() =>
-            `${formatCount(page.start + 1)}–${formatCount(page.start + page.contacts.length)} of ${formatCount(page.total)}`
-          }
-        </Pagination.Info>
-        <Pagination.Controls controls="simple" />
-      </Pagination>
-    </div>
-  );
-};
-
 const NoContacts = ({
   addButton,
   list,
@@ -595,8 +530,10 @@ const ContactsTable = ({
         busy={query.isPlaceholderData}
         footer={
           page.total === 0 ? undefined : (
-            <Pager
+            <CursorPager
+              label="Pages of contacts"
               loading={query.isPlaceholderData}
+              next={page.next}
               onPage={(cursor) =>
                 onSearch({
                   list: search.list,
@@ -604,7 +541,10 @@ const ContactsTable = ({
                   ...cursor,
                 })
               }
-              page={page}
+              previous={page.previous}
+              shown={page.contacts.length}
+              start={page.start}
+              total={page.total}
             />
           )
         }

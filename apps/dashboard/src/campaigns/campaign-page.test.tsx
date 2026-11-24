@@ -1,0 +1,282 @@
+import { CampaignIdSchema, Organization } from "@repo/domain";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from "@testing-library/react";
+import { Schema } from "effect";
+import { focusManager } from "@tanstack/react-query";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+
+import {
+  ACME,
+  renderWithOrganizations,
+} from "../organizations/test-organizations.tsx";
+import { CampaignPage } from "./campaign-page.tsx";
+import { SENDING_POLL_MS } from "./campaigns-api.ts";
+import {
+  CAMPAIGN,
+  CAMPAIGNS,
+  DRAFT,
+  ready,
+  ROAST,
+  SENDING,
+  SENT,
+} from "./test-campaigns.ts";
+
+const api = setupServer();
+
+const organization = Schema.decodeUnknownSync(Organization)(ACME);
+
+const SEND = `${CAMPAIGN}/send`;
+
+const renderPage = () =>
+  renderWithOrganizations(
+    <CampaignPage
+      campaignId={CampaignIdSchema.make(DRAFT.id)}
+      organization={organization}
+    />
+  );
+
+const statusLine = () => document.querySelector("header p")?.textContent ?? "";
+
+const confirmSend = async () => {
+  fireEvent.click(await screen.findByRole("button", { name: "Send now" }));
+
+  const dialog = await screen.findByRole("dialog", {
+    name: "Send to 3 contacts?",
+  });
+
+  fireEvent.submit(dialog.querySelector("form") ?? document.body);
+
+  return dialog;
+};
+
+const answering = (...answers: readonly object[]) => {
+  let asked = 0;
+
+  return () => {
+    const answer = answers[Math.min(asked, answers.length - 1)];
+    asked += 1;
+
+    return HttpResponse.json(answer);
+  };
+};
+
+describe("one campaign's page", () => {
+  beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    api.resetHandlers();
+  });
+
+  afterAll(() => api.close());
+
+  it("sends a draft once confirmed, then follows it from sending to sent", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let sends = 0;
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGNS, () =>
+        HttpResponse.json({
+          campaigns: [],
+          next: null,
+          previous: null,
+          start: 0,
+          total: 1,
+        })
+      ),
+      http.get(CAMPAIGN, answering(DRAFT, SENT)),
+      http.post(SEND, () => {
+        sends += 1;
+
+        return HttpResponse.json(SENDING);
+      })
+    );
+    renderPage();
+
+    await confirmSend();
+
+    await expect.poll(statusLine).toContain("Sending to 3 contacts since");
+    expect(sends).toBe(1);
+    expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+
+    await act(() => vi.advanceTimersByTimeAsync(SENDING_POLL_MS));
+
+    await expect.poll(statusLine).toContain("Sent to 2 of 3 contacts");
+    expect(statusLine()).toContain("1 couldn’t be sent through Postmark.");
+
+    const notifications = within(
+      screen.getByRole("region", { name: "Notifications" })
+    );
+
+    await expect(
+      notifications.findByText("Sent to 2 of 3 contacts")
+    ).resolves.toBeDefined();
+    expect(
+      notifications.getByText("Roast of the month, through Postmark")
+    ).toBeDefined();
+  });
+
+  it("keeps the confirmation open to try again when the server can't be reached", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
+      http.post(SEND, () => HttpResponse.error())
+    );
+    renderPage();
+
+    const dialog = await confirmSend();
+
+    await expect(within(dialog).findByRole("alert")).resolves.toHaveProperty(
+      "textContent",
+      "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be sent twice."
+    );
+    expect(statusLine()).toContain("Draft, created");
+  });
+
+  const NOBODY = {
+    ...ROAST,
+    subscriptions: { ...ROAST.subscriptions, subscribed: 0 },
+  };
+
+  it.each([
+    [
+      "no one is subscribed",
+      { _tag: "NoSubscribedContacts" },
+      409,
+      DRAFT,
+      { lists: [NOBODY] },
+      "No one to send to yet",
+    ],
+    [
+      "its connection was deleted",
+      { _tag: "ProviderConnectionNotFound" },
+      404,
+      DRAFT,
+      { connections: [] },
+      "Choose a provider connection before sending",
+    ],
+    [
+      "it was sent from another tab",
+      { _tag: "CampaignNotDraft" },
+      409,
+      SENT,
+      {},
+      "This campaign had already been sent",
+    ],
+  ])(
+    "says so on the page, with no Send now, when %s",
+    async (_, refusal, status, afterwards, nowOnTheServer, title) => {
+      api.use(
+        ...ready(),
+        http.get(CAMPAIGN, answering(DRAFT, afterwards)),
+        http.post(SEND, () => {
+          api.use(...ready(nowOnTheServer));
+
+          return HttpResponse.json(refusal, { status });
+        })
+      );
+      renderPage();
+
+      await confirmSend();
+
+      await expect(screen.findByText(title)).resolves.toBeDefined();
+      await expect.poll(() => screen.queryByRole("dialog")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+    }
+  );
+
+  it("offers Send now again once a list that had no one subscribed has contacts", async () => {
+    const lists = [ROAST, NOBODY, ROAST];
+    let asked = 0;
+    api.use(
+      ...ready(),
+      http.get(`*/lists/${ROAST.id}`, () => {
+        const list = lists[Math.min(asked, lists.length - 1)];
+        asked += 1;
+
+        return HttpResponse.json(list);
+      }),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
+      http.post(SEND, () =>
+        HttpResponse.json({ _tag: "NoSubscribedContacts" }, { status: 409 })
+      )
+    );
+    renderPage();
+
+    await confirmSend();
+    await expect(screen.findByText("No one to send to yet")).resolves.toBeDefined();
+
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    await expect(
+      screen.findByRole("button", { name: "Send now" })
+    ).resolves.toBeDefined();
+    expect(screen.queryByText("No one to send to yet")).toBeNull();
+  });
+
+  it("offers only Edit for a draft whose list was deleted", async () => {
+    api.use(
+      ...ready({ lists: [] }),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
+    renderPage();
+
+    await expect(
+      screen.findByText("Choose a list before sending")
+    ).resolves.toBeDefined();
+    expect(screen.getByText("The list was deleted")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Edit" }).getAttribute("href")
+    ).toBe(`/campaigns/${DRAFT.id}/edit`);
+  });
+
+  it("says when the Organization has no such campaign", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () =>
+        HttpResponse.json({ _tag: "CampaignNotFound" }, { status: 404 })
+      )
+    );
+    renderPage();
+
+    await expect(
+      screen.findByRole("heading", { name: "This campaign isn’t here" })
+    ).resolves.toBeDefined();
+  });
+
+  it("says a sent campaign went to everyone when the provider refused none", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () =>
+        HttpResponse.json({
+          ...SENT,
+          recipients: { failed: 0, sent: 3, total: 3 },
+        })
+      )
+    );
+    renderPage();
+
+    await expect.poll(statusLine).toContain("Sent to 3 contacts");
+    expect(statusLine()).not.toContain("couldn’t be sent");
+    expect(screen.getByText(ROAST.name)).toBeDefined();
+  });
+});

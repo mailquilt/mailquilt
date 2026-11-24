@@ -20,8 +20,12 @@ import { Route as AuthEmailVerifiedRouteImport } from './routes/_auth/email-veri
 import { Route as AuthSetupRouteImport } from './routes/_auth/setup'
 import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
+import { Route as AppCampaignsIndexRouteImport } from './routes/_app/campaigns/index'
+import { Route as AppCampaignsNewRouteImport } from './routes/_app/campaigns/new'
 import { Route as AppProvidersIndexRouteImport } from './routes/_app/providers/index'
 import { Route as AppProvidersNewRouteImport } from './routes/_app/providers/new'
+import { Route as AppCampaignsCampaignIdIndexRouteImport } from './routes/_app/campaigns/$campaignId/index'
+import { Route as AppCampaignsCampaignIdEditRouteImport } from './routes/_app/campaigns/$campaignId/edit'
 import { Route as AppProvidersProviderConnectionIdEditRouteImport } from './routes/_app/providers/$providerConnectionId/edit'
 
 const AppRoute = AppRouteImport.update({
@@ -77,6 +81,16 @@ const AuthSignUpRoute = AuthSignUpRouteImport.update({
   path: '/sign-up',
   getParentRoute: () => AuthRoute,
 } as any)
+const AppCampaignsIndexRoute = AppCampaignsIndexRouteImport.update({
+  id: '/campaigns/',
+  path: '/campaigns/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCampaignsNewRoute = AppCampaignsNewRouteImport.update({
+  id: '/campaigns/new',
+  path: '/campaigns/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProvidersIndexRoute = AppProvidersIndexRouteImport.update({
   id: '/providers/',
   path: '/providers/',
@@ -87,6 +101,18 @@ const AppProvidersNewRoute = AppProvidersNewRouteImport.update({
   path: '/providers/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCampaignsCampaignIdIndexRoute =
+  AppCampaignsCampaignIdIndexRouteImport.update({
+    id: '/campaigns/$campaignId/',
+    path: '/campaigns/$campaignId/',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppCampaignsCampaignIdEditRoute =
+  AppCampaignsCampaignIdEditRouteImport.update({
+    id: '/campaigns/$campaignId/edit',
+    path: '/campaigns/$campaignId/edit',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppProvidersProviderConnectionIdEditRoute =
   AppProvidersProviderConnectionIdEditRouteImport.update({
     id: '/providers/$providerConnectionId/edit',
@@ -104,9 +130,13 @@ export interface FileRoutesByFullPath {
   '/setup': typeof AuthSetupRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/campaigns/new': typeof AppCampaignsNewRoute
   '/providers/new': typeof AppProvidersNewRoute
+  '/campaigns/': typeof AppCampaignsIndexRoute
   '/providers/': typeof AppProvidersIndexRoute
+  '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
+  '/campaigns/$campaignId/': typeof AppCampaignsCampaignIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AppIndexRoute
@@ -118,9 +148,13 @@ export interface FileRoutesByTo {
   '/setup': typeof AuthSetupRoute
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
+  '/campaigns/new': typeof AppCampaignsNewRoute
   '/providers/new': typeof AppProvidersNewRoute
+  '/campaigns': typeof AppCampaignsIndexRoute
   '/providers': typeof AppProvidersIndexRoute
+  '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
+  '/campaigns/$campaignId': typeof AppCampaignsCampaignIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -135,9 +169,13 @@ export interface FileRoutesById {
   '/_auth/sign-in': typeof AuthSignInRoute
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/campaigns/new': typeof AppCampaignsNewRoute
   '/_app/providers/new': typeof AppProvidersNewRoute
+  '/_app/campaigns/': typeof AppCampaignsIndexRoute
   '/_app/providers/': typeof AppProvidersIndexRoute
+  '/_app/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/_app/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
+  '/_app/campaigns/$campaignId/': typeof AppCampaignsCampaignIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,9 +189,13 @@ export interface FileRouteTypes {
     | '/setup'
     | '/sign-in'
     | '/sign-up'
+    | '/campaigns/new'
     | '/providers/new'
+    | '/campaigns/'
     | '/providers/'
+    | '/campaigns/$campaignId/edit'
     | '/providers/$providerConnectionId/edit'
+    | '/campaigns/$campaignId/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -165,9 +207,13 @@ export interface FileRouteTypes {
     | '/setup'
     | '/sign-in'
     | '/sign-up'
+    | '/campaigns/new'
     | '/providers/new'
+    | '/campaigns'
     | '/providers'
+    | '/campaigns/$campaignId/edit'
     | '/providers/$providerConnectionId/edit'
+    | '/campaigns/$campaignId'
   id:
     | '__root__'
     | '/_app'
@@ -181,9 +227,13 @@ export interface FileRouteTypes {
     | '/_auth/sign-in'
     | '/_auth/sign-up'
     | '/_app/'
+    | '/_app/campaigns/new'
     | '/_app/providers/new'
+    | '/_app/campaigns/'
     | '/_app/providers/'
+    | '/_app/campaigns/$campaignId/edit'
     | '/_app/providers/$providerConnectionId/edit'
+    | '/_app/campaigns/$campaignId/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -270,6 +320,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignUpRouteImport
       parentRoute: typeof AuthRoute
     }
+    '/_app/campaigns/': {
+      id: '/_app/campaigns/'
+      path: '/campaigns'
+      fullPath: '/campaigns/'
+      preLoaderRoute: typeof AppCampaignsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/campaigns/new': {
+      id: '/_app/campaigns/new'
+      path: '/campaigns/new'
+      fullPath: '/campaigns/new'
+      preLoaderRoute: typeof AppCampaignsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/providers/': {
       id: '/_app/providers/'
       path: '/providers'
@@ -282,6 +346,20 @@ declare module '@tanstack/react-router' {
       path: '/providers/new'
       fullPath: '/providers/new'
       preLoaderRoute: typeof AppProvidersNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/campaigns/$campaignId/': {
+      id: '/_app/campaigns/$campaignId/'
+      path: '/campaigns/$campaignId'
+      fullPath: '/campaigns/$campaignId/'
+      preLoaderRoute: typeof AppCampaignsCampaignIdIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/campaigns/$campaignId/edit': {
+      id: '/_app/campaigns/$campaignId/edit'
+      path: '/campaigns/$campaignId/edit'
+      fullPath: '/campaigns/$campaignId/edit'
+      preLoaderRoute: typeof AppCampaignsCampaignIdEditRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/providers/$providerConnectionId/edit': {
@@ -299,9 +377,13 @@ interface AppRouteChildren {
   AppInstanceRoute: typeof AppInstanceRoute
   AppListsRoute: typeof AppListsRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppCampaignsNewRoute: typeof AppCampaignsNewRoute
   AppProvidersNewRoute: typeof AppProvidersNewRoute
+  AppCampaignsIndexRoute: typeof AppCampaignsIndexRoute
   AppProvidersIndexRoute: typeof AppProvidersIndexRoute
+  AppCampaignsCampaignIdEditRoute: typeof AppCampaignsCampaignIdEditRoute
   AppProvidersProviderConnectionIdEditRoute: typeof AppProvidersProviderConnectionIdEditRoute
+  AppCampaignsCampaignIdIndexRoute: typeof AppCampaignsCampaignIdIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -309,10 +391,14 @@ const AppRouteChildren: AppRouteChildren = {
   AppInstanceRoute: AppInstanceRoute,
   AppListsRoute: AppListsRoute,
   AppIndexRoute: AppIndexRoute,
+  AppCampaignsNewRoute: AppCampaignsNewRoute,
   AppProvidersNewRoute: AppProvidersNewRoute,
+  AppCampaignsIndexRoute: AppCampaignsIndexRoute,
   AppProvidersIndexRoute: AppProvidersIndexRoute,
+  AppCampaignsCampaignIdEditRoute: AppCampaignsCampaignIdEditRoute,
   AppProvidersProviderConnectionIdEditRoute:
     AppProvidersProviderConnectionIdEditRoute,
+  AppCampaignsCampaignIdIndexRoute: AppCampaignsCampaignIdIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

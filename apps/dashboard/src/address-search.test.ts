@@ -6,6 +6,8 @@ import { routeTree } from "./routeTree.gen.ts";
 const NEWS = "lst_01h455vb4pex5vsknk084sn02q";
 const ADA = "cnt_01h455vb4pex5vsknk084sn02q";
 const CONNECTION = "pcn_01h455vb4pex5vsknk084sn02q";
+const NEWER = "cmp_01h455vb4pex5vsknk084sn02q";
+const OLDER = "cmp_01h455vb4pex5vsknk084sn02p";
 
 describe("the address of a page that keeps its search in it", () => {
   it.each([
@@ -33,6 +35,24 @@ describe("the address of a page that keeps its search in it", () => {
       `/providers?connected=${CONNECTION}`,
       `/providers?connected=${CONNECTION}`,
       { connected: CONNECTION },
+    ],
+    [
+      "a campaign cursor that doesn't parse",
+      "/campaigns?after=foo",
+      "/campaigns",
+      {},
+    ],
+    [
+      "both campaign cursors",
+      `/campaigns?after=${OLDER}&before=${NEWER}`,
+      `/campaigns?after=${OLDER}`,
+      { after: OLDER },
+    ],
+    [
+      "a valid Campaigns search",
+      `/campaigns?before=${NEWER}`,
+      `/campaigns?before=${NEWER}`,
+      { before: NEWER },
     ],
     [
       "an error that isn't text",
