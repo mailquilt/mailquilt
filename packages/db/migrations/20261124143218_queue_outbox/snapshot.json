@@ -3,17 +3,11 @@
   "version": "10",
   "dialect": "postgres",
   "id": "089f3b2f-0453-4f82-82f9-434d54e7d8b0",
-  "prevIds": [
-    "f6bec74f-cbde-4b13-b137-10872b8a1d8e"
-  ],
+  "prevIds": ["f6bec74f-cbde-4b13-b137-10872b8a1d8e"],
   "footprints": [
     {
       "statementType": "create_table",
-      "statementTarget": [
-        "table",
-        "public",
-        "queue_outbox"
-      ],
+      "statementTarget": ["table", "public", "queue_outbox"],
       "writes": [
         "s|tbl|public.queue_outbox",
         "n|tbl|public.queue_outbox",
@@ -22,9 +16,7 @@
         "n|type|public.queue_outbox",
         "n|rel|public.queue_outbox_pkey"
       ],
-      "reads": [
-        "n|sch|public"
-      ]
+      "reads": ["n|sch|public"]
     }
   ],
   "deltas": [
@@ -75,9 +67,7 @@
         "schema": "public",
         "table": "queue_outbox",
         "name": "queue_outbox_pkey",
-        "columns": [
-          "id"
-        ],
+        "columns": ["id"],
         "nameExplicit": false,
         "entityType": "pks"
       }
