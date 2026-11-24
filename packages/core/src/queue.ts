@@ -20,7 +20,9 @@ export const QUEUE_RETRIES = 5;
 
 /**
  * How long the queue waits before the first retry. Each later retry waits
- * twice as long, so the retries span about 15 minutes of outage.
+ * twice as long, so the retries span about 15 minutes of outage. pg-boss, on
+ * Node, adds jitter: each wait falls between this schedule and twice it,
+ * capped at the last retry's wait.
  */
 export const QUEUE_RETRY_DELAY_SECONDS = 30;
 
