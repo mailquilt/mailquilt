@@ -84,6 +84,76 @@ jobs:
       - if: failure()
         run: docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml logs
 
+  smoke-cloudflare:
+    name: Smoke test (Cloudflare)
+    runs-on: ubuntu-24.04
+    # Postgres stands in for Hyperdrive's origin, and Mailpit for the SMTP
+    # server; wrangler dev runs the Worker, its Queue and its consumer locally.
+    services:
+      postgres:
+        image: postgres:18.7-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
+        env:
+          POSTGRES_PASSWORD: smoke-test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.33.1@sha256:aef2aacc11f075ec0fb6874275ee4a421e688e11a96ebb296134d1735c7761ce
+        env:
+          MP_SMTP_AUTH_ACCEPT_ANY: "true"
+          MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      DATABASE_URL: postgres://postgres:smoke-test@127.0.0.1:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter dashboard build
+      # As the deploy step does, before the Worker starts.
+      - run: pnpm --filter @repo/db migrate
+      - name: Start wrangler dev
+        working-directory: apps/api-worker
+        env:
+          CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: ${{ env.DATABASE_URL }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          set -a
+          . ../../e2e/smoke.env
+          set +a
+          ./node_modules/.bin/wrangler dev --port 8787 \
+            --var "AUTH_SECRET:$AUTH_SECRET" \
+            --var "ENCRYPTION_KEYS:$ENCRYPTION_KEYS" \
+            > "$RUNNER_TEMP/wrangler.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            curl -fs http://localhost:8787/health && exit 0
+            sleep 1
+          done
+          exit 1
+      - run: pnpm --filter e2e exec playwright install --with-deps chromium
+      # workerd looks names up over DNS, not in /etc/hosts, so Mailpit is
+      # reached by its address.
+      - run: pnpm --filter e2e smoke
+        env:
+          MAILQUILT_URL: http://localhost:8787
+          MAILPIT_URL: http://localhost:8025
+          MAILPIT_SMTP_HOST: 127.0.0.1
+          MAILPIT_SMTP_PORT: "1025"
+      - if: failure()
+        run: cat "$RUNNER_TEMP/wrangler.log"
+
   audit:
     name: Audit
     runs-on: ubuntu-24.04

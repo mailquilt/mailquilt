@@ -6,7 +6,7 @@
   "scripts": {
     "check-types": "tsc --noEmit",
     "dev": "wrangler dev",
-    "deploy": "pnpm --filter dashboard build && wrangler deploy"
+    "deploy": "pnpm --filter dashboard build && pnpm --filter @repo/db migrate && wrangler deploy"
   },
   "dependencies": {
     "@repo/api": "workspace:*",
@@ -17,6 +17,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@repo/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "wrangler": "catalog:"
   }

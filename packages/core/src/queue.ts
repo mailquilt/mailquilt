@@ -14,9 +14,10 @@ export type QueueMessage = typeof QueueMessageSchema.Type;
 
 /**
  * Port: hands messages to the runtime's queue, which delivers each at least
- * once to `handleQueueMessage`, possibly in another process. On Node the
- * messages join the database transaction `enqueue` runs in, so they're
- * delivered only if it commits. A queue that can't take them is a defect.
+ * once to `handleQueueMessage`, possibly in another process. The messages
+ * join the database transaction `enqueue` runs in, so they're delivered only
+ * if it commits: on Node through pg-boss, on Workers through an outbox table
+ * (ADR 0014). A queue that can't take them is a defect.
  */
 export class Queue extends Context.Service<
   Queue,

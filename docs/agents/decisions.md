@@ -21,7 +21,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Until the plain-text part and footer (#13) and unsubscribe (#12), a Campaign is sent as its HTML only (#10).
 - Until retries (#17), a Contact the Provider refuses is recorded as `failed` with the Provider's words and isn't tried again; the others still get it. When the server itself fails (unreachable, TLS, sign-in, blocked, no such host), the rest of that batch is recorded with the same failure without trying them, so one dead server can't hold the queue for a minute per Contact. A Campaign is `sent` once none of its recipients are still queued (#10).
 - Deleting a Provider Connection leaves its Campaigns without one: a draft can't be sent until another is chosen, and a Campaign still sending records the Contacts it hadn't reached as `failed` (#10).
-- Until Cloudflare Queues (#11), sending a Campaign on Workers answers 500 and leaves it a draft (#10).
+- On Workers, a send's queue messages go into the `queue_outbox` table in its transaction and are forwarded to Cloudflare Queues when the request ends, and every minute by a Cron Trigger for any left behind. One consumer runs at a time, as pg-boss works on Node, and takes one batch per invocation, one email at a time, so a batch has the 15-minute limit to itself and holds one SMTP and one database connection of the Worker's 6 (ADR 0014, #11).
 
 ## Providers
 
@@ -35,7 +35,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - A test email goes to any address the member types, through the connection's default sender, at most 10 every 10 minutes per person across Organizations. When the Provider refuses it, the API answers 502 `SendFailed` with the Provider's own words, so the member can fix the settings (#9).
 - A Provider Connection can be edited and deleted. An edit that leaves credentials out keeps them; `null` removes them. Changing the host, port or encryption while keeping saved credentials is refused (`CredentialsRequired`), so a member can't send someone else's password to a server they control or unencrypted (#9).
 - A DNS lookup that fails (timeout, server failure) is reported as `unreachable` with the resolver's reason; only a name with no address is `host-not-found` (#9).
-- Until the Workers SMTP adapter (#11), an SMTP Provider Connection can be saved on Cloudflare, and sending through it fails with `SendFailed` reason `unavailable` (#9).
+- SMTP on Workers is the same Nodemailer adapter, over workerd's `node:net` and `node:tls`, which run on `connect()`. TLS from the start opens the socket first and upgrades it, because workerd checks a socket it opens itself against the IP rather than the host name. Workers can't trust extra certificates and block port 25, and a certificate the server's name doesn't match fails as `unreachable` with workerd's opaque "internal error" rather than `tls` (#11).
 
 ## The install
 
@@ -45,7 +45,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - The System Mailer sends through SMTP, with the same adapter and outbound guard as Provider Connections. Its saved credentials are sealed and write-only, and only go to the server they were entered for, as a Provider Connection's do (#7).
 - `SYSTEM_MAILER_*` environment variables win over the System Mailer saved on the settings page, which then can't be changed (409 `SystemMailerFromEnvironment`). Some set but not all that are needed stops the app on Node; a Worker answers 500 to every request instead, saying why in its log (#7).
 - An account email that can't be sent, including when the saved System Mailer can't be read, is logged with its subject and the failure's reason, never the address or the server's reply, which often quotes it. Sign-up still succeeds (#7).
-- On Node the System Mailer answers at once and sends afterwards, so sign-up takes as long for a new address as for one with an account. On Workers it sends before answering, which is safe only while SMTP fails at once there; #11 must keep it so (#7).
+- On Node the System Mailer answers at once and sends afterwards, so sign-up takes as long for a new address as for one with an account. On Workers it sends before answering, which is safe only while SMTP fails at once there, so the System Mailer still doesn't send on Workers, though Provider Connections do (#7, #11).
 - A new password is 8 to 128 characters, the most Better Auth signs in with, so setup can't make an instance admin who can never sign in (#7).
 
 ## Data

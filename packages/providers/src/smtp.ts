@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { connect, isIP } from "node:net";
 import { rootCertificates } from "node:tls";
 import type { ConnectionOptions } from "node:tls";
 
@@ -15,6 +15,7 @@ import { SendFailed } from "@repo/domain";
 import { Duration, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { NetAddress } from "effect/net";
 import { createTransport } from "nodemailer";
+import type { SMTPTransportGetSocket } from "nodemailer/lib/smtp-transport";
 
 const CONNECTION_TIMEOUT = Duration.seconds(10);
 
@@ -123,12 +124,23 @@ const tlsOptions = (host: string, options: SmtpProviderOptions) => {
   return tls;
 };
 
+const openedSocket = (ip: string, port: number) => {
+  // WARNING: Workers' tls.connect checks a socket it opens itself against the IP, never `servername`, so TLS from the start to a checked IP fails there; upgrading an open socket checks `servername`.
+  const getSocket: SMTPTransportGetSocket = (_options, handOver) => {
+    handOver(null, { connection: connect(port, ip) });
+  };
+
+  return getSocket;
+};
+
 const transportFor = (
   { credentials, server }: SmtpSettings,
   address: NetAddress.InetAddress,
   options: SmtpProviderOptions
-) =>
-  createTransport({
+) => {
+  const ip = NetAddress.formatIp(address.address);
+
+  return createTransport({
     auth: credentials.pipe(
       Option.map(({ password, username }) => ({
         pass: Redacted.value(password),
@@ -137,8 +149,10 @@ const transportFor = (
       Option.getOrUndefined
     ),
     connectionTimeout: Duration.toMillis(CONNECTION_TIMEOUT),
+    getSocket:
+      server.security === "tls" ? openedSocket(ip, address.port) : undefined,
     greetingTimeout: Duration.toMillis(GREETING_TIMEOUT),
-    host: NetAddress.formatIp(address.address),
+    host: ip,
     ignoreTLS: server.security === "none",
     logger: false,
     port: address.port,
@@ -147,6 +161,7 @@ const transportFor = (
     socketTimeout: Duration.toMillis(SOCKET_TIMEOUT),
     tls: tlsOptions(server.host, options),
   });
+};
 
 const messageFor = (email: OutgoingEmail) => {
   const message: Parameters<ReturnType<typeof createTransport>["sendMail"]>[0] =
@@ -175,14 +190,16 @@ const messageFor = (email: OutgoingEmail) => {
 };
 
 /**
- * Sends through an SMTP server with Nodemailer, on Node. The host is checked
+ * Sends through an SMTP server with Nodemailer, on Node and on Workers, whose
+ * `node:net` and `node:tls` run on `connect()`. The host is checked
  * by the `OutboundGuard`, and the connection goes to the address it checked,
  * never to the host name again; TLS still verifies the certificate against
  * the host name (ADR 0010). Each email opens its own connection, closed
  * afterwards. A connection waits at most 10 seconds to open and for the
  * server's greeting, and 30 seconds for any reply, and a whole send,
  * looking up the host included, at most 60 seconds; giving up, or the request being cancelled, closes the
- * connection. Nothing is logged.
+ * connection. Nothing is logged. On Workers, `trustedCertificates` can't be
+ * used, and port 25 is blocked.
  */
 export const smtpProviderLayer = (options: SmtpProviderOptions = {}) =>
   Layer.effect(
