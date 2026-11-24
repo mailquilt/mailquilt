@@ -22,7 +22,14 @@ export {
   PARTITION_MONTHS_AHEAD,
 } from "./delivery-events.ts";
 
-export { asQueuedFor, Queue, QueueMessageSchema } from "./queue.ts";
+export {
+  asQueuedFor,
+  Queue,
+  QUEUE_RETRIES,
+  QUEUE_RETRY_DELAY_SECONDS,
+  QueueMessageSchema,
+  queueRetryDelaySeconds,
+} from "./queue.ts";
 
 export type { QueueMessage } from "./queue.ts";
 

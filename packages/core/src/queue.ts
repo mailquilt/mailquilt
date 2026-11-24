@@ -13,6 +13,22 @@ export const QueueMessageSchema = Schema.Union([SendCampaignBatch]);
 export type QueueMessage = typeof QueueMessageSchema.Type;
 
 /**
+ * How many times a message whose work failed is delivered again, such as
+ * while Postgres is briefly unreachable, before the queue gives up on it.
+ */
+export const QUEUE_RETRIES = 5;
+
+/**
+ * How long the queue waits before the first retry. Each later retry waits
+ * twice as long, so the retries span about 15 minutes of outage.
+ */
+export const QUEUE_RETRY_DELAY_SECONDS = 30;
+
+/** How long to wait before delivering a message again after its `attempt`-th delivery failed, counting from 1. */
+export const queueRetryDelaySeconds = (attempt: number) =>
+  QUEUE_RETRY_DELAY_SECONDS * 2 ** (attempt - 1);
+
+/**
  * Port: hands messages to the runtime's queue, which delivers each at least
  * once to `handleQueueMessage`, possibly in another process. The messages
  * join the database transaction `enqueue` runs in, so they're delivered only

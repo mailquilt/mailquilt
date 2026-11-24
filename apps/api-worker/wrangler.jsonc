@@ -19,8 +19,15 @@
   // more than one connection to the Provider's server.
   "queues": {
     "producers": [{ "binding": "QUEUE", "queue": "mailquilt" }],
+    // A failed batch is delivered again up to QUEUE_RETRIES (5) times, each
+    // after twice the wait of the last (`queueRetryDelaySeconds` in core).
     "consumers": [
-      { "queue": "mailquilt", "max_batch_size": 1, "max_concurrency": 1 },
+      {
+        "queue": "mailquilt",
+        "max_batch_size": 1,
+        "max_concurrency": 1,
+        "max_retries": 5,
+      },
     ],
   },
   // Every minute: forward queue messages a request couldn't (ADR 0014).

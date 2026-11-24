@@ -18,17 +18,18 @@ const BATCH = Schema.encodeSync(SendCampaignBatch)(
   })
 );
 
-const delivered = (body: Message["body"]) => {
-  const settled: ("ack" | "retry")[] = [];
+const delivered = (body: Message["body"], attempts = 1) => {
+  const settled: string[] = [];
 
   return {
     message: {
       ack: () => {
         settled.push("ack");
       },
+      attempts,
       body,
-      retry: () => {
-        settled.push("retry");
+      retry: (options?: QueueRetryOptions) => {
+        settled.push(`retry after ${options?.delaySeconds ?? 0}s`);
       },
     },
     settled,
@@ -63,16 +64,22 @@ describe("Cloudflare Queues consumer", () => {
     })
   );
 
-  it.effect("has a message whose work failed delivered again", () =>
-    Effect.gen(function* failed() {
-      const { message, settled } = delivered(BATCH);
+  it.effect(
+    "has a message whose work failed delivered again, waiting twice as long after each attempt",
+    () =>
+      Effect.gen(function* failed() {
+        const first = delivered(BATCH, 1);
+        const third = delivered(BATCH, 3);
 
-      yield* consumeQueueBatch({ messages: [message] }).pipe(
-        Effect.provide(ports(DatabaseDown))
-      );
+        yield* consumeQueueBatch({
+          messages: [first.message, third.message],
+        }).pipe(Effect.provide(ports(DatabaseDown)));
 
-      assert.deepStrictEqual(settled, ["retry"]);
-    })
+        assert.deepStrictEqual(
+          [...first.settled, ...third.settled],
+          ["retry after 30s", "retry after 120s"]
+        );
+      })
   );
 
   it.effect(

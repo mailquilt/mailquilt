@@ -8,7 +8,10 @@ import {
   createDeliveryEventPartitions,
   handleQueueMessage,
   Queue,
+  QUEUE_RETRIES,
+  QUEUE_RETRY_DELAY_SECONDS,
   QueueMessageSchema,
+  queueRetryDelaySeconds,
   SEND_BATCH_SIZE,
 } from "@repo/core";
 import { SEND_TIMEOUT_SECONDS } from "@repo/providers/smtp";
@@ -37,6 +40,14 @@ const BATCH_EXPIRES_IN_SECONDS =
 
 const EVERY_DAY_AT_3_UTC = "0 3 * * *";
 
+const MESSAGES_QUEUE_OPTIONS = {
+  expireInSeconds: BATCH_EXPIRES_IN_SECONDS,
+  retryBackoff: true,
+  retryDelay: QUEUE_RETRY_DELAY_SECONDS,
+  retryDelayMax: queueRetryDelaySeconds(QUEUE_RETRIES),
+  retryLimit: QUEUE_RETRIES,
+};
+
 const encodeMessages = Schema.encodeEffect(Schema.Array(QueueMessageSchema));
 
 const decodeMessage = Schema.decodeUnknownEffect(QueueMessageSchema);
@@ -62,14 +73,10 @@ const BossLive = Layer.effect(
 
       yield* Effect.promise(() => boss.start());
       yield* Effect.promise(() =>
-        boss.createQueue(MESSAGES_QUEUE, {
-          expireInSeconds: BATCH_EXPIRES_IN_SECONDS,
-        })
+        boss.createQueue(MESSAGES_QUEUE, MESSAGES_QUEUE_OPTIONS)
       );
       yield* Effect.promise(() =>
-        boss.updateQueue(MESSAGES_QUEUE, {
-          expireInSeconds: BATCH_EXPIRES_IN_SECONDS,
-        })
+        boss.updateQueue(MESSAGES_QUEUE, MESSAGES_QUEUE_OPTIONS)
       );
       yield* Effect.promise(() => boss.createQueue(MAINTENANCE_QUEUE));
 
