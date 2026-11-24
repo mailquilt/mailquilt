@@ -197,12 +197,14 @@ export const ActionDialog = ({
       >
         <LayerDialog.Content verticalAlign="center">
           <LayerDialog.Title>
-            <span className="block font-display text-display-sm font-semibold text-balance text-kumo-strong">
+            <span className="block font-display text-display-sm font-semibold text-balance break-words text-kumo-strong">
               {title}
             </span>
           </LayerDialog.Title>
           <LayerDialog.Description>
-            <span className="block text-base text-pretty">{description}</span>
+            <span className="block text-base text-pretty break-words">
+              {description}
+            </span>
           </LayerDialog.Description>
           <LayerDialog.Body>
             <div className="mq-dialog-body" ref={insideDialog}>
@@ -265,10 +267,10 @@ export const ActionDialog = ({
               className="mx-auto mt-2 block h-1 w-9 shrink-0 rounded-full bg-kumo-line"
             />
             <Drawer.Content className="flex min-h-0 flex-col overflow-y-auto px-4 pt-3.5 pb-2">
-              <Drawer.Title className="font-display text-display-sm font-semibold text-balance text-kumo-strong">
+              <Drawer.Title className="font-display text-display-sm font-semibold text-balance break-words text-kumo-strong">
                 {title}
               </Drawer.Title>
-              <Drawer.Description className="mt-1.5 text-base text-pretty text-kumo-subtle">
+              <Drawer.Description className="mt-1.5 text-base text-pretty break-words text-kumo-subtle">
                 {description}
               </Drawer.Description>
               <div className="mt-5 empty:hidden has-[>form:empty]:hidden">

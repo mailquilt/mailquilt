@@ -92,7 +92,7 @@ const NameOrganization = () => {
         <span className="flex h-lh items-center">
           <OrganizationPatch className="size-3.5" organizationId={active.id} />
         </span>
-        <span>
+        <span className="min-w-0 break-words">
           <span className="font-medium text-kumo-strong">{active.name}</span> is
           ready, and you’re {YOUR_ROLE[active.role]}.
         </span>

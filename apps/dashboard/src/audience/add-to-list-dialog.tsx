@@ -109,10 +109,10 @@ export const AddToListDialog = ({
         ) : null}
         <Radio.Group onValueChange={(value) => setChosen(value)} value={chosen}>
           <Radio.Legend className="sr-only">List</Radio.Legend>
-          <ul className="-mx-1 flex max-h-64 flex-col overflow-y-auto px-1">
+          <ul className="-mx-1 flex max-h-64 flex-col overflow-y-auto px-1 wrap-anywhere">
             {lists.map((candidate) => (
               <li
-                className="flex min-h-11 items-center gap-3 border-b border-kumo-hairline first:border-t"
+                className="flex min-h-11 shrink-0 items-center gap-3 border-b border-kumo-hairline py-2 first:border-t"
                 key={candidate.id}
               >
                 <Radio.Item label={candidate.name} value={candidate.id} />

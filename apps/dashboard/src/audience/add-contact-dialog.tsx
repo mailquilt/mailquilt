@@ -149,10 +149,10 @@ export const AddContactDialog = ({
                 <p className="mt-0.5 mb-2 text-sm leading-4.5 text-kumo-subtle">
                   Optional. They’ll get the campaigns sent to these lists.
                 </p>
-                <ul className="-mx-1 flex max-h-56 flex-col overflow-y-auto px-1">
+                <ul className="-mx-1 flex max-h-56 flex-col overflow-y-auto px-1 wrap-anywhere">
                   {lists.map((list) => (
                     <li
-                      className="flex min-h-11 items-center gap-3 border-b border-kumo-hairline first:border-t"
+                      className="flex min-h-11 shrink-0 items-center gap-3 border-b border-kumo-hairline py-2 first:border-t"
                       key={list.id}
                     >
                       <Checkbox

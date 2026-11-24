@@ -87,6 +87,7 @@ const COLUMNS = helper.columns([
     id: "status",
   }),
   helper.accessor((row) => row.listName, {
+    cell: ({ getValue }) => <span title={getValue()}>{getValue()}</span>,
     header: "List",
     id: "list",
   }),
@@ -114,7 +115,7 @@ const COLUMNS = helper.columns([
   }),
   helper.display({
     cell: ({ row }) => (
-      <span className="text-sm text-kumo-subtle">
+      <span className="line-clamp-2 text-sm text-kumo-subtle">
         {row.original.listName}, {dateOf(row.original.campaign).line}
       </span>
     ),
@@ -125,12 +126,12 @@ const COLUMNS = helper.columns([
 
 const COLUMN_CLASSES = {
   date: "w-36 whitespace-nowrap max-md:hidden",
-  list: "whitespace-nowrap text-kumo-default max-lg:hidden",
+  list: "max-w-64 truncate whitespace-nowrap text-kumo-default max-lg:hidden",
   sentTo: "text-right whitespace-nowrap tabular-nums max-xl:hidden",
   status: "w-32 whitespace-nowrap max-sm:w-auto",
   subject:
-    "w-full max-w-0 truncate whitespace-nowrap max-sm:w-auto max-sm:max-w-none max-sm:whitespace-normal",
-  summary: "sm:hidden",
+    "w-full max-w-0 truncate whitespace-nowrap max-sm:w-auto max-sm:max-w-none max-sm:whitespace-normal max-sm:wrap-anywhere",
+  summary: "wrap-anywhere sm:hidden",
 };
 
 const AREAS = {

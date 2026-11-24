@@ -934,14 +934,17 @@ aside.mq-frame {
   padding: 0 !important;
 }
 
+/* A title or sentence naming a long List or Organization wraps inside a long word too, rather than running out of the card. */
 .mq-state p {
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 
 /* Kumo centres Empty's description but not its title, so a title that wraps sat flush left. */
 .mq-state h2 {
   text-align: center;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .mq-state-actions {
@@ -1140,8 +1143,8 @@ aside.mq-frame {
   white-space: nowrap;
 }
 
-/* A List's name with its bar under it (640–1023px) gets room above and below. */
-@media (min-width: 640px) and (max-width: 1023px) {
+/* A List's name with its bar under it (640–1279px) gets room above and below. */
+@media (min-width: 640px) and (max-width: 1279px) {
   .mq-table td.mq-name-with-bar {
     padding-block: 0.75rem !important;
   }
@@ -1294,10 +1297,10 @@ aside.mq-frame {
   }
 }
 
-/* Above a table, its filters. They stay put while rows are selected. */
+/* Above a table, its filters. They stay put while rows are selected. On phones each takes its own row, so a long List name shows more than its first letters. */
 @media (max-width: 639px) {
   .mq-toolbar > * {
-    flex: 1;
+    flex: 1 1 100%;
   }
 }
 
