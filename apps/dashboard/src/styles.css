@@ -951,7 +951,7 @@ aside.mq-frame {
   gap: 0.5rem;
 }
 
-/* On phones the actions stack in a centred column at one width, the main one on top, so two never wrap into a ragged pair. A label too long for the column, such as one naming a long List, wraps and the button grows to hold it. */
+/* On phones the actions stack in a centred column at one width, the main one on top, so two never wrap into a ragged pair. A label too long for the column, such as one naming a long List, wraps (inside a long word too) and the button grows to hold it. */
 @media (max-width: 639px) {
   .mq-state-actions {
     flex-direction: column;
@@ -967,6 +967,7 @@ aside.mq-frame {
     padding-block: 0.5rem;
     justify-content: center;
     text-align: center;
+    overflow-wrap: anywhere;
   }
 }
 
