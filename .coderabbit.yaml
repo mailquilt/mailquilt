@@ -1,0 +1,179 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# CodeRabbit review settings. Reference: https://docs.coderabbit.ai/reference/configuration
+language: en-US
+tone_instructions: >-
+  Plain, direct words. For each finding, say what a user or self-hoster would see go wrong and rate it against the release bar in docs/agents/review.md. No praise, no filler.
+early_access: true
+
+reviews:
+  profile: chill
+  # Keep the author's pull request description; put the summary in the walkthrough comment.
+  high_level_summary_in_walkthrough: true
+  in_progress_fortune: false
+  poem: false
+  sequence_diagrams: true
+  estimate_code_review_effort: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  auto_apply_labels: true
+  labeling_instructions:
+    - label: "area: api"
+      instructions: Changes to the HTTP API, its routes, the API contract (packages/api, packages/contract) or the API docs.
+    - label: "area: sending"
+      instructions: Changes to how Campaigns are queued, sent, retried or tracked, or to the outbox.
+    - label: "area: providers"
+      instructions: Changes to email Provider connections (SMTP, provider APIs) in packages/providers.
+    - label: "area: audience"
+      instructions: Changes to Contacts, Lists, Subscriptions, Opt-outs or Suppressions.
+    - label: "area: content"
+      instructions: Changes to Templates or email content.
+    - label: "area: auth"
+      instructions: Changes to sign-in, sessions, API keys or Better Auth.
+    - label: "area: ops"
+      instructions: Changes to CI, Docker, compose files, deployment, the Cloudflare or Node runtimes, or release tooling.
+    - label: "area: docs"
+      instructions: Changes only to documentation, ADRs or agent docs.
+    - label: security
+      instructions: The change affects authentication, tenant isolation, secrets, SSRF guards, rate limits or anything in docs/security.md.
+    - label: accessibility
+      instructions: The change affects keyboard or screen reader use of the dashboard.
+
+  path_filters:
+    - "!pnpm-lock.yaml"
+    - "!skills-lock.json"
+    - "!**/migrations/meta/**"
+    - "!.agents/skills/**"
+    - "!.claude/skills/**"
+
+  path_instructions:
+    - path: "packages/db/migrations/**/*.sql"
+      instructions: >-
+        Migrations must be expand-then-contract: a release can add columns, tables and indexes, and only a later release drops or renames what the old code still reads. Flag any migration that would break the running previous version, lose data, or lock a large table. A breaking change must be called "Breaking" in the pull request.
+    - path: "packages/{api,core,domain,db}/**/*.ts"
+      instructions: >-
+        Every query and endpoint must be scoped to one Organization (ADR 0007, ADR 0014). Flag any path where one Organization could read or change another's data, and any new endpoint without a case in packages/api/test/organization-isolation.test.ts. Long collections are paged by id (ADR 0008). Ids follow the TypeID format (ADR 0006).
+    - path: "packages/{providers,runtime-cloudflare,runtime-node}/**/*.ts"
+      instructions: >-
+        Outbound connections must go to the address the SSRF guard checked (ADR 0010, docs/security.md). Secrets are sealed under versioned keys bound to their row (ADR 0009) and must never be logged. Ports are provided per request (ADR 0003).
+    - path: "apps/dashboard/**"
+      instructions: >-
+        Check against docs/agents/design.md and apps/dashboard/README.md: design tokens instead of one-off values, every state (loading, empty, error, disabled), WCAG 2.2 AA, phone widths, and icons only from the one icon module (ADR 0013). A page reads only the search its route decodes (ADR 0012).
+    - path: "**/*.test.{ts,tsx}"
+      instructions: >-
+        Follow docs/agents/testing.md: never fake the database, test each rule once at the right seam, and don't test framework or library behaviour.
+    - path: "e2e/**"
+      instructions: Follow docs/agents/testing.md. Flag fixed waits, shared state between tests and selectors tied to styling.
+    - path: ".github/workflows/**"
+      instructions: >-
+        Actions pinned to a full commit SHA, least-privilege permissions per job, no untrusted input interpolated into run steps. No check may be skipped or made non-required.
+    - path: "docs/**/*.md"
+      instructions: >-
+        Every claim about behaviour must match the code. Flag sentences the diff makes untrue, and ADRs or docs/agents/decisions.md entries the change reverses without saying so.
+
+  auto_review:
+    enabled: true
+    drafts: false
+    auto_incremental_review: true
+    base_branches:
+      - "^main$"
+
+  finishing_touches:
+    unit_tests:
+      enabled: true
+    simplify:
+      enabled: true
+    autofix:
+      enabled: true
+    fix_ci:
+      enabled: true
+    resolve_merge_conflict:
+      enabled: true
+
+  pre_merge_checks:
+    title:
+      mode: warning
+      requirements: >-
+        Conventional Commits style (feat:, fix:, docs:, style:, refactor:, test:, chore:, ci:) followed by a plain sentence in the imperative mood that says what changes for the user.
+    description:
+      mode: warning
+    issue_assessment:
+      mode: warning
+    custom_checks:
+      - name: One behaviour
+        mode: warning
+        instructions: >-
+          The pull request changes one behaviour. Fail if it mixes unrelated changes, for example a feature with an unrelated refactor or fix.
+      - name: Breaking changes declared
+        mode: warning
+        instructions: >-
+          Fail if the change alters the public API contract, a stored format or the upgrade path, or adds a migration that is not expand-then-contract, and the description does not say "Breaking".
+      - name: Tenant isolation covered
+        mode: warning
+        instructions: >-
+          Fail if the change adds or changes an API endpoint and does not add or update a case in packages/api/test/organization-isolation.test.ts.
+      - name: Decisions respected
+        mode: warning
+        instructions: >-
+          Fail if the change reverses anything in docs/agents/decisions.md or docs/adr/ without saying which one and why in the description, and updating that document.
+
+  tools:
+    oxc:
+      enabled: true
+    biome:
+      enabled: false
+    eslint:
+      enabled: false
+    gitleaks:
+      enabled: true
+    actionlint:
+      enabled: true
+    zizmor:
+      enabled: true
+    shellcheck:
+      enabled: true
+    hadolint:
+      enabled: true
+    squawk:
+      enabled: true
+    osvScanner:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    github-checks:
+      enabled: true
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  web_search:
+    enabled: true
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  pull_requests:
+    scope: auto
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - files: "docs/agents/review.md,docs/agents/decisions.md,docs/architecture.md,docs/security.md,docs/adr/*.md,GLOSSARY.md"
+        applyTo: "**/*"
+      - files: "docs/agents/testing.md"
+        applyTo: "**/*.test.ts,**/*.test.tsx,e2e/**"
+      - files: "docs/agents/design.md,apps/dashboard/README.md"
+        applyTo: "apps/dashboard/**"
+
+issue_enrichment:
+  auto_enrich:
+    enabled: true
+  planning:
+    enabled: true
+    auto_planning:
+      enabled: true
+      labels:
+        - ready-for-agent
