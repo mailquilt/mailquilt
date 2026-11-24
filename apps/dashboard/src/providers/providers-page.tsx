@@ -241,8 +241,8 @@ const COLUMN_CLASSES = {
   actions: "whitespace-nowrap sm:w-px",
   name: "sm:min-w-[14rem]",
   security: "whitespace-nowrap max-[90rem]:hidden",
-  sendsAs: "text-kumo-default",
-  server: "text-kumo-default max-xl:hidden",
+  sendsAs: "text-kumo-default xl:min-w-48",
+  server: "text-kumo-default max-xl:hidden xl:min-w-48",
 };
 
 const AREAS = {

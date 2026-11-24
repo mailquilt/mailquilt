@@ -11,16 +11,19 @@ const breakPoints = (value: string) => {
 };
 
 /**
- * An email address or host that wraps only after "@" or a dot, never
- * mid-word, at a hyphen, or before its ending: "news@ / example.com", never
- * "example. / com" or "eu-west- / 1".
+ * An email address or host that wraps only after "@" or a dot, not at a
+ * hyphen or before its ending: "news@ / example.com", never "example. / com"
+ * or "eu-west- / 1". A part wider than the whole column on its own wraps
+ * inside, so it never pushes the column wider.
  */
 export const Breakable = ({ value }: { value: string }) => (
   <>
     {breakPoints(value).map((part, index) => (
-      <span className="whitespace-nowrap" key={`${index}-${part}`}>
+      <span
+        className="inline-block max-w-full wrap-anywhere"
+        key={`${index}-${part}`}
+      >
         {part}
-        <wbr />
       </span>
     ))}
   </>
