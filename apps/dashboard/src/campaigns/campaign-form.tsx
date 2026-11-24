@@ -429,7 +429,7 @@ export const CampaignForm = ({
                 >
                   <span className="flex w-full justify-between gap-6">
                     <span className="wrap-anywhere">{candidate.name}</span>
-                    <span className="text-kumo-subtle tabular-nums">
+                    <span className="whitespace-nowrap text-kumo-subtle tabular-nums">
                       {formatCount(candidate.subscriptions.subscribed)}{" "}
                       subscribed
                     </span>
