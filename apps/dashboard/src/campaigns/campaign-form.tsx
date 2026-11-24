@@ -202,8 +202,12 @@ const ChoiceField = ({
 
   return (
     <Select
-      className={FIELD}
-      description={error === undefined ? description : undefined}
+      className={`${FIELD} min-w-0`}
+      description={
+        error === undefined && description !== undefined ? (
+          <span className="wrap-anywhere">{description}</span>
+        ) : undefined
+      }
       error={error}
       label={label}
       name={field.name}
@@ -419,12 +423,12 @@ export const CampaignForm = ({
             >
               {lists.map((candidate) => (
                 <Select.Option
-                  className="mq-count-option *:first:flex-1"
+                  className="mq-count-option *:first:min-w-0 *:first:flex-1"
                   key={candidate.id}
                   value={candidate.id}
                 >
                   <span className="flex w-full justify-between gap-6">
-                    <span className="truncate">{candidate.name}</span>
+                    <span className="wrap-anywhere">{candidate.name}</span>
                     <span className="text-kumo-subtle tabular-nums">
                       {formatCount(candidate.subscriptions.subscribed)}{" "}
                       subscribed
@@ -469,7 +473,11 @@ export const CampaignForm = ({
               valueLabel={connection?.name}
             >
               {connections.map((candidate) => (
-                <Select.Option key={candidate.id} value={candidate.id}>
+                <Select.Option
+                  className="wrap-anywhere"
+                  key={candidate.id}
+                  value={candidate.id}
+                >
                   {candidate.name}
                 </Select.Option>
               ))}
@@ -494,9 +502,14 @@ export const CampaignForm = ({
               autoComplete="off"
               className={FIELD}
               description={
-                connection === undefined
-                  ? "Filled in from the connection you choose."
-                  : `Filled in from ${connection.name}. A change here is for this campaign only.`
+                connection === undefined ? (
+                  "Filled in from the connection you choose."
+                ) : (
+                  <span className="wrap-anywhere">
+                    Filled in from {connection.name}. A change here is for this
+                    campaign only.
+                  </span>
+                )
               }
               field={field}
               inputMode="email"

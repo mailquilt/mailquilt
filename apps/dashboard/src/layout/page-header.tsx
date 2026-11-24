@@ -41,7 +41,7 @@ export const PageHeader = ({
     <div
       className={`flex min-w-0 flex-col gap-2 ${titleRunsToActions ? "flex-1 basis-[24rem]" : "max-w-[60ch]"}`}
     >
-      <h1 className="font-display text-display font-semibold text-balance text-kumo-strong max-sm:text-2xl max-sm:leading-7.5">
+      <h1 className="font-display text-display font-semibold text-balance break-words text-kumo-strong max-sm:text-2xl max-sm:leading-7.5">
         {title}
         {titleDetail === undefined ? null : (
           <span className="mq-tone">
@@ -49,7 +49,9 @@ export const PageHeader = ({
           </span>
         )}
       </h1>
-      <p className="text-base text-pretty text-(--mq-body)">{description}</p>
+      <p className="text-base text-pretty break-words text-(--mq-body)">
+        {description}
+      </p>
     </div>
     {actions === undefined ? null : (
       <div className="flex gap-2 max-sm:w-full max-sm:*:flex-1 max-sm:*:justify-center">

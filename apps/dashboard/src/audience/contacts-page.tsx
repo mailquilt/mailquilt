@@ -241,7 +241,7 @@ const ListFilter = ({
 }) => (
   <Select
     aria-label="List"
-    className="max-sm:w-full"
+    className="min-w-0 max-sm:w-full sm:w-auto"
     onValueChange={(value) => onChange(String(value))}
     renderValue={() => (
       <span>
@@ -269,12 +269,12 @@ const ListFilter = ({
         <Select.GroupLabel>Lists</Select.GroupLabel>
         {lists.map((candidate) => (
           <Select.Option
-            className="mq-count-option *:first:flex-1"
+            className="mq-count-option *:first:min-w-0 *:first:flex-1"
             key={candidate.id}
             value={candidate.id}
           >
             <span className="flex w-full justify-between gap-6">
-              <span className="truncate">{candidate.name}</span>
+              <span className="wrap-anywhere">{candidate.name}</span>
               <span className="text-kumo-subtle tabular-nums">
                 {formatCount(totalOf(candidate))}
               </span>

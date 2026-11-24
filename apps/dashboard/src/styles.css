@@ -934,14 +934,17 @@ aside.mq-frame {
   padding: 0 !important;
 }
 
+/* A title or sentence naming a long List or Organization wraps inside a long word too, rather than running out of the card. */
 .mq-state p {
   text-wrap: pretty;
+  overflow-wrap: anywhere;
 }
 
 /* Kumo centres Empty's description but not its title, so a title that wraps sat flush left. */
 .mq-state h2 {
   text-align: center;
   text-wrap: balance;
+  overflow-wrap: anywhere;
 }
 
 .mq-state-actions {

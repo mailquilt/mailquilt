@@ -150,7 +150,7 @@ const listColumns = (biggest: number) =>
 const COLUMN_CLASSES = {
   created: "whitespace-nowrap max-xl:hidden",
   makeUp: "w-[32%] max-lg:hidden",
-  name: "mq-name-with-bar max-w-[24rem] truncate whitespace-nowrap",
+  name: "mq-name-with-bar max-w-[24rem] truncate whitespace-nowrap max-xl:max-w-64",
   open: "w-8",
   pending: NUMBER,
   subscribed: NUMBER,

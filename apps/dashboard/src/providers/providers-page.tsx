@@ -166,7 +166,7 @@ const COLUMNS = helper.columns([
           <EnvelopeSimpleIcon className="size-4" />
         </span>
         <span className="min-w-0">
-          <span className="block font-medium break-words text-kumo-strong">
+          <span className="block font-medium wrap-anywhere text-kumo-strong">
             {row.original.connection.name}
           </span>
           <span className="block text-sm text-kumo-subtle">

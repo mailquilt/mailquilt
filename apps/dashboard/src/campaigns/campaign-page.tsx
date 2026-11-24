@@ -137,7 +137,9 @@ const StatusLine = ({
       <span className="flex h-lh items-center">
         <CampaignBlock live status={campaign.status} />
       </span>
-      <span>{statusWords(campaign, connectionName)}</span>
+      <span className="min-w-0 break-words">
+        {statusWords(campaign, connectionName)}
+      </span>
     </span>
   );
 };
