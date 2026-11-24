@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { callApi } from "../api.ts";
+import { authClient } from "../auth/auth-client.ts";
 import { FrameLoading } from "../layout/frame.tsx";
 import { useAccount } from "../layout/session-gates.tsx";
 import { connectionsKey } from "../providers/providers-api.ts";
@@ -75,6 +76,39 @@ const useOrganizationsState = () => {
   return state;
 };
 
+/** The Organizations listed alongside the session check, and whose they are. */
+export interface FirstList {
+  readonly accountId: string | null;
+  readonly organizations: readonly Organization[];
+}
+
+/**
+ * Asks for the person's Organizations at the same time as the session check,
+ * before it's known who they are, so the signed-in pages don't wait for one
+ * answer and then the other. A session check is sent with it, so the list is
+ * tagged with the account the session named; `OrganizationsProvider` uses it
+ * only for that account. It isn't retried: if it fails, the provider loads
+ * the list itself.
+ */
+export const useOrganizationsAlongsideSession = () =>
+  useQuery({
+    gcTime: 0,
+    queryFn: async ({ signal }) => {
+      const [session, organizations] = await Promise.all([
+        authClient.getSession({ fetchOptions: { cache: "no-store", signal } }),
+        callApi((client) => client.organizations.list(), signal),
+      ]);
+
+      return {
+        accountId: session.data?.user.id ?? null,
+        organizations,
+      } satisfies FirstList;
+    },
+    queryKey: ["organizations", "alongside-session"],
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
 /**
  * Loads the signed-in person's Organizations and holds which one this tab
  * works in. Wraps the signed-in pages, and shows them only once the list has
@@ -90,16 +124,26 @@ const useOrganizationsState = () => {
  */
 export const OrganizationsProvider = ({
   children,
+  firstList,
 }: {
   children: React.ReactNode;
+  /** What `useOrganizationsAlongsideSession` loaded: the first load, for its account only. */
+  firstList?: FirstList | undefined;
 }) => {
   const [chosenId, setChosenId] = useState(readRemembered);
   const account = useAccount();
 
+  const accountsFirstList =
+    firstList?.accountId === account.id ? firstList.organizations : undefined;
+
   const query = useQuery({
+    initialData: accountsFirstList,
     queryFn: ({ signal }) =>
       callApi((client) => client.organizations.list(), signal),
     queryKey: organizationsQueryKey(account.id),
+    refetchOnMount: (current) =>
+      accountsFirstList === undefined ||
+      current.state.data !== accountsFirstList,
   });
 
   const choose = useCallback((organizationId: string) => {

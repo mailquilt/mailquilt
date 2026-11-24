@@ -1,8 +1,12 @@
+import { LinkProvider, Toasty } from "@cloudflare/kumo";
+import { OrganizationIdSchema } from "@repo/domain";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
   createRootRoute,
+  createRoute,
   createRouter,
+  Outlet,
   RouterProvider,
 } from "@tanstack/react-router";
 import {
@@ -27,7 +31,10 @@ import {
 import { authClient } from "../auth/auth-client.ts";
 import { SetupSteps } from "../home/setup-steps.tsx";
 import { AppShell } from "../layout/app-shell.tsx";
-import { SignedInOnly } from "../layout/session-gates.tsx";
+import { RouterLink } from "../layout/router-link.tsx";
+import { AccountContext, SignedInOnly } from "../layout/session-gates.tsx";
+import { createQueryClient } from "../router.tsx";
+import { Route as SignedInPagesRoute } from "../routes/_app.tsx";
 import {
   OrganizationsProvider,
   useCreateOrganization,
@@ -81,6 +88,50 @@ const SignedInShell = () => (
     </AppShell>
   </SignedInOnly>
 );
+
+const OrganizationNames = () => {
+  const { organizations } = useOrganizations();
+
+  return (
+    <ul aria-label="Organizations">
+      {organizations.map((organization) => (
+        <li key={organization.id}>{organization.name}</li>
+      ))}
+    </ul>
+  );
+};
+
+const renderSignedInPages = () => {
+  const root = createRootRoute({ component: Outlet });
+
+  const pages = createRoute({
+    component: SignedInPagesRoute.options.component,
+    getParentRoute: () => root,
+    id: "signed-in",
+  });
+
+  const home = createRoute({
+    component: () => <p>Home page</p>,
+    getParentRoute: () => pages,
+    path: "/",
+  });
+
+  render(
+    <QueryClientProvider client={createQueryClient()}>
+      <LinkProvider component={RouterLink}>
+        <Toasty>
+          <RouterProvider
+            router={createRouter({
+              history: createMemoryHistory(),
+              routeTree: root.addChildren([pages.addChildren([home])]),
+            })}
+          />
+        </Toasty>
+      </LinkProvider>
+    </QueryClientProvider>
+  );
+  act(() => authClient.$store.notify("$sessionSignal"));
+};
 
 describe("organizations", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
@@ -285,5 +336,103 @@ describe("organizations", () => {
     expect(
       screen.getByRole("list", { name: "Organizations" }).textContent
     ).toBe(BOLT.name);
+  });
+
+  it("asks for the organizations without waiting for the session check", async () => {
+    let listAsked = false;
+    api.use(
+      http.get("*/api/auth/get-session", async () => {
+        await vi.waitUntil(() => listAsked, { timeout: 2000 });
+
+        return HttpResponse.json(SESSION);
+      }),
+      http.get("*/api/organizations", () => {
+        listAsked = true;
+
+        return HttpResponse.json([ACME]);
+      })
+    );
+
+    renderSignedInPages();
+
+    await expect(
+      screen.findByText("Home page", {}, { timeout: 3000 })
+    ).resolves.toBeDefined();
+  });
+
+  it("draws one loading frame for the whole wait, not a new one when the session answers first", async () => {
+    let sessionsAnswered = 0;
+    let listed = false;
+    api.use(
+      http.get("*/api/auth/get-session", () => {
+        sessionsAnswered += 1;
+
+        return HttpResponse.json(SESSION);
+      }),
+      http.get("*/api/organizations", async () => {
+        await vi.waitUntil(() => listed, { timeout: 5000 });
+
+        return HttpResponse.json([ACME]);
+      })
+    );
+
+    renderSignedInPages();
+
+    const loadingNavigation = await screen.findByRole("navigation", {
+      name: "Main",
+    });
+
+    await vi.waitUntil(() => sessionsAnswered >= 2);
+    await vi.waitUntil(() => authClient.$store.atoms.session?.get().data);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(loadingNavigation.isConnected).toBeTruthy();
+
+    listed = true;
+
+    await expect(screen.findByText("Home page")).resolves.toBeDefined();
+  });
+
+  it("never shows organizations listed for another account's session", async () => {
+    api.use(http.get("*/api/organizations", () => HttpResponse.json([BOLT])));
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routeTree: createRootRoute({
+        component: () => (
+          <AccountContext
+            value={{
+              email: "grace@example.com",
+              id: "g",
+              instanceAdmin: false,
+              name: "Grace",
+            }}
+          >
+            <OrganizationsProvider
+              firstList={{
+                accountId: "u",
+                organizations: [
+                  { ...ACME, id: OrganizationIdSchema.make(ACME.id) },
+                ],
+              }}
+            >
+              <OrganizationNames />
+            </OrganizationsProvider>
+          </AccountContext>
+        ),
+      }),
+    });
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>
+    );
+
+    expect(screen.queryByText(ACME.name)).toBeNull();
+    await expect(screen.findByText(BOLT.name)).resolves.toBeDefined();
+    expect(screen.queryByText(ACME.name)).toBeNull();
   });
 });

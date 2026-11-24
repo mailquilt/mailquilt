@@ -30,12 +30,20 @@ export const useAccount = () => {
 
 /**
  * Renders its pages for a signed-in person and gives them the account; sends
- * anyone else to sign in. If the session can't be checked, it offers a retry
+ * anyone else to sign in. Until the session, and anything passed as
+ * `loading`, has loaded, it draws the loading frame, one for the whole wait. If the session can't be checked, it offers a retry
  * rather than treating the person as signed out. When the session ends, here
  * or in another tab, it forgets everything loaded for the person, so whoever
  * signs in next on this browser never sees it.
  */
-export const SignedInOnly = ({ children }: { children: React.ReactNode }) => {
+export const SignedInOnly = ({
+  children,
+  loading = false,
+}: {
+  children: React.ReactNode;
+  /** Something else the signed-in pages need is still loading: the loading frame stays until it has. */
+  loading?: boolean;
+}) => {
   const { data: session, error, isPending, refetch } = authClient.useSession();
   const queryClient = useQueryClient();
   const signedOut = !isPending && !session && !error;
@@ -62,6 +70,10 @@ export const SignedInOnly = ({ children }: { children: React.ReactNode }) => {
 
   if (!session) {
     return <Navigate replace to="/sign-in" />;
+  }
+
+  if (loading) {
+    return <FrameLoading />;
   }
 
   return <AccountContext value={session.user}>{children}</AccountContext>;
