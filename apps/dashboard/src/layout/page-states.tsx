@@ -5,11 +5,11 @@ import { AuthHeading, AuthLayout } from "./auth-layout.tsx";
 import { PatchLoader } from "./empty-state.tsx";
 
 /**
- * The whole page while what it needs is still loading. Pages wait here
- * rather than drawing a guess and changing it a moment later. It is drawn on
- * the frame's ink, because every page it leads to is ink around a light
- * block (the signed-in frame, or the quilt on signed-out pages), so the first
- * load never flashes white.
+ * The whole page while a signed-out page waits for the install's status
+ * (signed-in pages wait on `FrameLoading`). Pages wait here rather than
+ * drawing a guess and changing it a moment later. It is drawn on the frame's
+ * ink, because every page it leads to is ink around a light block, so the
+ * first load never flashes white.
  */
 export const PageLoading = () => (
   <div className="mq-frame-loading flex min-h-svh items-center justify-center">

@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import { callApi } from "../api.ts";
-import { PageLoading } from "../layout/page-states.tsx";
+import { FrameLoading } from "../layout/frame.tsx";
 import { useAccount } from "../layout/session-gates.tsx";
 import { connectionsKey } from "../providers/providers-api.ts";
 
@@ -146,7 +146,7 @@ export const OrganizationsProvider = ({
   const neverAnswered = query.isPending && query.errorUpdatedAt === 0;
 
   if (neverAnswered) {
-    return <PageLoading />;
+    return <FrameLoading />;
   }
 
   return <OrganizationsContext value={state}>{children}</OrganizationsContext>;

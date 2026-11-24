@@ -105,10 +105,10 @@ describe("organizations", () => {
 
     renderWithOrganizations(<SetupSteps />);
 
-    await expect
-      .poll(() => screen.queryByRole("status", { name: "Loading" }))
-      .not.toBeNull();
-    expect(screen.queryByRole("list")).toBeNull();
+    await expect.poll(() => screen.queryByText("Loading")).not.toBeNull();
+    expect(
+      screen.queryByRole("list", { name: /^Steps to your first campaign/u })
+    ).toBeNull();
 
     listed = true;
 
