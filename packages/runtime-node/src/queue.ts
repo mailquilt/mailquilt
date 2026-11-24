@@ -9,7 +9,9 @@ import {
   handleQueueMessage,
   Queue,
   QueueMessageSchema,
+  SEND_BATCH_SIZE,
 } from "@repo/core";
+import { SEND_TIMEOUT_SECONDS } from "@repo/providers/smtp";
 import {
   Cause,
   Config,
@@ -26,6 +28,12 @@ import { PgBoss } from "pg-boss";
 const MESSAGES_QUEUE = "mailquilt";
 
 const MAINTENANCE_QUEUE = "maintenance";
+
+const MARGIN_SECONDS = 300;
+
+// WARNING: pg-boss retries a job it thinks expired while the first attempt may still be sending, so a batch's deadline covers every email in it taking its longest.
+const BATCH_EXPIRES_IN_SECONDS =
+  SEND_BATCH_SIZE * SEND_TIMEOUT_SECONDS + MARGIN_SECONDS;
 
 const EVERY_DAY_AT_3_UTC = "0 3 * * *";
 
@@ -53,7 +61,16 @@ const BossLive = Layer.effect(
       });
 
       yield* Effect.promise(() => boss.start());
-      yield* Effect.promise(() => boss.createQueue(MESSAGES_QUEUE));
+      yield* Effect.promise(() =>
+        boss.createQueue(MESSAGES_QUEUE, {
+          expireInSeconds: BATCH_EXPIRES_IN_SECONDS,
+        })
+      );
+      yield* Effect.promise(() =>
+        boss.updateQueue(MESSAGES_QUEUE, {
+          expireInSeconds: BATCH_EXPIRES_IN_SECONDS,
+        })
+      );
       yield* Effect.promise(() => boss.createQueue(MAINTENANCE_QUEUE));
 
       return boss;

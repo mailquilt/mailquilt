@@ -17,7 +17,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Every Campaign message has `List-Unsubscribe` and `List-Unsubscribe-Post`, a plain-text part and the Organization's postal address.
 - Double opt-in is on by default for hosted signup forms, and an owner can turn it off for a List.
 - Until several Lists and exclusions (#15), a Campaign targets one List. Sending it fixes who it goes to in one query, in the same transaction that moves it to `sending`, and queues one message per 100 of them; a send with nobody subscribed is refused (`NoSubscribedContacts`) and leaves a draft (#10).
-- A Campaign's HTML is at most 50,000 characters, because the API refuses request bodies over 64 KiB and JSON escapes every quote in it (#10).
+- A Campaign's HTML is at most 60 KiB as a JSON string in UTF-8 (`campaignHtmlBytes`), because the API refuses request bodies over 64 KiB; a character count would let non-ASCII text or many quotes pass and then be refused (#10).
 - Until the plain-text part and footer (#13) and unsubscribe (#12), a Campaign is sent as its HTML only (#10).
 - Until retries (#17), a Contact the Provider refuses is recorded as `failed` with the Provider's words and isn't tried again; the others still get it. When the server itself fails (unreachable, TLS, sign-in, blocked, no such host), the rest of that batch is recorded with the same failure without trying them, so one dead server can't hold the queue for a minute per Contact. A Campaign is `sent` once none of its recipients are still queued (#10).
 - Deleting a Provider Connection leaves its Campaigns without one: a draft can't be sent until another is chosen, and a Campaign still sending records the Contacts it hadn't reached as `failed` (#10).

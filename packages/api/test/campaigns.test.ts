@@ -1,5 +1,4 @@
 import { assert, layer } from "@effect/vitest";
-import { SEND_BATCH_SIZE } from "@repo/core";
 import { QueueInbox, SmtpOutbox } from "@repo/core/testing";
 import {
   CampaignIdSchema,
@@ -275,7 +274,9 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         const outbox = yield* SmtpOutbox;
 
         const email = (yield* outbox.sent).find(
-          (send) => send.email.to === "ada@example.com"
+          (send) =>
+            send.email.to === "ada@example.com" &&
+            send.email.subject === campaign.subject
         )?.email;
 
         assert.deepStrictEqual(email, {
@@ -327,7 +328,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
-    `sends in batches of ${SEND_BATCH_SIZE}, and is sent once the last batch is`,
+    "sends in batches of 100, and is sent once the last batch is",
     () =>
       Effect.gen(function* batches() {
         const { campaign, campaignParams, client, list, params } =
@@ -339,7 +340,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           with made as (
             insert into contacts (id, organization_id, email)
             select 'cnt_' || lpad(n::text, 26, '0'), ${params.organizationId}, 'person-' || n || '@batch.example'
-            from generate_series(1, ${SEND_BATCH_SIZE + 1}) as n
+            from generate_series(1, 101) as n
             returning id
           )
           insert into subscriptions (id, organization_id, list_id, contact_id, status)
@@ -366,13 +367,13 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           { ...halfway.recipients },
           {
             failed: 0,
-            sent: SEND_BATCH_SIZE,
-            total: SEND_BATCH_SIZE + 1,
+            sent: 100,
+            total: 101,
           }
         );
         assert.strictEqual(done.status, "sent");
-        assert.strictEqual(done.recipients.sent, SEND_BATCH_SIZE + 1);
-        assert.lengthOf(yield* sentTo(campaign.subject), SEND_BATCH_SIZE + 1);
+        assert.strictEqual(done.recipients.sent, 101);
+        assert.lengthOf(yield* sentTo(campaign.subject), 101);
       })
   );
 

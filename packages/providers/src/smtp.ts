@@ -22,7 +22,8 @@ const GREETING_TIMEOUT = Duration.seconds(10);
 
 const SOCKET_TIMEOUT = Duration.seconds(30);
 
-const SEND_TIMEOUT_SECONDS = 60;
+/** The longest one email may take to send, looking up the host included. */
+export const SEND_TIMEOUT_SECONDS = 60;
 
 const TRAILING_DOT = /\.$/u;
 

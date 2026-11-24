@@ -11,7 +11,8 @@ import {
   CampaignSubject,
   ListIdSchema,
   MailAddress,
-  MAX_CAMPAIGN_HTML_LENGTH,
+  campaignHtmlBytes,
+  MAX_CAMPAIGN_HTML_BYTES,
   ProviderConnectionIdSchema,
   SenderName,
 } from "@repo/domain";
@@ -33,6 +34,8 @@ import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
 import { SettingsSection } from "../layout/settings-section.tsx";
 import { EmailPreview } from "./email-preview.tsx";
+
+const KIB = 1024;
 
 const FIELD = "w-full max-sm:h-11 pointer-coarse:h-11";
 
@@ -239,7 +242,9 @@ const ContentField = ({
   const id = useId();
   const hintId = useId();
   const html = String(field.state.value);
-  const tooLong = html.length > MAX_CAMPAIGN_HTML_LENGTH;
+  const bytes = campaignHtmlBytes(html);
+  const tooLong = bytes > MAX_CAMPAIGN_HTML_BYTES;
+  const kilobytes = html === "" ? 0 : Math.ceil(bytes / KIB);
   const invalid = message !== undefined;
 
   const hint =
@@ -326,8 +331,7 @@ const ContentField = ({
         <p
           className={`shrink-0 text-sm leading-snug tabular-nums ${tooLong ? "text-kumo-danger" : "text-kumo-subtle"}`}
         >
-          {formatCount(html.length)} of {formatCount(MAX_CAMPAIGN_HTML_LENGTH)}{" "}
-          characters
+          {formatCount(kilobytes)} KB of {MAX_CAMPAIGN_HTML_BYTES / KIB} KB
         </p>
       </div>
     </div>

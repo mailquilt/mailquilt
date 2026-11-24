@@ -131,11 +131,11 @@ export const useList = (
 const useKeepCampaign = (organizationId: OrganizationId) => {
   const queryClient = useQueryClient();
 
-  return (campaign: Campaign) => {
-    queryClient.setQueryData(
-      campaignKey(organizationId, campaign.id),
-      campaign
-    );
+  return async (campaign: Campaign) => {
+    const key = campaignKey(organizationId, campaign.id);
+
+    await queryClient.cancelQueries({ exact: true, queryKey: key });
+    queryClient.setQueryData(key, campaign);
 
     return queryClient.invalidateQueries({
       queryKey: pagesKey(organizationId),

@@ -29,7 +29,7 @@ const EditCampaign = () => {
   return (
     <EditCampaignPage
       campaignId={campaignId}
-      key={active.id}
+      key={`${active.id}/${campaignId}`}
       organization={active}
     />
   );

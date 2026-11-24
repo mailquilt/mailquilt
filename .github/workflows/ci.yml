@@ -78,11 +78,11 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter e2e
       # The image built from this commit, its Postgres, and Mailpit, as a
       # self-hoster runs them (e2e/smoke.env holds the throwaway settings).
-      - run: docker compose --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml up -d --build --wait
+      - run: docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml up -d --build --wait
       - run: pnpm --filter e2e exec playwright install --with-deps chromium
       - run: pnpm --filter e2e smoke
       - if: failure()
-        run: docker compose --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml logs
+        run: docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml logs
 
   audit:
     name: Audit

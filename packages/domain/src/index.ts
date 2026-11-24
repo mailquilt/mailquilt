@@ -16,8 +16,9 @@ export {
   CampaignDraft,
   CampaignHtml,
   CampaignStatusSchema,
+  campaignHtmlBytes,
   CampaignSubject,
-  MAX_CAMPAIGN_HTML_LENGTH,
+  MAX_CAMPAIGN_HTML_BYTES,
 } from "./campaign-content.ts";
 
 export type { CampaignStatus } from "./campaign-content.ts";

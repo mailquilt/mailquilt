@@ -29,7 +29,7 @@ const OneCampaign = () => {
   return (
     <CampaignPage
       campaignId={campaignId}
-      key={active.id}
+      key={`${active.id}/${campaignId}`}
       organization={active}
     />
   );

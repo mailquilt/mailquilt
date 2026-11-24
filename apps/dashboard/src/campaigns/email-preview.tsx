@@ -3,14 +3,16 @@ import { useEffect, useRef } from "react";
 // WARNING: the frame may read its own document (allow-same-origin) so the page can size it to the email and stop its links, but it never runs the email's scripts, submits its forms or navigates the page (docs/security.md).
 const SANDBOX = "allow-same-origin";
 
-const stopLinks = (event: MouseEvent) => {
-  if (
-    event.target instanceof Element &&
-    event.target.closest("a[href], area[href]") !== null
-  ) {
-    event.preventDefault();
-  }
-};
+// WARNING: a click in the frame comes from the frame's own window, whose Element isn't this page's, so it's checked against the frame's.
+const stopLinksIn =
+  (frame: Window & typeof globalThis) => (event: MouseEvent) => {
+    if (
+      event.target instanceof frame.Element &&
+      event.target.closest("a[href], area[href]") !== null
+    ) {
+      event.preventDefault();
+    }
+  };
 
 // WARNING: the frame is shrunk to nothing before it's measured, or an email whose page is set to 100% height would keep whatever height it had; it happens within one task, so it's never drawn shrunk.
 const fitToContent = (frame: HTMLIFrameElement) => {
@@ -70,7 +72,14 @@ export const EmailPreview = ({
         onLoad={(event) => {
           const loaded = event.currentTarget;
 
-          loaded.contentDocument?.addEventListener("click", stopLinks);
+          // SAFETY: a frame's window has the same globals as this page's, its own Element among them.
+          const window = loaded.contentWindow as
+            | (Window & typeof globalThis)
+            | null;
+
+          if (window !== null) {
+            window.document.addEventListener("click", stopLinksIn(window));
+          }
 
           if (fit) {
             fitToContent(loaded);
