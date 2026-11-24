@@ -136,7 +136,9 @@ export const classifyAddress = (address: NetAddress.IpAddress) => {
  * such as an SMTP server, would go. It resolves the host and returns the
  * address to connect to. Callers connect to that address, never to the host
  * name again, so a second DNS answer can't point the connection somewhere
- * else after the check (ADR 0010).
+ * else after the check (ADR 0010). SMTP on Workers is the exception: it
+ * connects by name after the check, because Cloudflare starts TLS only on a
+ * socket opened by name and reaches only the public internet.
  */
 export class OutboundGuard extends Context.Service<
   OutboundGuard,

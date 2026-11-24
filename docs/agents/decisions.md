@@ -70,7 +70,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Better Auth sits behind our own allow list of endpoints. `disabledPaths` is only a second layer, and plugins we don't use aren't installed.
 - Better Auth's rate limiter uses our `RateLimiter` port in every environment. Its in-memory store is never used.
 - The client IP is read only from the configured header: `cf-connecting-ip` on Cloudflare, the proxy's header on Docker.
-- Every outbound request to a user-chosen address goes through the outbound guard, and connects to the address it checked (ADR 0010). It's always on for hosted; self-hosted installs allow private networks and loopback by default. Cloud metadata, link-local and reserved addresses are always refused (#9).
+- Every outbound request to a user-chosen address goes through the outbound guard, and connects to the address it checked (ADR 0010), except SMTP on Workers, which connects by name after the check because Cloudflare starts TLS only on a socket opened by name (#11). It's always on for hosted; self-hosted installs allow private networks and loopback by default. Cloud metadata, link-local and reserved addresses are always refused (#9).
 - Secrets at rest are sealed with AES-256-GCM under `ENCRYPTION_KEYS`, bound to their row; the app doesn't start without valid keys (ADR 0009, #9).
 - On the hosted service, public pages are served from a domain that never receives cookies, and open and click tracking requires the Organization's own tracking domain.
 - Redis isn't used. A Redis rate limiter is added only if several replicas or measured Postgres load need it.
