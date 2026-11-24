@@ -1,4 +1,9 @@
-import { handleQueueMessage, Queue, QueueMessageSchema } from "@repo/core";
+import {
+  handleQueueMessage,
+  Queue,
+  QueueMessageSchema,
+  queueRetryDelaySeconds,
+} from "@repo/core";
 import { forwardQueueOutbox, QueueOutboxLive } from "@repo/db";
 import { Cause, Effect, Layer, Ref, Schema } from "effect";
 
@@ -62,11 +67,15 @@ const decodeMessage = Schema.decodeUnknownEffect(QueueMessageSchema);
  * Does the work each message from Cloudflare Queues asks for, one after
  * another, so a batch holds one SMTP connection and one database
  * connection at a time, within a Worker's 6. Each message is acknowledged
- * once its work is done, and retried if it failed. A message that doesn't
+ * once its work is done, and retried if it failed, after a delay that
+ * doubles with each attempt (`queueRetryDelaySeconds`). A message that doesn't
  * decode never will, so it's logged and acknowledged.
  */
 export const consumeQueueBatch = (batch: {
-  readonly messages: readonly Pick<Message, "ack" | "body" | "retry">[];
+  readonly messages: readonly Pick<
+    Message,
+    "ack" | "attempts" | "body" | "retry"
+  >[];
 }) =>
   Effect.forEach(
     batch.messages,
@@ -85,7 +94,15 @@ export const consumeQueueBatch = (batch: {
             Effect.logError(
               "A queue message failed; Cloudflare Queues will deliver it again",
               Cause.pretty(cause)
-            ).pipe(Effect.andThen(Effect.sync(() => message.retry()))),
+            ).pipe(
+              Effect.andThen(
+                Effect.sync(() =>
+                  message.retry({
+                    delaySeconds: queueRetryDelaySeconds(message.attempts),
+                  })
+                )
+              )
+            ),
           onSuccess: () => Effect.sync(() => message.ack()),
         })
       ),
