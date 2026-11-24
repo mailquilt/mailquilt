@@ -3,15 +3,15 @@ import { Table } from "@cloudflare/kumo";
 import type { ReactTable, RowData, TableFeatures } from "@tanstack/react-table";
 
 /**
- * Where a column goes when rows stack into two lines on phones: the
- * checkbox, the main line, the second line, beside the main line, or not
- * shown.
+ * Where a column goes when rows stack into lines on phones: the
+ * checkbox, the main line, the second line, beside the main line, a line of
+ * its own under the rest, or not shown.
  */
-export type StackedArea = "check" | "main" | "sub" | "side" | "hide";
+export type StackedArea = "check" | "main" | "sub" | "side" | "foot" | "hide";
 
 /**
  * A TanStack table drawn with Kumo's `Table` and its default header, with
- * 48px hairline rows and selected rows tinted. On phones each row restacks into two lines, its columns placed by
+ * 48px hairline rows and selected rows tinted. On phones each row restacks into lines, its columns placed by
  * `areas`, instead of the table scrolling sideways. `columnClassNames` lays
  * out a column's header and cells by its id; how a value looks belongs to
  * its cell.
