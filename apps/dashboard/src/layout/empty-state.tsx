@@ -1,4 +1,5 @@
 import { Button, Empty } from "@cloudflare/kumo";
+import { useLayoutEffect, useRef } from "react";
 
 const EmptyArt = () => (
   <svg
@@ -103,7 +104,8 @@ export const EmptyState = ({
  * In place of what couldn't be loaded, with Try again. The button keeps
  * keyboard focus while it retries: Kumo's loading Button disables itself,
  * which drops focus to the page, so this one says it's busy and changes its
- * label instead.
+ * label instead. Once what it stood in for loads, focus on Try again moves
+ * to the page area (`#main`), whose content just arrived.
  */
 export const LoadFailed = ({
   description = "Mailquilt couldn’t reach its server. Check your connection, then try again.",
@@ -115,28 +117,45 @@ export const LoadFailed = ({
   onRetry: () => void;
   retrying: boolean;
   title: string;
-}) => (
-  <div className="mq-state" role="alert">
-    <Empty
-      contents={
-        <Button
-          aria-disabled={retrying || undefined}
-          onClick={() => {
-            if (!retrying) {
-              onRetry();
-            }
-          }}
-          variant="secondary"
-        >
-          {retrying ? "Trying again…" : "Try again"}
-        </Button>
+}) => {
+  const state = useRef<HTMLDivElement>(null);
+
+  // WARNING: this runs while the button is still in the page; once React removes it, the browser has already dropped its focus to the body.
+  useLayoutEffect(() => {
+    const node = state.current;
+
+    return () => {
+      if (node?.contains(document.activeElement)) {
+        document
+          .querySelector<HTMLElement>("#main")
+          ?.focus({ preventScroll: true });
       }
-      description={description}
-      icon={<SlotArt />}
-      title={title}
-    />
-  </div>
-);
+    };
+  }, []);
+
+  return (
+    <div className="mq-state" ref={state} role="alert">
+      <Empty
+        contents={
+          <Button
+            aria-disabled={retrying || undefined}
+            onClick={() => {
+              if (!retrying) {
+                onRetry();
+              }
+            }}
+            variant="secondary"
+          >
+            {retrying ? "Trying again…" : "Try again"}
+          </Button>
+        }
+        description={description}
+        icon={<SlotArt />}
+        title={title}
+      />
+    </div>
+  );
+};
 
 /**
  * The loader: a patch whose four blocks fill in turn. It shows only after
