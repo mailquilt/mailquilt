@@ -1,6 +1,9 @@
+import { formatWithOptions } from "node:util";
+
 import { assert, layer } from "@effect/vitest";
 import { EmailAddress, MailAddress } from "@repo/domain";
-import { Effect, Schema } from "effect";
+import { Effect, Option, pipe, Schema } from "effect";
+import { vi } from "vitest";
 
 import {
   PASSWORD,
@@ -32,6 +35,37 @@ const ACCOUNT_EMAILS = [
   "a.@example.com",
   "ada@example.c",
 ];
+
+const decodeErrorCode = Schema.decodeUnknownOption(
+  Schema.Struct({ code: Schema.String })
+);
+
+const CONSOLE_METHODS = ["debug", "error", "info", "log", "warn"] as const;
+
+const withConsoleOutput = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() =>
+      CONSOLE_METHODS.map((method) => vi.spyOn(console, method))
+    ),
+    (spies) =>
+      effect.pipe(
+        Effect.map((result) => {
+          const printed = spies.flatMap((spy) =>
+            spy.mock.calls.map((args) =>
+              formatWithOptions({ depth: 10 }, ...args)
+            )
+          );
+
+          return [result, printed.join("\n")] as const;
+        })
+      ),
+    (spies) =>
+      Effect.sync(() => {
+        for (const spy of spies) {
+          spy.mockRestore();
+        }
+      })
+  );
 
 const Session = Schema.NullOr(
   Schema.Struct({ user: Schema.Struct({ email: Schema.String }) })
@@ -201,6 +235,37 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
           assert.isTrue(Schema.is(MailAddress)(email), email);
         }
       })
+  );
+
+  test.effect("never logs the address when two sign-ups for it race", () =>
+    Effect.gen(function* racingSignUps() {
+      const email = uniqueEmail();
+
+      const [responses, output] = yield* withConsoleOutput(
+        Effect.all(
+          Array.from({ length: 3 }, () => signUp(email)),
+          { concurrency: "unbounded" }
+        )
+      );
+
+      const codes = yield* pipe(
+        responses,
+        Effect.forEach((response) =>
+          Effect.promise(() => response.json()).pipe(
+            Effect.map((body) => Option.getOrNull(decodeErrorCode(body)))
+          )
+        )
+      );
+
+      assert.isTrue(
+        codes.some((body) => body?.code === "FAILED_TO_CREATE_USER"),
+        "no two sign-ups reached the insert at once"
+      );
+      assert.include(output, "Failed to create user");
+      assert.include(output, "UniqueViolation");
+      assert.notInclude(output, email);
+      assert.notInclude(output, "already exists");
+    })
   );
 
   test.effect(

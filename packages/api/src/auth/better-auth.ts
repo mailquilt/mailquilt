@@ -51,6 +51,33 @@ const consumeSignInForAccount = (email: string) =>
 const retryAfterSeconds = (retryAfter: Duration.Duration) =>
   Math.ceil(Duration.toSeconds(retryAfter));
 
+const LOG_SEVERITY = {
+  debug: "Debug",
+  error: "Error",
+  info: "Info",
+  warn: "Warn",
+} as const;
+
+const ErrorKind = Schema.Union([
+  Schema.Struct({
+    _tag: Schema.String,
+    reason: Schema.optionalKey(Schema.Struct({ _tag: Schema.String })),
+  }),
+  Schema.instanceOf(Error),
+]);
+
+const decodeErrorKind = Schema.decodeUnknownOption(ErrorKind);
+
+const kindName = (kind: typeof ErrorKind.Type) => {
+  if (!("_tag" in kind)) {
+    return kind.name;
+  }
+
+  return kind.reason === undefined
+    ? kind._tag
+    : `${kind._tag}: ${kind.reason._tag}`;
+};
+
 /**
  * Better Auth for one request, on that request's ports. Building it is cheap:
  * Better Auth builds its router for every request anyway.
@@ -60,9 +87,12 @@ export const makeAuth = Effect.gen(function* makeAuth() {
   const sql = yield* SqlClient.SqlClient;
   const rateLimiter = yield* RateLimiter;
 
-  const runPromise = Effect.runPromiseWith(
-    yield* Effect.context<Instance | RateLimiter | SystemMailer>()
-  );
+  const context = yield* Effect.context<
+    Instance | RateLimiter | SystemMailer
+  >();
+
+  const runPromise = Effect.runPromiseWith(context);
+  const runFork = Effect.runForkWith(context);
 
   return betterAuth({
     account: { modelName: "accounts" },
@@ -134,8 +164,19 @@ export const makeAuth = Effect.gen(function* makeAuth() {
       sendVerificationEmail: ({ user, url }) =>
         runPromise(sendEmailVerification(user.email, url)),
     },
-    // WARNING: Better Auth logs email addresses below error level, and our logs must never hold them.
-    logger: { level: "error" },
+    // WARNING: Better Auth logs email addresses below error level, and logs its errors whole, quoting rows the database refused, such as a duplicate address (#149). Our logs must never hold them.
+    logger: {
+      level: "error",
+      log: (level, message, ...args) => {
+        runFork(
+          Effect.logWithLevel(LOG_SEVERITY[level])(message, {
+            errors: args.map((arg) =>
+              decodeErrorKind(arg).pipe(Option.map(kindName), Option.getOrNull)
+            ),
+          })
+        );
+      },
+    },
     rateLimit: {
       customRules: { "/sign-in/email": SIGN_IN_PER_IP },
       customStorage: {
