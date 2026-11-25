@@ -11,7 +11,7 @@ Mailquilt isn't released yet. P1, the first release, is being built; [ROADMAP.md
 What works today, on Docker and on Cloudflare:
 
 - First-run setup, which creates the instance admin. Sign-up is invite-only by default.
-- Sign-up and sign-in with email and password, with email verification.
+- Sign-up and sign-in with email and password, with email verification. On Cloudflare, account emails aren't sent yet, so only the instance admin, verified at setup, can sign in there.
 - Organizations, each with its own Contacts, Lists, Provider Connections and Campaigns.
 - Adding Contacts and Lists.
 - SMTP Provider Connections, with a test email.
@@ -37,9 +37,11 @@ AUTH_SECRET=
 ENCRYPTION_KEYS=
 # Letters and digits only: openssl rand -hex 32
 POSTGRES_PASSWORD=
-# Where you'll open Mailquilt. Use https anywhere but localhost.
-APP_URL=https://mail.example.com
+# Where you'll open Mailquilt: http://localhost:3000 to try it on your own machine.
+APP_URL=http://localhost:3000
 ```
+
+On a server, set `APP_URL` to an `https` address instead, such as `https://mail.example.com`, and put a reverse proxy in front that serves it over HTTPS and forwards to the app's port (3000, or `PORT`). Compose doesn't provide one; Coolify does. Browsers drop the sign-in cookie over plain http anywhere but localhost.
 
 Then start it:
 
