@@ -36,7 +36,7 @@ export AUTH_SECRET="$(openssl rand -base64 32)"
 export ENCRYPTION_KEYS="1:$(openssl rand -base64 32)"
 ```
 
-`APP_URL` is the address you open: the server refuses signed-in changes from any other origin. Keep `AUTH_SECRET` and `ENCRYPTION_KEYS` the same between runs, or you're signed out and saved Provider credentials can't be read. Turborepo passes only the settings listed under `server#dev` in `turbo.json` to the server, so a new setting goes in that list too.
+`APP_URL` is the address you open: the server refuses sign-in and signed-in changes from any other origin. Keep `AUTH_SECRET` and `ENCRYPTION_KEYS` the same between runs, or you're signed out and saved Provider credentials can't be read. Turborepo passes only the settings listed under `server#dev` in `turbo.json` to the server, so a new setting goes in that list too.
 
 Read [docs/agents/testing.md](docs/agents/testing.md) before you write or change tests.
 
