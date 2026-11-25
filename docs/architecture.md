@@ -2,17 +2,19 @@
 
 How Mailquilt is built so the same code runs fully on Cloudflare or anywhere Docker runs. Capitalized terms are defined in [GLOSSARY.md](../GLOSSARY.md). Decisions with lasting trade-offs are in [docs/adr](adr/).
 
+This is the design P1 builds toward. Where a part isn't built yet, it says **planned** and names the issue that builds it.
+
 ## Deployment targets
 
 |  | Cloudflare | Docker (Coolify or any host) |
 | --- | --- | --- |
 | Entry app | `apps/api-worker` | `apps/server` (one Node process) |
 | Database | Postgres through Hyperdrive, or a serverless Postgres such as Neon | Postgres in the compose file |
-| Storage | R2 | Any S3-compatible store (R2, S3, MinIO) |
+| Storage (planned, #25) | R2 | Any S3-compatible store (R2, S3, MinIO) |
 | Queue | Cloudflare Queues, fed from an outbox table ([ADR 0014](adr/0014-queued-work-acts-in-the-organization-its-message-names.md)) | pg-boss on Postgres |
 | Scheduler | Cron Triggers | pg-boss cron |
-| Rate limiting | Workers rate-limiting binding (coarse, per IP) + Postgres counters (precise) | In-memory (coarse, per IP) + Postgres counters (precise); Redis adapter only if several replicas or measured load need it |
-| Inbound bounces | Email Workers handler | Provider webhooks; bounce-mailbox polling (P2) |
+| Rate limiting | Postgres counters | Postgres counters; a Redis adapter only if several replicas or measured load need it |
+| Inbound bounces (planned, #19, #21) | Email Workers handler | Provider webhooks; bounce-mailbox polling (P2) |
 | Migrations | Run in the deploy step | Run on boot behind a Postgres advisory lock |
 
 Each entry app serves the JSON API, the public pages, and the dashboard's static files. The compose file holds only the app and Postgres.
@@ -24,11 +26,11 @@ Each entry app serves the JSON API, the public pages, and the dashboard's static
 | `domain` | Schemas, branded and prefixed IDs, domain errors. No input or output | — |
 | `contract` | Effect `HttpApi` groups; the single public contract and the source of the OpenAPI spec and the dashboard's typed client | `domain` |
 | `core` | Use cases, written only against ports (Effect services) | `domain` |
-| `api` | `HttpApi` handlers: each endpoint calls a `core` use case. Better Auth behind our allow list ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)). One `ApiLive` Layer that every entry app serves | `contract`, `core` |
+| `api` | `HttpApi` handlers: each endpoint calls a `core` use case. Better Auth behind our allow list ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)). One `ApiLive` Layer that every entry app serves | `domain`, `contract`, `core` |
 | `db` | Drizzle Postgres schema, migrations, repository implementations | `domain`, ports in `core` |
 | `providers` | One adapter per Provider: sending plus parsing its webhooks. Each implements a Provider port from `core` | `domain`, ports in `core` |
-| `runtime-cloudflare` | Layers for each port on Cloudflare | ports in `core`, `db` |
-| `runtime-node` | Layers for each port on Node | ports in `core`, `db` |
+| `runtime-cloudflare` | Layers for each port on Cloudflare | `domain`, ports in `core`, `db`, `providers` |
+| `runtime-node` | Layers for each port on Node | ports in `core`, `db`, `providers` |
 
 Apps only assemble Layers. On Workers, the runtime is built once per isolate, not per request. The earlier prototype rebuilt every service on every request. Ports are request requirements of `ApiLive`: Node shares one Postgres pool across requests, and Workers opens Postgres per request through Hyperdrive ([ADR 0003](adr/0003-ports-are-provided-per-request.md)). Better Auth is built per request on the same `SqlClient` ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)).
 
@@ -38,12 +40,14 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 - **IDs:** a type prefix plus a UUIDv7 in the TypeID format, for example `org_01h455vb4pex5vsknk084sn02q` for an Organization and `cmp_…` for a Campaign ([ADR 0006](adr/0006-ids-follow-the-typeid-format.md)). They are part of the public API and never change format.
 - **Tenant isolation:** endpoints for one Organization's data name it in the path (`/api/organizations/:organizationId/…`). `asMemberOf` checks membership on every request and provides `CurrentOrganization`, which every repository method for tenant data requires, so no such query runs without one ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). A CI test suite tries to read across Organizations.
 - **Paging:** collections that grow with an Organization's audience, such as Contacts, come a page at a time, newest first, with IDs as the cursors and a total ([ADR 0008](adr/0008-long-collections-are-paged-by-id.md)).
-- **Delivery events:** one table partitioned by month. A scheduled job creates future partitions. Retention drops whole partitions (13 months by default). Drizzle can't declare partitioned tables, so that migration is written by hand.
+- **Delivery events:** one table partitioned by month. A scheduled job creates future partitions. Retention will drop whole partitions, 13 months by default (planned, #22). Drizzle can't declare partitioned tables, so that migration is written by hand.
 - **Campaign totals and Contact engagement summaries** (last opened, counts) are stored separately and outlive raw events.
 - **Bulk writes are set-based**, never one query per Contact.
 - **Migrations are expand-then-contract:** add in one release, remove in a later one.
 
 ## Sending pipeline (outline)
+
+Today a Campaign is sent now to the subscribed Contacts of one List, in batches through its Provider Connection. Targeting several Lists and exclusions (#15), Opt-outs (#12), Suppressions (#14), scheduling (#16), throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
 
 1. **Start:** a Campaign starts (now or when the scheduler finds it due).
 2. **Resolve recipients in one set-based query:**
@@ -63,9 +67,11 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 - A page that keeps what it shows in the address reads only the search its route decodes; a route redirects an address with a part that doesn't parse to the cleaned one ([ADR 0012](adr/0012-a-page-reads-only-the-search-its-route-decodes.md)).
 - TanStack Query for queries and mutations, through the typed client generated from `contract`.
 - TanStack Form for forms, validated with the Effect schemas in `domain` through Standard Schema, so the dashboard and the API check the same rules.
-- Kumo (Base UI and Tailwind v4) for components; `@mailquilt/editor` (through `@mailquilt/react`) for email design.
+- Kumo (Base UI and Tailwind v4) for components; `@mailquilt/editor` (through `@mailquilt/react`) for email design (planned, #24).
 
 ## Public pages
+
+Planned, with the features they serve: #12, #13, #23, #29, #30 and #38.
 
 - Unsubscribe, preference center, double opt-in confirmation, signup form, web archive, tracking pixel and click redirects.
 - Rendered on the server by the entry app (React and Kumo rendered to HTML), with no client JavaScript required.
@@ -73,10 +79,9 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Observability
 
-- Structured JSON logs by default.
-- OpenTelemetry traces and logs through Effect, exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set.
 - `/health` for Docker and Coolify health checks.
-- No usage telemetry. The only call home is an update check, which an environment variable turns off.
+- No usage telemetry.
+- Planned (#40): structured JSON logs by default (today the apps print Effect's default text format); OpenTelemetry traces and logs through Effect, exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; an update check, the only call home, which an environment variable turns off.
 
 ## Testing
 
@@ -85,10 +90,10 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 | `domain`, `core` | Vitest 5 + `@effect/vitest`, with in-memory Layers and `TestClock` |
 | `db` | Vitest + Testcontainers (real Postgres): queries, migrations, partitions, cross-Organization isolation |
 | `providers` | Vitest with a fake `HttpClient` Layer and recorded responses; Mailpit as the SMTP server |
-| End to end | Playwright: sign in → import → send a Campaign → email arrives in Mailpit, against both the Docker image and `wrangler dev` |
-| Security | CI suites for isolation, token tampering, rate limits, SSRF blocking, and Better Auth endpoints outside the allow list |
+| End to end | Playwright: first-run setup → add a Provider Connection, a List and Contacts → send a Campaign → email arrives in Mailpit, against both the Docker image and `wrangler dev` |
+| Security | CI suites for isolation, rate limits, SSRF blocking, and Better Auth endpoints outside the allow list; token tampering comes with the first signed token (#12) |
 
-`@cloudflare/vitest-pool-workers` 0.23 requires Vitest 4, while `@effect/vitest` 4.1.5 requires Vitest 5. Until the Workers pool supports Vitest 5, the Cloudflare runtime is covered by the end-to-end run against `wrangler dev`.
+`@cloudflare/vitest-pool-workers` 0.23 requires Vitest 4, while `@effect/vitest` 4.1.4 requires Vitest 5. Until the Workers pool supports Vitest 5, the Cloudflare runtime is covered by the end-to-end run against `wrangler dev`.
 
 ## Versions
 
@@ -98,7 +103,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Lessons from the earlier prototypes
 
-From `.references/`:
+The earlier prototypes aren't in this repo.
 
 - They built many layers before one email was sent. Here the P1 smoke test sends a real Campaign early.
 - They ran D1 only and committed no migrations.

@@ -84,6 +84,8 @@ Researched 2026-11-21. Prices change often, so check before quoting them publicl
 
 ## Data policy
 
+The policy P1 ships with. Not built yet: deleting raw events after their window (#22), the security event log (#35), and the update check (#40).
+
 | Data | Kept |
 | --- | --- |
 | Contacts, Lists, Templates, Campaigns, Campaign statistics, each Contact's engagement summary | As long as the plan is paid |

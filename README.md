@@ -1,155 +1,64 @@
-# Turborepo starter
+# Mailquilt
 
-This Turborepo starter is maintained by the Turborepo core team.
+Mailquilt is an open-source email platform for newsletters, automations and transactional email. It provides the interface and logic; every email is delivered through a sending service you connect yourself, such as your own SMTP server.
 
-## Using this example
+It runs fully on Cloudflare or anywhere Docker runs, from the same code.
 
-Run the following command:
+## Status
 
-```sh
-npx create-turbo@latest
-```
+Mailquilt isn't released yet. P1, the first release, is being built; [ROADMAP.md](ROADMAP.md) lists what it includes.
 
-## What's inside?
+What works today, on Docker and on Cloudflare:
 
-This Turborepo includes the following packages/apps:
+- First-run setup, which creates the instance admin. Sign-up is invite-only by default.
+- Sign-up and sign-in with email and password, with email verification. On Cloudflare, account emails aren't sent yet, so only the instance admin, verified at setup, can sign in there.
+- Organizations, each with its own Contacts, Lists, Provider Connections and Campaigns.
+- Adding Contacts and Lists.
+- SMTP Provider Connections, with a test email.
+- Sending a Campaign to one List, in the background.
 
-### Apps and Packages
+Unsubscribe links, Suppressions, scheduling, templates, imports and the other P1 features are still to come, so don't send to real audiences yet.
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+## Run it with Docker
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+You need Docker with Compose.
 
 ```sh
-cd my-turborepo
-turbo build
+git clone https://github.com/mailquilt/mailquilt.git
+cd mailquilt
 ```
 
-Without global `turbo`, use your package manager:
+Create a `.env` file next to `compose.yaml`:
 
 ```sh
-cd my-turborepo
-npx turbo build
-pnpm exec turbo build
-pnpm exec turbo build
+# At least 32 random characters: openssl rand -base64 32
+AUTH_SECRET=
+# A key number and 32 random bytes in base64: echo "1:$(openssl rand -base64 32)"
+ENCRYPTION_KEYS=
+# Letters and digits only: openssl rand -hex 32
+POSTGRES_PASSWORD=
+# Where you'll open Mailquilt: http://localhost:3000 to try it on your own machine.
+APP_URL=http://localhost:3000
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+On a server, set `APP_URL` to an `https` address instead, such as `https://mail.example.com`, and put a reverse proxy in front that serves it over HTTPS and forwards to the app's port (3000, or `PORT`). Compose doesn't provide one; Coolify does. Browsers drop the sign-in cookie over plain http anywhere but localhost.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Then start it:
 
 ```sh
-turbo build --filter=docs
+docker compose up -d
 ```
 
-Without global `turbo`:
+Open `APP_URL` and follow the first-run setup. The header of [compose.yaml](compose.yaml) explains every setting, including the optional ones.
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
+## Learn more
 
-### Develop
+- [GLOSSARY.md](GLOSSARY.md): the terms Mailquilt uses, such as Organization, Contact and Provider Connection
+- [docs/architecture.md](docs/architecture.md): how it's built
+- [docs/security.md](docs/security.md): the threat model and its controls
+- [CONTRIBUTING.md](CONTRIBUTING.md): setting up the repo and opening a pull request
+- [SECURITY.md](SECURITY.md): reporting a vulnerability privately
 
-To develop all apps and packages, run the following command:
+## License
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Mailquilt's core is licensed under the [GNU Affero General Public License v3.0](LICENSE). Contributors sign a [Contributor License Agreement](CLA.md).

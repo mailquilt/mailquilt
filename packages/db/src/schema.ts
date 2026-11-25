@@ -411,8 +411,8 @@ export const campaignRecipients = pgTable(
  * What happened to each email a Campaign sent, such as `sent`. Partitioned by
  * month of `occurred_at` in its hand-written migration, which Drizzle can't
  * declare; `create_delivery_event_partitions` makes the coming months'
- * partitions, and a scheduled job calls it. Events are dropped a month at a
- * time, by partition.
+ * partitions, and a scheduled job calls it. Nothing drops them yet; retention
+ * will drop a month at a time, by partition (#22).
  */
 export const deliveryEvents = pgTable(
   "delivery_events",
