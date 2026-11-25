@@ -2,7 +2,8 @@ import { formatWithOptions } from "node:util";
 
 import { assert, layer } from "@effect/vitest";
 import { EmailAddress, MailAddress } from "@repo/domain";
-import { Effect, Option, pipe, Schema } from "effect";
+import { Effect, Fiber, Option, pipe, Schema } from "effect";
+import { SqlClient } from "effect/sql";
 import { vi } from "vitest";
 
 import {
@@ -35,6 +36,8 @@ const ACCOUNT_EMAILS = [
   "a.@example.com",
   "ada@example.c",
 ];
+
+const SIGN_UPS = 3;
 
 const decodeErrorCode = Schema.decodeUnknownOption(
   Schema.Struct({ code: Schema.String })
@@ -240,13 +243,36 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
   test.effect("never logs the address when two sign-ups for it race", () =>
     Effect.gen(function* racingSignUps() {
       const email = uniqueEmail();
+      const sql = yield* SqlClient.SqlClient;
 
-      const [responses, output] = yield* withConsoleOutput(
-        Effect.all(
-          Array.from({ length: 3 }, () => signUp(email)),
-          { concurrency: "unbounded" }
-        )
+      const blockedUserInserts = sql<{ readonly count: number }>`
+        select count(*)::int as count from pg_locks
+        where relation = 'users'::regclass
+          and mode = 'RowExclusiveLock'
+          and not granted
+      `.pipe(Effect.map(([row]) => row?.count ?? 0));
+
+      // WARNING: the lock holds every insert until all three sign-ups have found the address free, so two of them always fail on the unique index.
+      const racing = yield* sql.withTransaction(
+        Effect.gen(function* holdUserInserts() {
+          yield* sql`lock table users in share mode`;
+
+          const signUps = yield* withConsoleOutput(
+            Effect.all(
+              Array.from({ length: SIGN_UPS }, () => signUp(email)),
+              { concurrency: "unbounded" }
+            )
+          ).pipe(Effect.forkDetach);
+
+          yield* blockedUserInserts.pipe(
+            Effect.repeat({ until: (count) => count === SIGN_UPS })
+          );
+
+          return signUps;
+        })
       );
+
+      const [responses, output] = yield* Fiber.join(racing);
 
       const codes = yield* pipe(
         responses,

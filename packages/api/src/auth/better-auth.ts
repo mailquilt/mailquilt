@@ -13,6 +13,7 @@ import { SqlClient } from "effect/sql";
 import { AUTH_BASE_PATH, DISABLED_AUTH_PATHS } from "./allow-list.ts";
 import { AuthConfig } from "./config.ts";
 import { kyselyOnSqlClient } from "./kysely.ts";
+import { logMessage } from "./log-message.ts";
 
 /**
  * The only header Better Auth reads the client IP from. Our router sets it
@@ -164,12 +165,12 @@ export const makeAuth = Effect.gen(function* makeAuth() {
       sendVerificationEmail: ({ user, url }) =>
         runPromise(sendEmailVerification(user.email, url)),
     },
-    // WARNING: Better Auth logs email addresses below error level, and logs its errors whole, quoting rows the database refused, such as a duplicate address (#149). Our logs must never hold them.
+    // WARNING: Better Auth logs email addresses below error level, logs its errors whole, quoting rows the database refused, and quotes request values in its messages (#149). Our logs must never hold them.
     logger: {
       level: "error",
       log: (level, message, ...args) => {
         runFork(
-          Effect.logWithLevel(LOG_SEVERITY[level])(message, {
+          Effect.logWithLevel(LOG_SEVERITY[level])(logMessage(message), {
             errors: args.map((arg) =>
               decodeErrorKind(arg).pipe(Option.map(kindName), Option.getOrNull)
             ),
