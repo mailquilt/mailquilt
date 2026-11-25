@@ -47,7 +47,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - `SYSTEM_MAILER_*` environment variables win over the System Mailer saved on the settings page, which then can't be changed (409 `SystemMailerFromEnvironment`). Some set but not all that are needed stops the app on Node; a Worker answers 500 to every request instead, saying why in its log (#7).
 - An account email that can't be sent, including when the saved System Mailer can't be read, is logged with its subject and the failure's reason, never the address or the server's reply, which often quotes it. Sign-up still succeeds (#7).
 - On Node the System Mailer answers at once and sends afterwards, so sign-up takes as long for a new address as for one with an account. On Workers it sends before answering, which is safe only while SMTP fails at once there, so the System Mailer still doesn't send on Workers, though Provider Connections do (#7, #11).
-- A new password is 8 to 128 characters, the most Better Auth signs in with, so setup can't make an instance admin who can never sign in (#7).
+- Every field first-run setup takes accepts only what Better Auth signs in with, so setup can't make an instance admin who can never sign in. A new password is 8 to 128 characters (#7). An email address passes Better Auth's own check as well as the browser's, so `admin@localhost` is refused (#147).
 
 ## Data
 

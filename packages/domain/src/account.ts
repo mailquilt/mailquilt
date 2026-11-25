@@ -23,12 +23,23 @@ export const SIGN_UP_CLOSED = "SIGN_UP_CLOSED";
 export const BROWSER_EMAIL_INPUT_PATTERN =
   /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/u;
 
-/** The address someone signs up and signs in with. */
+// WARNING: Zod 4.6's `z.email()` pattern, which Better Auth checks at every sign-up and sign-in. An address it refuses, such as admin@localhost, can never sign in; packages/api/test/auth.test.ts fails if an upgrade moves its rule.
+const BETTER_AUTH_EMAIL_PATTERN =
+  /^(?:[A-Za-z0-9_'+-]+\.)*[A-Za-z0-9_'+-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/u;
+
+/**
+ * The address someone signs up and signs in with. It must pass both the
+ * browser's check and Better Auth's, so first-run setup can't make an
+ * instance admin who can never sign in.
+ */
 export const EmailAddress = Schema.String.check(
   Schema.isNonEmpty({ message: "Enter your email address." }),
-  Schema.isPattern(BROWSER_EMAIL_INPUT_PATTERN, {
-    message: "Enter an email address like name@example.com.",
-  })
+  Schema.makeFilter(
+    (email) =>
+      BROWSER_EMAIL_INPUT_PATTERN.test(email) &&
+      BETTER_AUTH_EMAIL_PATTERN.test(email),
+    { message: "Enter an email address like name@example.com." }
+  )
 );
 
 /** What a person calls themselves on their account. */

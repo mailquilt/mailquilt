@@ -1,4 +1,5 @@
 import { assert, layer } from "@effect/vitest";
+import { EmailAddress, MailAddress } from "@repo/domain";
 import { Effect, Schema } from "effect";
 
 import {
@@ -22,6 +23,15 @@ const ENDPOINTS_MAILQUILT_USES = new Set([
   "GET /verify-email",
   "POST /send-verification-email",
 ]);
+
+// WARNING: every row passes the browser's email check; all but the first fail a different part of Better Auth's, so an upgrade that moves its rule fails here.
+const ACCOUNT_EMAILS = [
+  "Ada.Lovelace+news@Example.com",
+  "admin@localhost",
+  "a!b@example.com",
+  "a.@example.com",
+  "ada@example.c",
+];
 
 const Session = Schema.NullOr(
   Schema.Struct({ user: Schema.Struct({ email: Schema.String }) })
@@ -173,6 +183,24 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
       assert.strictEqual(limited.status, 429);
       assert.strictEqual(limitedForm.status, 429);
     })
+  );
+
+  test.effect(
+    "accepts an account email exactly when Better Auth signs in with it",
+    () =>
+      Effect.gen(function* accountEmailRule() {
+        for (const email of ACCOUNT_EMAILS) {
+          const response = yield* signIn(email, "wrong password", uniqueIp());
+          const betterAuthSignsIn = response.status !== 400;
+
+          assert.strictEqual(
+            Schema.is(EmailAddress)(email),
+            betterAuthSignsIn,
+            email
+          );
+          assert.isTrue(Schema.is(MailAddress)(email), email);
+        }
+      })
   );
 
   test.effect(
