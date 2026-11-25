@@ -60,7 +60,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Adding Contacts to a List subscribes only those with no Subscription to that List yet. An existing Subscription keeps its status, so a member can't subscribe again someone who unsubscribed, or skip a pending confirmation. The answer says how many were left as they were (#8).
 - Adding Contacts to a List takes up to 50 at once (one page), and adds nobody if one of them doesn't exist (#8).
 - Collections that grow with an Organization's audience are paged by ID, newest first, 50 per page, with a total and cursors both ways. Lists and Organizations are returned whole (ADR 0008, #8).
-- Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default. Campaign totals and Contact engagement summaries outlive them.
+- Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default once retention is built (#22). Campaign totals and Contact engagement summaries outlive them.
 - Imports, recipient snapshots and event writes are set-based. There's never a query per Contact.
 - Migrations are expand-then-contract. They run on boot behind an advisory lock in Docker, and in the deploy step on Cloudflare.
 - A Campaign's recipients and delivery events have no TypeID: no endpoint names one, so they're keyed by the Campaign and Contact (recipients) or a sequence and the time (events) (#10).
@@ -75,7 +75,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Secrets at rest are sealed with AES-256-GCM under `ENCRYPTION_KEYS`, bound to their row; the app doesn't start without valid keys (ADR 0009, #9).
 - On the hosted service, public pages are served from a domain that never receives cookies, and open and click tracking requires the Organization's own tracking domain.
 - Redis isn't used. A Redis rate limiter is added only if several replicas or measured Postgres load need it.
-- Self-hosted installs send no usage telemetry, only an update check that can be turned off.
+- Self-hosted installs send no usage telemetry. The only call home allowed is an update check that can be turned off (#40).
 
 ## Building and testing
 

@@ -4,9 +4,9 @@ Each test should fail for one reason no other test fails for. Before adding a te
 
 ## Where a test goes
 
-Mail Quilt has three test seams. Use the highest one that can see the rule.
+Mailquilt has three test seams. Use the highest one that can see the rule.
 
-1. **The public API, in process.** Most tests live here. The test calls the app through the typed client generated from `contract`, with the `HttpApi` running in the test process and a real Postgres from Testcontainers. Every other port uses its fake: the recording Provider, the in-process Queue, `TestClock`, in-memory Storage, the Captcha and DNS fakes, the System Mailer outbox. Write these with `@effect/vitest` (`it.effect`, `it.layer`), so waits, retries and rate-limit windows run without real time passing.
+1. **The public API, in process.** Most tests live here. The test calls the app through the typed client generated from `contract`, with the `HttpApi` running in the test process and a real Postgres from Testcontainers. Every other port uses its fake: the recording Provider, the in-process Queue, `TestClock`, the System Mailer outbox. Write these with `@effect/vitest` (`it.effect`, `it.layer`), so waits, retries and rate-limit windows run without real time passing.
 2. **The Provider port.** One shared contract suite runs against every Provider adapter: recorded HTTP responses and webhook payloads, and Mailpit for SMTP.
 3. **The deployment.** One Playwright smoke test per deployment target signs in, sends a Campaign and checks it arrives in Mailpit. It proves the pieces are wired together. Don't add rules to it.
 

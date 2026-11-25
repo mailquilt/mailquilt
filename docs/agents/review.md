@@ -15,7 +15,7 @@ A broad review of the whole codebase runs only at the checkpoints in `ROADMAP.md
 ## Review each change before it merges
 
 - Read the diff and the code it touches. For a refactor, compare what the old code did with what the new code does.
-- Check each sentence the pull request adds to the docs, the API descriptions or a changeset against the code, by running it or by a test.
+- Check each sentence the pull request adds to the docs or the API descriptions against the code, by running it or by a test.
 - Check the change against `docs/agents/decisions.md` and `docs/adr/`. A change that goes against one of them says so and updates it.
 - For a change to the dashboard, also run the checklist in `docs/agents/design.md`.
 - A change to the public API contract, a stored format, or a migration that isn't expand-then-contract is a breaking change, and the pull request says "Breaking".
