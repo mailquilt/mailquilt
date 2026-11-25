@@ -25,7 +25,17 @@
     "server#dev": {
       "dependsOn": ["dashboard#build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "APP_URL",
+        "AUTH_SECRET",
+        "BLOCK_PRIVATE_NETWORKS",
+        "CLIENT_IP_HEADER",
+        "DATABASE_URL",
+        "ENCRYPTION_KEYS",
+        "PORT",
+        "SYSTEM_MAILER_*"
+      ]
     },
     "test": {
       "dependsOn": ["transit"],
