@@ -13,7 +13,7 @@ Closes #
 - [ ] The change was agreed in the issue above, or it's a small fix
 - [ ] `pnpm lint`, `pnpm check-types` and `pnpm test` pass
 - [ ] Each new test was seen failing without the change
-- [ ] A new endpoint has a case in the cross-Organization isolation suite
+- [ ] A new endpoint has a case in the cross-Organization isolation suite, and one that takes another resource's ID also has a case sending another Organization's ID from inside your own
 - [ ] What the docs and API descriptions say was checked against the code, not written from memory
 - [ ] It says "Breaking" if the API contract, a stored format or the upgrade path changes, and migrations are expand-then-contract
 - [ ] Nothing in `docs/agents/decisions.md` or `docs/adr/` is reversed, or this says which and why, and updates it

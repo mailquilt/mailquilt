@@ -16,5 +16,5 @@ We chose AES-GCM from `effect/crypto` because it runs on WebCrypto on both Node 
 ## Consequences
 
 - Rotation: add a key with a higher version, deploy, and new and updated secrets use it. Values sealed with the old key still open while it is listed. Re-sealing old rows, so the old key can be removed, needs a job that doesn't exist yet.
-- Removing a key that still seals a row makes that row's secret unreadable, and sending through it fails with a 500.
+- Removing a key that still seals a row makes that row's secret unreadable. A test email through it fails with a 500. A Campaign sending through it fails every batch until the batch's retries run out, then stays `sending` with nothing recorded (#158).
 - Every later secret at rest (webhook signing secrets, API tokens for an Integration) uses this port, with its own table and row ID as the context.

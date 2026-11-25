@@ -55,14 +55,21 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - On Cloudflare, Hyperdrive's query cache is off (`--caching-disabled`). With it on, reads are served up to a minute old: a Campaign that started sending still reads as a draft, and so would a session that was signed out (#11).
 - IDs are a type prefix plus a UUIDv7 in the TypeID format, such as `org_01h455vb4pex5vsknk084sn02q`. They're part of the public API (ADR 0006).
 - Every repository method for tenant data requires `CurrentOrganization` from the request context, which only `asMemberOf` provides after checking membership. There's no unscoped query path for tenant data, and Postgres row-level security isn't used (ADR 0007).
+- The isolation suite fails when an endpoint for one Organization's data has no case from another Organization. An endpoint that also takes another resource's ID, such as a Campaign's List or Provider Connection, needs a second, hand-written case: another Organization's ID sent from inside your own Organization. Nothing finds a missing one, so the pull request template asks (#43).
+- Inside `db.transaction`, queries use `db`, never a `tx` argument. Drizzle runs the transaction on `SqlClient.withTransaction`, so it belongs to the fiber and `db` joins it, and a helper called inside gets it without being passed one (#43).
 - The Organization a request acts in is named in its path, not stored on the session, so two tabs can work in two Organizations. The dashboard remembers each tab's choice (ADR 0007, #6).
 - A Contact's email address is unique per Organization regardless of case, and kept as entered (#8).
+- Email addresses are ASCII only, the same check as a browser's email field, so an address with non-ASCII characters in its name or domain is refused. Accepting them needs SMTPUTF8 support end to end (#43).
 - Adding Contacts to a List subscribes only those with no Subscription to that List yet. An existing Subscription keeps its status, so a member can't subscribe again someone who unsubscribed, or skip a pending confirmation. The answer says how many were left as they were (#8).
 - Adding Contacts to a List takes up to 50 at once (one page), and adds nobody if one of them doesn't exist (#8).
 - Collections that grow with an Organization's audience are paged by ID, newest first, 50 per page, with a total and cursors both ways. Lists and Organizations are returned whole (ADR 0008, #8).
+- Response schemas reuse input rules, so a stored value that fails a rule can't be returned. A change that tightens an input rule also migrates the stored values that would fail it, in the same pull request (#43).
+- In the API, a field holding an ID is named for it (`listId`, `listIds`), in query parameters too, and a response gives a missing value as `null`, never as an absent key. The Contacts filter `list` and a sender's absent `name` are the exceptions left to fix before the first release (#158) (#43).
 - Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default once retention is built (#22). Campaign totals and Contact engagement summaries outlive them.
 - Imports, recipient snapshots and event writes are set-based. There's never a query per Contact.
+- A rule over many rows at once, such as who receives a Campaign or which Contacts a List adds, is one SQL statement in the repository. `core` holds a use case's steps, not set logic (#43).
 - Migrations are expand-then-contract. They run on boot behind an advisory lock in Docker, and in the deploy step on Cloudflare.
+- Migrations run in one transaction, so `CREATE INDEX CONCURRENTLY` isn't available: an index on a large table, such as delivery events, holds up writes to it while it builds, at boot on Docker and in the deploy step on Cloudflare. That's accepted while tables are small; such a migration gets its own plan. Migrations don't set a `lock_timeout` yet (#158) (#43).
 - A Campaign's recipients and delivery events have no TypeID: no endpoint names one, so they're keyed by the Campaign and Contact (recipients) or a sequence and the time (events) (#10).
 - An Organization's data is deleted 30 days after a hosted plan is cancelled.
 
@@ -70,6 +77,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 
 - Better Auth sits behind our own allow list of endpoints. `disabledPaths` is only a second layer, and plugins we don't use aren't installed.
 - Better Auth's rate limiter uses our `RateLimiter` port in every environment. Its in-memory store is never used.
+- Sign-in is limited to 20 tries an hour per account, from any IP. Anyone who knows an address can use up those tries and keep its owner, the instance admin included, from signing in for an hour. That's accepted, because the limit stops password guessing across many IPs; on hosted, Turnstile (#38) makes it costlier (#43).
 - The client IP is read only from the configured header: `cf-connecting-ip` on Cloudflare, the proxy's header on Docker.
 - Every outbound request to a user-chosen address goes through the outbound guard, and connects to the address it checked (ADR 0010), except SMTP on Workers, which connects by name after the check because Cloudflare starts TLS only on a socket opened by name (#11). It's always on for hosted; self-hosted installs allow private networks and loopback by default. Cloud metadata, link-local and reserved addresses are always refused (#9).
 - Secrets at rest are sealed with AES-256-GCM under `ENCRYPTION_KEYS`, bound to their row; the app doesn't start without valid keys (ADR 0009, #9).
@@ -84,8 +92,10 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - A dashboard request the API refuses with `SignInRequired` isn't retried. The query client checks the session again, and when it has ended, `SignedInOnly` sends the person to sign in. Pages and forms don't handle `SignInRequired` themselves, and whatever was typed into an open form is lost (#58).
 - On Node, pg-boss is both the Queue and the Scheduler.
 - Persistence is never tested with in-memory fakes (see `testing.md`).
+- A failure a caller handles is a typed error: `Schema.TaggedError` in `domain` when the API returns it, `Data.TaggedError` in `core` otherwise. Anything else, such as an unexpected SQL error, becomes a defect through `Effect.orDie`, not `catchTag(…, Effect.die)` or a fallback value that hides it (#43).
 - `@cloudflare/vitest-pool-workers` isn't used while it needs Vitest 4 and `@effect/vitest` needs Vitest 5. The Cloudflare runtime is covered by the smoke test on `wrangler dev`.
 - Every dependency is pinned exactly in one pnpm catalog, with a 7-day `minimumReleaseAge`. `drizzle-orm` and `drizzle-kit` are excluded, because the Effect integration exists only in their newest release candidates.
+- A package pnpm installs only as another's peer, such as `redis` for `@effect/platform-node`, sits outside the catalog. One that ships in the Docker image is added to the catalog, so its version is chosen on purpose (#158) (#43).
 - CI installs with `--frozen-lockfile` in every job, so tests never meet a dependency version the repo hasn't taken on purpose.
 - Dependencies are updated by hand, with no Renovate or Dependabot update PRs, so no third-party app gets write access to the repo. Dependabot alerts and `pnpm audit` in CI flag vulnerable versions. At each checkpoint in `ROADMAP.md`, run `pnpm outdated -r` and update what's worth it. This replaces the Renovate setup from #3.
 
