@@ -122,13 +122,30 @@ layer(makeTestApp({ install: "fresh", systemMailer: "smtp" }), {
       })
   );
 
+  test.effect("refuses a setup email Better Auth doesn't sign in with", () =>
+    Effect.gen(function* emailWithoutSignIn() {
+      const client = yield* ApiClient;
+
+      const refused = yield* send("POST", "/api/instance/setup", {
+        body: {
+          email: "admin@localhost",
+          name: "Ada",
+          password: "a strong first password",
+        },
+      });
+
+      assert.strictEqual(refused.status, 400);
+      assert.isFalse((yield* client.instance.status()).setUp);
+    })
+  );
+
   test.effect(
-    "first-run setup makes one instance admin, even when two run at once, and never runs again",
+    "first-run setup makes one instance admin, who signs in with the address as typed, even when two run at once, and never runs again",
     () =>
       Effect.gen(function* firstRunSetup() {
         const client = yield* ApiClient;
-        const first = uniqueEmail();
-        const second = uniqueEmail();
+        const first = `Ada.${uniqueEmail()}`;
+        const second = `Ada.${uniqueEmail()}`;
 
         const results = yield* Effect.all(
           [first, second].map((email) =>
@@ -158,7 +175,7 @@ layer(makeTestApp({ install: "fresh", systemMailer: "smtp" }), {
 
         const { user } = yield* sessionUser(sessionCookie(signedIn));
 
-        assert.strictEqual(user.email, admins[0]);
+        assert.strictEqual(user.email, admins[0]?.toLowerCase());
         assert.isTrue(user.instanceAdmin);
         assert.isTrue((yield* client.instance.status()).setUp);
 
