@@ -79,6 +79,9 @@ jobs:
       # The image built from this commit, its Postgres, and Mailpit, as a
       # self-hoster runs them (e2e/smoke.env holds the throwaway settings).
       - run: docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml up -d --build --wait
+      # compose.yaml passes on only the settings it names, so check that an
+      # optional one from the env file reaches the app (#148).
+      - run: test "$(docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml exec -T app printenv BLOCK_PRIVATE_NETWORKS)" = false
       - run: pnpm --filter e2e exec playwright install --with-deps chromium
       - run: pnpm --filter e2e smoke
       - if: failure()

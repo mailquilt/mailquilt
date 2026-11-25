@@ -5,7 +5,28 @@
 #   AUTH_SECRET        at least 32 random characters: openssl rand -base64 32
 #   ENCRYPTION_KEYS    1:<32 random bytes, base64>: echo "1:$(openssl rand -base64 32)"
 #   POSTGRES_PASSWORD  letters and digits only, as it goes into a connection URL: openssl rand -hex 32
-#   APP_URL            where people open Mailquilt, such as https://mail.example.com
+#   APP_URL            the exact address people open Mailquilt at, such as
+#                      https://mail.example.com. Use https anywhere but
+#                      localhost: browsers drop the secure sign-in cookie
+#                      over plain http. The default, http://localhost:3000,
+#                      doesn't follow PORT.
+#   PORT               the port on this machine (3000 by default)
+#
+# Optional. Leave one out, or empty, to keep its default:
+#
+#   CLIENT_IP_HEADER        the header your reverse proxy puts the client's
+#                           IP in, such as X-Real-IP. Without it, the client
+#                           is whatever connects to the app, and behind a
+#                           proxy that is the proxy for everyone.
+#   BLOCK_PRIVATE_NETWORKS  true stops SMTP connections to private networks
+#                           and loopback too (off by default)
+#   SYSTEM_MAILER_SMTP_HOST, SYSTEM_MAILER_SMTP_PORT,
+#   SYSTEM_MAILER_SMTP_SECURITY (tls, starttls or none),
+#   SYSTEM_MAILER_FROM_EMAIL, and optionally SYSTEM_MAILER_FROM_NAME, and
+#   SYSTEM_MAILER_SMTP_USERNAME with SYSTEM_MAILER_SMTP_PASSWORD (both or neither):
+#                           the SMTP server account emails go through. Set
+#                           all the required ones or none; with none, set it
+#                           on the instance settings page instead.
 
 services:
   app:
@@ -16,6 +37,16 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET to at least 32 random characters}
       ENCRYPTION_KEYS: ${ENCRYPTION_KEYS:?Set ENCRYPTION_KEYS, such as 1:<32 random bytes in base64>}
       DATABASE_URL: postgres://mailquilt:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/mailquilt
+      # Empty when unset, which the app reads as unset, so it keeps its default.
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+      BLOCK_PRIVATE_NETWORKS: ${BLOCK_PRIVATE_NETWORKS:-}
+      SYSTEM_MAILER_SMTP_HOST: ${SYSTEM_MAILER_SMTP_HOST:-}
+      SYSTEM_MAILER_SMTP_PORT: ${SYSTEM_MAILER_SMTP_PORT:-}
+      SYSTEM_MAILER_SMTP_SECURITY: ${SYSTEM_MAILER_SMTP_SECURITY:-}
+      SYSTEM_MAILER_FROM_EMAIL: ${SYSTEM_MAILER_FROM_EMAIL:-}
+      SYSTEM_MAILER_FROM_NAME: ${SYSTEM_MAILER_FROM_NAME:-}
+      SYSTEM_MAILER_SMTP_USERNAME: ${SYSTEM_MAILER_SMTP_USERNAME:-}
+      SYSTEM_MAILER_SMTP_PASSWORD: ${SYSTEM_MAILER_SMTP_PASSWORD:-}
     ports:
       - "${PORT:-3000}:3000"
     depends_on:
