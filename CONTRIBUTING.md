@@ -23,7 +23,7 @@ pnpm check-types  # type-check every package
 pnpm test         # run the tests
 ```
 
-`pnpm dev` runs each app's dev task, including the Node server on port 3000 and the dashboard's dev server, which sends `/api` to it. The server needs a Postgres and the settings `compose.yaml` describes, in your shell before you run it. For example:
+`pnpm dev` runs each app's dev task, including the Node server on port 3000 and the dashboard's dev server on port 3001, which sends `/api` to it. Open the dashboard at http://localhost:3001. The server needs a Postgres and the settings `compose.yaml` describes, in your shell before you run it. For example:
 
 ```sh
 docker run -d --name mailquilt-dev-db -p 5432:5432 \
@@ -31,12 +31,12 @@ docker run -d --name mailquilt-dev-db -p 5432:5432 \
   postgres:18.7-alpine
 
 export DATABASE_URL=postgres://mailquilt:dev@localhost:5432/mailquilt
-export APP_URL=http://localhost:3000
+export APP_URL=http://localhost:3001
 export AUTH_SECRET="$(openssl rand -base64 32)"
 export ENCRYPTION_KEYS="1:$(openssl rand -base64 32)"
 ```
 
-Keep `AUTH_SECRET` and `ENCRYPTION_KEYS` the same between runs, or you're signed out and saved Provider credentials can't be read. Turborepo passes only the settings listed under `server#dev` in `turbo.json` to the server, so a new setting goes in that list too.
+`APP_URL` is the address you open: the server refuses signed-in changes from any other origin. Keep `AUTH_SECRET` and `ENCRYPTION_KEYS` the same between runs, or you're signed out and saved Provider credentials can't be read. Turborepo passes only the settings listed under `server#dev` in `turbo.json` to the server, so a new setting goes in that list too.
 
 Read [docs/agents/testing.md](docs/agents/testing.md) before you write or change tests.
 
