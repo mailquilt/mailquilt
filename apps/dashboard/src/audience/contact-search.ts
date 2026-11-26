@@ -3,11 +3,10 @@ import {
   ListIdSchema,
   SubscriptionStatusSchema,
 } from "@repo/domain";
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 import type { Types } from "effect";
 
-const droppedIfInvalid = <S extends Schema.Top>(schema: S) =>
-  schema.pipe(Schema.catchDecoding(() => Effect.succeedNone));
+import { droppedIfInvalid, oneCursor } from "../search-in-url.ts";
 
 const ContactSearchInUrl = Schema.Struct({
   after: Schema.optionalKey(droppedIfInvalid(ContactIdSchema)),
@@ -47,11 +46,5 @@ export const consistentSearch = ({
     }
   }
 
-  if (after !== undefined) {
-    search.after = after;
-  } else if (before !== undefined) {
-    search.before = before;
-  }
-
-  return search satisfies ContactSearch;
+  return { ...search, ...oneCursor({ after, before }) } satisfies ContactSearch;
 };
