@@ -25,6 +25,7 @@ import type { Types } from "effect";
 
 import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
+import { preferencesUrl } from "./preferences-link.ts";
 import { ProviderConnections } from "./provider-connections.ts";
 import { sendThrough } from "./provider.ts";
 import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
@@ -273,7 +274,16 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           organizationId: message.organizationId,
         });
 
-        const footer = { addressLine, unsubscribeUrl: unsubscribe };
+        const preferences = yield* preferencesUrl({
+          contactId: recipient.contactId,
+          organizationId: message.organizationId,
+        });
+
+        const footer = {
+          addressLine,
+          preferencesUrl: preferences,
+          unsubscribeUrl: unsubscribe,
+        };
 
         const email: Types.Mutable<OutgoingEmail> = {
           from: batch.from,

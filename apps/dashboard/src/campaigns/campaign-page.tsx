@@ -274,6 +274,7 @@ const asSent = (campaign: Campaign, organization: Organization) => {
   if (organization.postalAddress === null) {
     return withFooterHtml(campaign.html, {
       addressLine: ADDRESS_SLOT,
+      preferencesUrl: "#",
       unsubscribeUrl: "#",
     }).replace(
       `>${ADDRESS_SLOT}</p>`,
@@ -286,6 +287,7 @@ const asSent = (campaign: Campaign, organization: Organization) => {
       organization.name,
       organization.postalAddress
     ),
+    preferencesUrl: "#",
     unsubscribeUrl: "#",
   });
 };

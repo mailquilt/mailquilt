@@ -1,48 +1,23 @@
 import { stopAllEmail, unsubscribe, unsubscribePage } from "@repo/core";
 import type { InvalidToken, SignedTokens, Unsubscribes } from "@repo/core";
-import { ByteSize, Cause, Effect, Layer, Option, Schema } from "effect";
-import {
-  HttpIncomingMessage,
-  HttpRouter,
-  HttpServerRequest,
-  HttpServerResponse,
-  UrlParams,
-} from "effect/http";
+import { Cause, Effect, Layer, Option } from "effect";
+import { HttpRouter, HttpServerResponse, UrlParams } from "effect/http";
 
+import {
+  formFields,
+  htmlPage as page,
+  seeOther,
+  tokenParam,
+} from "../public-pages/responses.ts";
+import { PAGE_FIELD } from "../public-pages/shell.ts";
 import {
   brokenLinkPage,
   confirmPage,
   failedPage,
   stoppedAllPage,
   unsubscribedPage,
-  PAGE_FIELD,
-  THEME_SCRIPT_HASH,
 } from "./pages.ts";
 import type { FailedStep } from "./pages.ts";
-
-const MAX_FORM_BODY_SIZE = ByteSize.kibibytes(4);
-
-// WARNING: the token is in the address, so no page may send a Referer, be cached or be indexed; nothing on it loads from elsewhere.
-const PAGE_HEADERS = {
-  "Cache-Control": "no-store",
-  "Content-Security-Policy": `default-src 'none'; script-src '${THEME_SCRIPT_HASH}'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
-  "Referrer-Policy": "no-referrer",
-  "X-Robots-Tag": "noindex",
-};
-
-const page = (html: string, status = 200) =>
-  HttpServerResponse.text(html, {
-    contentType: "text/html; charset=utf-8",
-    headers: PAGE_HEADERS,
-    status,
-  });
-
-const tokenParam = HttpServerRequest.schemaSearchParams(
-  Schema.Struct({ token: Schema.String })
-).pipe(
-  Effect.map(({ token }) => token),
-  Effect.orElseSucceed(() => "")
-);
 
 const pathOf = (token: string) =>
   `/unsubscribe?token=${encodeURIComponent(token)}`;
@@ -53,17 +28,14 @@ const stopAllPathOf = (token: string) =>
 const logFailure = (cause: Cause.Cause<unknown>) =>
   Effect.logError("An unsubscribe link failed", Cause.pretty(cause));
 
-const isOneClick = HttpServerRequest.HttpServerRequest.pipe(
-  Effect.flatMap((request) => request.urlParamsBody),
+const isOneClick = formFields.pipe(
   Effect.map(
-    (params) =>
+    (fields) =>
       !Option.contains(
-        UrlParams.getFirst(params, PAGE_FIELD.name),
+        UrlParams.getFirst(fields, PAGE_FIELD.name),
         PAGE_FIELD.value
       )
-  ),
-  Effect.orElseSucceed(() => true),
-  Effect.provideService(HttpIncomingMessage.MaxBodySize, MAX_FORM_BODY_SIZE)
+  )
 );
 
 const showPage = Effect.gen(function* showUnsubscribePage() {
@@ -105,10 +77,7 @@ const act = (step: {
       Effect.as(
         oneClick
           ? HttpServerResponse.text("Unsubscribed.")
-          : HttpServerResponse.redirect(pathOf(token), {
-              headers: PAGE_HEADERS,
-              status: 303,
-            })
+          : seeOther(pathOf(token))
       ),
       Effect.catchTag("InvalidToken", () =>
         Effect.succeed(

@@ -17,7 +17,7 @@ const NO_SALT = new Uint8Array(KEY_BYTES);
  * What a token is for. Each purpose signs with its own key, so a token made
  * for one can never pass as another.
  */
-export type TokenPurpose = "unsubscribe";
+export type TokenPurpose = "unsubscribe" | "preferences";
 
 /**
  * Port: signs short strings, such as the IDs an unsubscribe link acts on, so

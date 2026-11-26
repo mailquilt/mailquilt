@@ -10,5 +10,5 @@ The entry app serves the API and the dashboard's static files from one origin. O
 ## Consequences
 
 - Better Auth, provider webhooks and every `HttpApi` group mount under `/api`.
-- Public pages (unsubscribe, preference center, tracking) are also answered by the Worker. Unsubscribe is listed as `/unsubscribe` and `/unsubscribe/*` (#12); each later public page adds its own prefix the same way.
+- Public pages (unsubscribe, preference center, tracking) are also answered by the Worker. Unsubscribe is listed as `/unsubscribe` and `/unsubscribe/*` (#12), and preferences as `/preferences` and `/preferences/*` (#13); each later public page adds its own prefix the same way.
 - On Node, an unknown path under `/api` returns 404 instead of the dashboard, as it does on Workers.

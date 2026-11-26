@@ -8,6 +8,7 @@ import { DeliveryEventPartitionsLive } from "./delivery-event-partitions.ts";
 import { InstanceLive } from "./instance.ts";
 import { ListsLive } from "./lists.ts";
 import { OrganizationsLive } from "./organizations.ts";
+import { PreferencesLive } from "./preferences.ts";
 import { ProviderConnectionsLive } from "./provider-connections.ts";
 import { RateLimiterLive } from "./rate-limiter.ts";
 import { UnsubscribesLive } from "./unsubscribes.ts";
@@ -25,6 +26,8 @@ export { InstanceLive } from "./instance.ts";
 export { ListsLive } from "./lists.ts";
 
 export { OrganizationsLive } from "./organizations.ts";
+
+export { PreferencesLive } from "./preferences.ts";
 
 export { ProviderConnectionsLive } from "./provider-connections.ts";
 
@@ -48,6 +51,7 @@ export const DatabasePortsLive = Layer.mergeAll(
   InstanceLive,
   ListsLive,
   OrganizationsLive,
+  PreferencesLive,
   ProviderConnectionsLive,
   RateLimiterLive,
   UnsubscribesLive
