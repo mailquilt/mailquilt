@@ -18,10 +18,17 @@ const HOSTILE = {
   subscribed: true,
 };
 
+const WITHOUT_BREAKS = /<wbr\/>/gu;
+
+const textOf = (html: string) => html.replaceAll(WITHOUT_BREAKS, "");
+
 const pages = [
-  ["confirm", confirmPage(HOSTILE, "/unsubscribe?token=t")],
-  ["unsubscribed", unsubscribedPage(HOSTILE, "/unsubscribe/all?token=t")],
-  ["stopped all", stoppedAllPage(HOSTILE)],
+  ["confirm", textOf(confirmPage(HOSTILE, "/unsubscribe?token=t"))],
+  [
+    "unsubscribed",
+    textOf(unsubscribedPage(HOSTILE, "/unsubscribe/all?token=t")),
+  ],
+  ["stopped all", textOf(stoppedAllPage(HOSTILE))],
 ] as const;
 
 describe("unsubscribe pages", () => {

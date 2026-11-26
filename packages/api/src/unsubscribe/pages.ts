@@ -23,15 +23,15 @@ body { margin: 0; min-height: 100vh; min-height: 100svh; display: flex; flex-dir
 .mq-public { width: 100%; max-width: 28rem; margin: 0 auto; padding-top: 64px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .mq-public-block { width: 88px; height: 88px; color: var(--mq-block-ink); }
 .mq-public-block-row { width: auto; }
-.mq-public-sender { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 16px; letter-spacing: -0.02em; color: var(--text-color-kumo-subtle); overflow-wrap: anywhere; }
-.mq-public h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.12; letter-spacing: -0.035em; text-wrap: balance; overflow-wrap: anywhere; }
-.mq-public p { margin: 0; color: var(--mq-body); font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
+.mq-public-sender { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: var(--text-lg); letter-spacing: -0.02em; color: var(--text-color-kumo-subtle); overflow-wrap: anywhere; }
+.mq-public h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: var(--text-display-md); line-height: var(--text-display-md--line-height); letter-spacing: -0.035em; text-wrap: balance; overflow-wrap: anywhere; }
+.mq-public p { margin: 0; color: var(--mq-body); font-size: var(--text-lg); line-height: var(--text-lg--line-height); overflow-wrap: anywhere; }
 .mq-public-email { color: var(--text-color-kumo-strong); font-weight: 500; }
 .mq-public form { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 6px 0 0; }
 .mq-public-more { margin-top: 18px; }
 .mq-public-action { width: 100%; max-width: 20rem; justify-content: center; }
-.mq-public-footer { margin-top: auto; padding: 32px 0 28px; font-size: 13px; color: var(--text-color-kumo-subtle); }
-@media (min-width: 768px) { .mq-public { padding-top: 120px; } .mq-public h1 { font-size: 40px; } .mq-public-block { width: 104px; height: 104px; } }
+.mq-public-footer { margin-top: auto; padding: 32px 0 28px; font-size: var(--text-sm); color: var(--text-color-kumo-subtle); }
+@media (min-width: 768px) { .mq-public { padding-top: 120px; } .mq-public h1 { font-size: var(--text-display-lg); line-height: var(--text-display-lg--line-height); } .mq-public-block { width: 104px; height: 104px; } }
 `;
 
 /**
@@ -203,8 +203,27 @@ const listsOf = (names: readonly string[]) => {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
 };
 
+const AFTER_AT_OR_DOT = /(?<=[@.])/u;
+
+// WARNING: an address may wrap only after "@" or a dot, never before its ending, as the dashboard's `Breakable` does; keep the two alike.
+const breakPoints = (address: string) => {
+  const parts = address.split(AFTER_AT_OR_DOT);
+
+  if (parts.length > 1 && parts.at(-2)?.endsWith(".")) {
+    parts.splice(-2, 2, `${parts.at(-2)}${parts.at(-1)}`);
+  }
+
+  return parts;
+};
+
 const Email = ({ address }: { readonly address: string }) =>
-  h("span", { className: "mq-public-email" }, address);
+  h(
+    "span",
+    { className: "mq-public-email" },
+    ...breakPoints(address).flatMap((part, index) =>
+      index === 0 ? [part] : [h("wbr", { key: `break-${index}` }), part]
+    )
+  );
 
 /** Asks whether to unsubscribe. Nothing changes until the button is pressed. */
 export const confirmPage = (unsubscription: Unsubscription, action: string) => {

@@ -96,7 +96,10 @@ const unsubscribePath = (email: {
 const responseOf = (response: Response) =>
   Effect.gen(function* readResponse() {
     return {
-      html: yield* Effect.promise(() => response.text()),
+      html: (yield* Effect.promise(() => response.text())).replaceAll(
+        "<wbr/>",
+        ""
+      ),
       location: response.headers.get("location"),
       status: response.status,
     };
