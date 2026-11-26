@@ -18,6 +18,7 @@ import { Array as Arr, Context, Effect, Option, pipe, Ref } from "effect";
 import type { Types } from "effect";
 
 import { CurrentOrganization } from "./current-organization.ts";
+import { plainTextOf } from "./plain-text.ts";
 import { ProviderConnections } from "./provider-connections.ts";
 import { sendThrough } from "./provider.ts";
 import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
@@ -27,6 +28,7 @@ import { SendCampaignBatch } from "./send-campaign-batch.ts";
 import {
   unsubscribeHeaders,
   unsubscribeUrl,
+  withUnsubscribeLine,
   withUnsubscribeLink,
 } from "./unsubscribe.ts";
 
@@ -242,6 +244,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
     }
 
     const batch = found.value;
+    const text = plainTextOf(batch.html);
 
     const connection =
       batch.providerConnectionId === null
@@ -263,6 +266,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           headers: unsubscribeHeaders(unsubscribe),
           html: withUnsubscribeLink(batch.html, unsubscribe),
           subject: batch.subject,
+          text: withUnsubscribeLine(text, unsubscribe),
           to: recipient.email,
         };
 

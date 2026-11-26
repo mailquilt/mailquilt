@@ -95,6 +95,10 @@ export const withUnsubscribeLink = (html: string, url: string) => {
     : `${html.slice(0, last.index)}${footer}${html.slice(last.index)}`;
 };
 
+/** The Campaign's plain-text part with an unsubscribe line at its foot, matching `withUnsubscribeLink`. */
+export const withUnsubscribeLine = (text: string, url: string) =>
+  `${text}\n\nDon’t want these emails? Unsubscribe:\n${url}`;
+
 /** The headers that let a mail app offer its own one-click unsubscribe (RFC 8058). */
 export const unsubscribeHeaders = (url: string) => ({
   "List-Unsubscribe": `<${url}>`,

@@ -279,7 +279,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
             send.email.subject === campaign.subject
         )?.email;
 
-        const { headers, html, ...rest } = email ?? assert.fail();
+        const { headers, html, text, ...rest } = email ?? assert.fail();
 
         assert.deepStrictEqual(rest, {
           from: CONTENT.from,
@@ -288,6 +288,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           to: "ada@example.com",
         });
         assert.isTrue(html?.startsWith(CONTENT.html));
+        assert.isTrue(text?.startsWith("THIS WEEK AT ACME\n\nHello!\n\n"));
         assert.isDefined(headers?.["List-Unsubscribe"]);
       })
   );
