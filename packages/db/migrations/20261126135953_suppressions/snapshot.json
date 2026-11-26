@@ -3,17 +3,11 @@
   "version": "10",
   "dialect": "postgres",
   "id": "583880ed-31e8-4451-88a8-4be511be1986",
-  "prevIds": [
-    "4173865c-a5ac-4310-938f-2696d69ce769"
-  ],
+  "prevIds": ["4173865c-a5ac-4310-938f-2696d69ce769"],
   "footprints": [
     {
       "statementType": "create_table",
-      "statementTarget": [
-        "table",
-        "public",
-        "suppressions"
-      ],
+      "statementTarget": ["table", "public", "suppressions"],
       "writes": [
         "s|tbl|public.suppressions",
         "n|tbl|public.suppressions",
@@ -22,9 +16,7 @@
         "n|type|public.suppressions",
         "n|rel|public.suppressions_pkey"
       ],
-      "reads": [
-        "n|sch|public"
-      ]
+      "reads": ["n|sch|public"]
     },
     {
       "statementType": "create_index",
@@ -69,11 +61,7 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": [
-        "table",
-        "public",
-        "suppressions"
-      ],
+      "statementTarget": ["table", "public", "suppressions"],
       "writes": [
         "s|fk|public.suppressions.suppressions_organization_id_organizations_id_fkey",
         "n|fk|public.suppressions.suppressions_organization_id_organizations_id_fkey",
@@ -248,14 +236,10 @@
         "table": "suppressions",
         "name": "suppressions_organization_id_organizations_id_fkey",
         "nameExplicit": false,
-        "columns": [
-          "organization_id"
-        ],
+        "columns": ["organization_id"],
         "schemaTo": "public",
         "tableTo": "organizations",
-        "columnsTo": [
-          "id"
-        ],
+        "columnsTo": ["id"],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -267,9 +251,7 @@
         "schema": "public",
         "table": "suppressions",
         "name": "suppressions_pkey",
-        "columns": [
-          "id"
-        ],
+        "columns": ["id"],
         "nameExplicit": false,
         "entityType": "pks"
       }
