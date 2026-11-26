@@ -16,7 +16,9 @@ const altTextOnly: FormatCallback = (element, _walk, builder) => {
  * The plain-text part of a Campaign email, made from its HTML: headings,
  * paragraphs and lists as text, a link's address in brackets after its
  * words, and an image as its alt text, never its address, so a spacer or
- * tracking image leaves nothing. The page title isn't shown.
+ * tracking image leaves nothing. Each table row and cell is a block of its
+ * own, since most email layouts are tables. The page title, and anything
+ * hidden with `display: none`, such as a preview line, aren't shown.
  */
 export const plainTextOf = (html: string) =>
   convert(html, {
@@ -25,6 +27,12 @@ export const plainTextOf = (html: string) =>
     selectors: [
       { format: "altTextOnly", selector: "img" },
       { format: "skip", selector: "title" },
+      { format: "skip", selector: "[style*='display:none']" },
+      { format: "skip", selector: "[style*='display: none']" },
+      { format: "block", selector: "table" },
+      { format: "block", selector: "tr" },
+      { format: "block", selector: "td" },
+      { format: "block", selector: "th" },
       { options: { hideLinkHrefIfSameAsText: true }, selector: "a" },
     ],
   });

@@ -35,4 +35,22 @@ describe("a Campaign's plain-text part", () => {
       "Hello!"
     );
   });
+
+  it("puts each table row and cell on a line of its own, as most email layouts are tables", () => {
+    assert.strictEqual(
+      plainTextOf(
+        "<table><tr><td>Hello Ada,</td></tr><tr><td>Price</td><td>$10</td></tr></table>"
+      ),
+      "Hello Ada,\n\nPrice\n\n$10"
+    );
+  });
+
+  it("leaves out text the HTML hides, such as a preview line and its filler", () => {
+    assert.strictEqual(
+      plainTextOf(
+        '<div style="display:none;max-height:0">Big sale inside&#847;&zwnj;&nbsp;</div><span style="display: none !important">More</span><p>Hello!</p>'
+      ),
+      "Hello!"
+    );
+  });
 });
