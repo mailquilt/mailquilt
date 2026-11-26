@@ -16,6 +16,7 @@ import {
   stoppedAllPage,
   unsubscribedPage,
   PAGE_FIELD,
+  THEME_SCRIPT_HASH,
 } from "./pages.ts";
 import type { FailedStep } from "./pages.ts";
 
@@ -24,8 +25,7 @@ const MAX_FORM_BODY_SIZE = ByteSize.kibibytes(4);
 // WARNING: the token is in the address, so no page may send a Referer, be cached or be indexed; nothing on it loads from elsewhere.
 const PAGE_HEADERS = {
   "Cache-Control": "no-store",
-  "Content-Security-Policy":
-    "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+  "Content-Security-Policy": `default-src 'none'; script-src '${THEME_SCRIPT_HASH}'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`,
   "Referrer-Policy": "no-referrer",
   "X-Robots-Tag": "noindex",
 };

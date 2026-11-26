@@ -1,46 +1,38 @@
+import { Button, LinkButton } from "@cloudflare/kumo/components/button";
 import type { Unsubscription } from "@repo/core";
+import { createElement as h, Fragment } from "react";
+import type { ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+// WARNING: the dashboard's build publishes its stylesheet, with Kumo and the Mailquilt theme, under this name (apps/dashboard/vite.config.ts); rename both together.
+const STYLESHEET = "/public-pages.css";
+
+/**
+ * Sets light or dark before the first paint, as the dashboard does
+ * (`apps/dashboard/src/theme/theme.ts`): the visitor's saved choice, or else
+ * their device's. Without JavaScript the page stays light.
+ */
+export const THEME_SCRIPT = `{const apply=()=>{let saved=null;try{saved=localStorage.getItem("mailquilt-theme")}catch{saved=null}const dark=saved==="dark"||(saved!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.mode=dark?"dark":"light"};apply();matchMedia("(prefers-color-scheme: dark)").addEventListener("change",apply)}`;
+
+/** `THEME_SCRIPT`'s SHA-256, so the Content Security Policy allows it and nothing else. */
+export const THEME_SCRIPT_HASH =
+  "sha256-jKoITROcYU+fx/48QvXIt6+dWlcPqV3Jeizu5jECuFs=";
 
 const STYLES = `
-@font-face { font-family: "Space Grotesk"; src: url("/fonts/space-grotesk-latin-wght-normal.woff2") format("woff2"); font-weight: 300 700; font-display: optional; }
-@font-face { font-family: "Instrument Sans"; src: url("/fonts/instrument-sans-latin-wght-normal.woff2") format("woff2"); font-weight: 400 700; font-display: optional; }
-:root {
-  color-scheme: light dark;
-  --bg: #ffffff; --ink: #111113; --body: #52525b; --muted: #71717a; --block: #111113;
-  --button: #111113; --button-ink: #ffffff; --line: #d4d4d8; --focus: #111113;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111113; --ink: #f4f4f5; --body: #a1a1aa; --muted: #8b949e; --block: #e4e4e7;
-    --button: #f4f4f5; --button-ink: #111113; --line: #3f3f46; --focus: #f4f4f5;
-  }
-}
-* { box-sizing: border-box; }
-html { background: var(--bg); }
-body { margin: 0; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); font-family: "Instrument Sans", ui-sans-serif, system-ui, sans-serif; text-align: center; padding: 0 24px; }
-main { width: 100%; max-width: 28rem; margin: 0 auto; padding-top: 64px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
-@media (min-width: 768px) { main { padding-top: 120px; } h1 { font-size: 40px; } .block { width: 104px; height: 104px; } }
-.block { width: 88px; height: 88px; color: var(--block); }
-.block.all { width: auto; }
-.sender { margin: 0; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 16px; letter-spacing: -0.02em; color: var(--muted); overflow-wrap: anywhere; }
-h1 { margin: 0; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 30px; line-height: 1.12; letter-spacing: -0.035em; text-wrap: balance; overflow-wrap: anywhere; }
-p { margin: 0; color: var(--body); font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
-.email { color: var(--ink); font-weight: 500; }
-form { width: 100%; display: flex; justify-content: center; margin: 6px 0 0; }
-button, .again { font: 600 16px/1 "Instrument Sans", ui-sans-serif, system-ui, sans-serif; border-radius: 8px; padding: 14px 20px; border: 1px solid var(--button); background: var(--button); color: var(--button-ink); cursor: pointer; width: 100%; max-width: 20rem; text-decoration: none; }
-.again { display: block; margin-top: 6px; }
-.more { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 18px; width: 100%; }
-.more button { width: auto; font-size: 15px; padding: 13px 18px; background: transparent; color: var(--ink); border-color: var(--muted); }
-button:focus-visible, .again:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-footer { margin-top: auto; padding: 32px 0 28px; font-size: 13px; color: var(--muted); }
+body { margin: 0; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; padding: 0 24px; background: var(--color-kumo-base); color: var(--text-color-kumo-strong); font-family: var(--font-sans); text-align: center; }
+.mq-public { width: 100%; max-width: 28rem; margin: 0 auto; padding-top: 64px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.mq-public-block { width: 88px; height: 88px; color: var(--mq-block-ink); }
+.mq-public-block-row { width: auto; }
+.mq-public-sender { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 16px; letter-spacing: -0.02em; color: var(--text-color-kumo-subtle); overflow-wrap: anywhere; }
+.mq-public h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.12; letter-spacing: -0.035em; text-wrap: balance; overflow-wrap: anywhere; }
+.mq-public p { margin: 0; color: var(--mq-body); font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
+.mq-public-email { color: var(--text-color-kumo-strong); font-weight: 500; }
+.mq-public form { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 6px 0 0; }
+.mq-public-more { margin-top: 18px; }
+.mq-public-action { width: 100%; max-width: 20rem; justify-content: center; }
+.mq-public-footer { margin-top: auto; padding: 32px 0 28px; font-size: 13px; color: var(--text-color-kumo-subtle); }
+@media (min-width: 768px) { .mq-public { padding-top: 120px; } .mq-public h1 { font-size: 40px; } .mq-public-block { width: 104px; height: 104px; } }
 `;
-
-const escape = (text: string) =>
-  text
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
 
 /**
  * The field every form on these pages posts. A post without it is a mail
@@ -48,23 +40,116 @@ const escape = (text: string) =>
  */
 export const PAGE_FIELD = { name: "from", value: "page" } as const;
 
-const FROM_PAGE = `<input type="hidden" name="${PAGE_FIELD.name}" value="${PAGE_FIELD.value}">`;
-
 type BlockKind = "full" | "empty" | "all";
 
-const BLOCKS: Readonly<Record<BlockKind, string>> = {
-  all: `<svg aria-hidden="true" class="block all" viewBox="0 0 108 72">${[
-    0, 38, 76,
-  ]
-    .map(
-      (x) =>
-        `<rect fill="none" height="26" opacity="0.55" rx="3" stroke="currentColor" stroke-dasharray="4 3" stroke-width="2" width="26" x="${x + 3}" y="23"/>`
+const dashed = {
+  fill: "none",
+  stroke: "currentColor",
+} as const;
+
+const Block = ({ kind }: { readonly kind: BlockKind }) => {
+  if (kind === "full") {
+    return h(
+      "svg",
+      {
+        "aria-hidden": true,
+        className: "mq-public-block",
+        viewBox: "0 0 72 72",
+      },
+      h("rect", {
+        fill: "currentColor",
+        height: 64,
+        rx: 6,
+        width: 64,
+        x: 4,
+        y: 4,
+      }),
+      h("rect", {
+        fill: "var(--color-kumo-base)",
+        height: 26,
+        rx: 2,
+        width: 40,
+        x: 16,
+        y: 24,
+      }),
+      h("path", {
+        d: "M17 25 L36 39 L55 25",
+        fill: "none",
+        stroke: "currentColor",
+        strokeLinejoin: "round",
+        strokeWidth: 3,
+      })
+    );
+  }
+
+  if (kind === "empty") {
+    return h(
+      "svg",
+      {
+        "aria-hidden": true,
+        className: "mq-public-block",
+        viewBox: "0 0 72 72",
+      },
+      h("rect", {
+        ...dashed,
+        height: 62,
+        opacity: 0.6,
+        rx: 6,
+        strokeDasharray: "6 5",
+        strokeWidth: 2.5,
+        width: 62,
+        x: 5,
+        y: 5,
+      })
+    );
+  }
+
+  return h(
+    "svg",
+    {
+      "aria-hidden": true,
+      className: "mq-public-block mq-public-block-row",
+      viewBox: "0 0 108 72",
+    },
+    ...[0, 38, 76].map((x) =>
+      h("rect", {
+        ...dashed,
+        height: 26,
+        key: x,
+        opacity: 0.55,
+        rx: 3,
+        strokeDasharray: "4 3",
+        strokeWidth: 2,
+        width: 26,
+        x: x + 3,
+        y: 23,
+      })
     )
-    .join("")}</svg>`,
-  empty:
-    '<svg aria-hidden="true" class="block" viewBox="0 0 72 72"><rect fill="none" height="62" opacity="0.6" rx="6" stroke="currentColor" stroke-dasharray="6 5" stroke-width="2.5" width="62" x="5" y="5"/></svg>',
-  full: '<svg aria-hidden="true" class="block" viewBox="0 0 72 72"><rect fill="currentColor" height="64" rx="6" width="64" x="4" y="4"/><rect fill="var(--bg)" height="26" rx="2" width="40" x="16" y="24"/><path d="M17 25 L36 39 L55 25" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="3"/></svg>',
+  );
 };
+
+const PageField = () =>
+  h("input", {
+    name: PAGE_FIELD.name,
+    type: "hidden",
+    value: PAGE_FIELD.value,
+  });
+
+const PostButton = ({
+  action,
+  label,
+  variant,
+}: {
+  readonly action: string;
+  readonly label: string;
+  readonly variant: "primary" | "secondary";
+}) =>
+  h(
+    "form",
+    { action, method: "post" },
+    h(PageField),
+    h(Button, { className: "mq-public-action", type: "submit", variant }, label)
+  );
 
 const page = ({
   block,
@@ -73,24 +158,37 @@ const page = ({
   title,
 }: {
   readonly block?: BlockKind;
-  readonly body: string;
+  readonly body: ReactNode;
   readonly sender?: string;
   readonly title: string;
 }) =>
   [
-    '<!doctype html><html lang="en"><head><meta charset="utf-8">',
+    '<!doctype html><html lang="en" data-theme="mailquilt"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<meta name="robots" content="noindex">',
-    `<title>${escape(title)}</title>`,
+    renderToStaticMarkup(h("title", null, title)),
     '<link rel="icon" href="/favicon.svg" type="image/svg+xml">',
-    '<link rel="preload" href="/fonts/space-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>',
-    '<link rel="preload" href="/fonts/instrument-sans-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>',
-    `<style>${STYLES}</style></head><body><main>`,
-    block === undefined ? "" : BLOCKS[block],
-    sender === undefined ? "" : `<p class="sender">${escape(sender)}</p>`,
-    `<h1>${escape(title)}</h1>`,
-    body,
-    "</main><footer>Sent with Mailquilt</footer></body></html>",
+    `<script>${THEME_SCRIPT}</script>`,
+    `<link rel="stylesheet" href="${STYLESHEET}">`,
+    `<style>${STYLES}</style></head>`,
+    renderToStaticMarkup(
+      h(
+        "body",
+        null,
+        h(
+          "main",
+          { className: "mq-public" },
+          block === undefined ? null : h(Block, { kind: block }),
+          sender === undefined
+            ? null
+            : h("p", { className: "mq-public-sender" }, sender),
+          h("h1", null, title),
+          body
+        ),
+        h("footer", { className: "mq-public-footer" }, "Sent with Mailquilt")
+      )
+    ),
+    "</html>",
   ].join("");
 
 const listsOf = (names: readonly string[]) => {
@@ -105,11 +203,8 @@ const listsOf = (names: readonly string[]) => {
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1) ?? ""}`;
 };
 
-const email = (address: string) =>
-  `<span class="email">${escape(address)}</span>`;
-
-const button = (action: string, label: string) =>
-  `<form action="${escape(action)}" method="post">${FROM_PAGE}<button type="submit">${escape(label)}</button></form>`;
+const Email = ({ address }: { readonly address: string }) =>
+  h("span", { className: "mq-public-email" }, address);
 
 /** Asks whether to unsubscribe. Nothing changes until the button is pressed. */
 export const confirmPage = (unsubscription: Unsubscription, action: string) => {
@@ -117,7 +212,18 @@ export const confirmPage = (unsubscription: Unsubscription, action: string) => {
 
   return page({
     block: "full",
-    body: `<p>${escape(unsubscription.organizationName)} will stop sending ${escape(lists)} to ${email(unsubscription.email)}.</p>${button(action, "Unsubscribe")}`,
+    body: h(
+      Fragment,
+      null,
+      h(
+        "p",
+        null,
+        `${unsubscription.organizationName} will stop sending ${lists} to `,
+        h(Email, { address: unsubscription.email }),
+        "."
+      ),
+      h(PostButton, { action, label: "Unsubscribe", variant: "primary" })
+    ),
     sender: unsubscription.organizationName,
     title: `Unsubscribe from ${lists}?`,
   });
@@ -130,7 +236,32 @@ export const unsubscribedPage = (
 ) =>
   page({
     block: "empty",
-    body: `<p>${escape(unsubscription.organizationName)} won’t send ${escape(listsOf(unsubscription.listNames))} to ${email(unsubscription.email)} again.</p><form action="${escape(stopAllAction)}" method="post" class="more">${FROM_PAGE}<p>Don’t want any marketing email from ${escape(unsubscription.organizationName)}?</p><button type="submit">Stop all marketing email</button></form>`,
+    body: h(
+      Fragment,
+      null,
+      h(
+        "p",
+        null,
+        `${unsubscription.organizationName} won’t send ${listsOf(unsubscription.listNames)} to `,
+        h(Email, { address: unsubscription.email }),
+        " again."
+      ),
+      h(
+        "form",
+        { action: stopAllAction, className: "mq-public-more", method: "post" },
+        h(PageField),
+        h(
+          "p",
+          null,
+          `Don’t want any marketing email from ${unsubscription.organizationName}?`
+        ),
+        h(
+          Button,
+          { type: "submit", variant: "secondary" },
+          "Stop all marketing email"
+        )
+      )
+    ),
     sender: unsubscription.organizationName,
     title: "You’re unsubscribed",
   });
@@ -139,7 +270,13 @@ export const unsubscribedPage = (
 export const stoppedAllPage = (unsubscription: Unsubscription) =>
   page({
     block: "all",
-    body: `<p>${escape(unsubscription.organizationName)} can’t send newsletters or offers to ${email(unsubscription.email)} again. Emails about an order or your account may still arrive.</p>`,
+    body: h(
+      "p",
+      null,
+      `${unsubscription.organizationName} can’t send newsletters or offers to `,
+      h(Email, { address: unsubscription.email }),
+      " again. Emails about an order or your account may still arrive."
+    ),
     sender: unsubscription.organizationName,
     title: `You won’t get marketing email from ${unsubscription.organizationName}`,
   });
@@ -147,7 +284,11 @@ export const stoppedAllPage = (unsubscription: Unsubscription) =>
 /** For a link that was cut short, changed, or no longer names anyone. */
 export const brokenLinkPage = () =>
   page({
-    body: "<p>It may have been cut short when it was copied. Open it again from the email, or use the unsubscribe link in a newer email from the same sender.</p>",
+    body: h(
+      "p",
+      null,
+      "It may have been cut short when it was copied. Open it again from the email, or use the unsubscribe link in a newer email from the same sender."
+    ),
     title: "This unsubscribe link doesn’t work",
   });
 
@@ -167,10 +308,17 @@ const FAILED_TITLES: Readonly<Record<FailedStep, string>> = {
  */
 export const failedPage = (step: FailedStep, action: string) =>
   page({
-    body: `<p>Nothing changed. Try again in a moment.</p>${
+    body: h(
+      Fragment,
+      null,
+      h("p", null, "Nothing changed. Try again in a moment."),
       step === "load"
-        ? `<a class="again" href="${escape(action)}">Try again</a>`
-        : button(action, "Try again")
-    }`,
+        ? h(
+            LinkButton,
+            { className: "mq-public-action", href: action, variant: "primary" },
+            "Try again"
+          )
+        : h(PostButton, { action, label: "Try again", variant: "primary" })
+    ),
     title: FAILED_TITLES[step],
   });

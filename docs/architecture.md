@@ -73,7 +73,7 @@ Today a Campaign is sent now to the subscribed Contacts of one List without an O
 
 - Built: unsubscribe (`/unsubscribe`, `packages/api/src/unsubscribe/`), with the one-click post and the Opt-out (#12).
 - Planned: preference center, double opt-in confirmation, signup form, web archive, tracking pixel and click redirects (#13, #23, #29, #30, #38).
-- Rendered on the server by the entry app as plain HTML built in TypeScript, every value escaped, with no client JavaScript. Not React: the Node server runs its TypeScript with Node's type stripping, which can't load `.tsx`. Their fonts are copies of the dashboard's in `apps/dashboard/public/fonts/`, served as static files.
+- Rendered on the server by the entry app with React and Kumo (`renderToStaticMarkup`), with no client JavaScript needed; only a theme script, allowed by its hash, picks light or dark. They're written in `.ts` with `createElement`, not JSX, because the Node server runs its TypeScript with Node's type stripping, which can't read JSX. They link the dashboard's own stylesheet, which its build also publishes as `/public-pages.css` (`apps/dashboard/vite.config.ts`), so Kumo and the Mailquilt theme look the same as in the dashboard.
 - On Cloudflare each public path is listed in `run_worker_first` (ADR 0004).
 - On hosted, they are served from a separate domain that never receives cookies. On a single-domain self-host, archive pages are served with `Content-Security-Policy: sandbox`.
 
