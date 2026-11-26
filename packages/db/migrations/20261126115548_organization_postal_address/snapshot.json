@@ -3,9 +3,7 @@
   "version": "10",
   "dialect": "postgres",
   "id": "4173865c-a5ac-4310-938f-2696d69ce769",
-  "prevIds": [
-    "59625a40-2f18-4d12-b879-6979392105b0"
-  ],
+  "prevIds": ["59625a40-2f18-4d12-b879-6979392105b0"],
   "footprints": [
     {
       "statementType": "add_column",
@@ -20,10 +18,7 @@
         "n|col|public.organizations.postal_address",
         "e|col|public.organizations.postal_address"
       ],
-      "reads": [
-        "n|tbl|public.organizations",
-        "n|sch|public"
-      ]
+      "reads": ["n|tbl|public.organizations", "n|sch|public"]
     }
   ],
   "deltas": [
