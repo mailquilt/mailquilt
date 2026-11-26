@@ -1,4 +1,4 @@
-import type { ContactId, ListId, OrganizationId } from "@repo/domain";
+import type { ContactId, List, ListId, OrganizationId } from "@repo/domain";
 import {
   keepPreviousData,
   useMutation,
@@ -52,6 +52,41 @@ export const useLists = (organizationId: OrganizationId) =>
       ),
     queryKey: listsKey(organizationId),
   });
+
+/**
+ * One List with its counts, or `null` when the Organization no longer has it.
+ * It waits until `listId` is known. A List already in the cached list of
+ * Lists draws at once, and is checked.
+ */
+export const useList = (
+  organizationId: OrganizationId,
+  listId: ListId | undefined
+) => {
+  const queryClient = useQueryClient();
+
+  return useQuery({
+    enabled: listId !== undefined,
+    initialData: () =>
+      queryClient
+        .getQueryData<readonly List[]>(listsKey(organizationId))
+        ?.find((list) => list.id === listId),
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(listsKey(organizationId))?.dataUpdatedAt,
+    queryFn: ({ signal }) =>
+      listId === undefined
+        ? Promise.resolve(null)
+        : callApi(
+            (client) =>
+              client.lists
+                .get({ params: { listId, organizationId } })
+                .pipe(
+                  Effect.catchTag("ListNotFound", () => Effect.succeed(null))
+                ),
+            signal
+          ),
+    queryKey: [...listsKey(organizationId), listId ?? "unknown"],
+  });
+};
 
 const useRefreshAudience = (organizationId: OrganizationId) => {
   const queryClient = useQueryClient();

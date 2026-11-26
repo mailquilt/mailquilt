@@ -12,6 +12,7 @@ import {
 } from "@tanstack/react-table";
 import { useEffect, useRef, useState } from "react";
 
+import { loadingFirstTime } from "../api.ts";
 import { DataTable } from "../audience/data-table.tsx";
 import type { StackedArea } from "../audience/data-table.tsx";
 import { formatDay } from "../audience/format.ts";
@@ -324,7 +325,7 @@ export const ProvidersPage = ({
   const onDeleted = (name: string) =>
     setLastDeleted((last) => ({ count: (last?.count ?? 0) + 1, name }));
 
-  if (connections.isPending && connections.errorUpdatedAt === 0) {
+  if (loadingFirstTime(connections)) {
     return <PageAreaLoading label="Loading providers" />;
   }
 

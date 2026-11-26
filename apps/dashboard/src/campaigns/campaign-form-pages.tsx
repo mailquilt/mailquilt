@@ -3,6 +3,7 @@ import type { CampaignId, Organization } from "@repo/domain";
 import { useNavigate } from "@tanstack/react-router";
 import { Predicate } from "effect";
 
+import { loadingFirstTime } from "../api.ts";
 import { useLists } from "../audience/audience-api.ts";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
@@ -81,9 +82,7 @@ const useChoices = (organization: Organization) => {
   const lists = useLists(organization.id);
   const connections = useProviderConnections(organization.id);
 
-  const loading = [lists, connections].some(
-    (query) => query.isPending && query.errorUpdatedAt === 0
-  );
+  const loading = [lists, connections].some(loadingFirstTime);
 
   const refetchDeleted = (failure: Error) => {
     if (Predicate.isTagged(failure, "ListNotFound")) {
@@ -209,10 +208,7 @@ export const EditCampaignPage = ({
   const navigate = useNavigate();
   const toasts = useConfirmationToast();
 
-  if (
-    choices.loading ||
-    (campaign.isPending && campaign.errorUpdatedAt === 0)
-  ) {
+  if (choices.loading || loadingFirstTime(campaign)) {
     return <PageAreaLoading label="Loading the draft" />;
   }
 

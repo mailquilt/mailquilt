@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-table";
 import { useMemo, useRef } from "react";
 
+import { loadingFirstTime } from "../api.ts";
 import { CaretRightIcon, PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
@@ -206,7 +207,7 @@ export const ListsPage = ({ organization }: { organization: Organization }) => {
 
   const newListButton = useRef<HTMLButtonElement>(null);
 
-  if (lists.isPending && lists.errorUpdatedAt === 0) {
+  if (loadingFirstTime(lists)) {
     return <PageAreaLoading label="Loading lists" />;
   }
 

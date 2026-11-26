@@ -2,6 +2,7 @@ import { LinkButton } from "@cloudflare/kumo";
 import type { Organization, ProviderConnectionId } from "@repo/domain";
 import { useNavigate } from "@tanstack/react-router";
 
+import { loadingFirstTime } from "../api.ts";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageHeader } from "../layout/page-header.tsx";
@@ -97,7 +98,7 @@ export const EditPage = ({
   const update = useUpdateConnection(organization.id, providerConnectionId);
   const navigate = useNavigate();
 
-  if (connections.isPending && connections.errorUpdatedAt === 0) {
+  if (loadingFirstTime(connections)) {
     return <PageAreaLoading label="Loading the connection" />;
   }
 

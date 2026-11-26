@@ -12,6 +12,7 @@ import {
   useTable,
 } from "@tanstack/react-table";
 
+import { loadingFirstTime } from "../api.ts";
 import { useLists } from "../audience/audience-api.ts";
 import { DataTable } from "../audience/data-table.tsx";
 import type { StackedArea } from "../audience/data-table.tsx";
@@ -204,9 +205,7 @@ export const CampaignsPage = ({
   const lists = useLists(organization.id);
   const connections = useProviderConnections(organization.id);
 
-  const loading = [page, lists, connections].some(
-    (query) => query.isPending && query.errorUpdatedAt === 0
-  );
+  const loading = [page, lists, connections].some(loadingFirstTime);
 
   if (loading) {
     return <PageAreaLoading label="Loading campaigns" />;

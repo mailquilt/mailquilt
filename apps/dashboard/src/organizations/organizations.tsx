@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 
-import { callApi } from "../api.ts";
+import { callApi, loadingFirstTime } from "../api.ts";
 import { FrameLoading } from "../layout/frame.tsx";
 import { useAccount } from "../layout/session-gates.tsx";
 import { connectionsKey } from "../providers/providers-api.ts";
@@ -143,7 +143,7 @@ export const OrganizationsProvider = ({
     [active, choose, organizations, retry, retrying]
   );
 
-  const neverAnswered = query.isPending && query.errorUpdatedAt === 0;
+  const neverAnswered = loadingFirstTime(query);
 
   if (neverAnswered) {
     return <FrameLoading />;

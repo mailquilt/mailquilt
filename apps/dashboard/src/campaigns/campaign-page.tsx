@@ -8,6 +8,8 @@ import type {
 } from "@repo/domain";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { loadingFirstTime } from "../api.ts";
+import { useList } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
 import { PaperPlaneTiltIcon, PencilSimpleIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
@@ -21,11 +23,7 @@ import { useConfirmationToast } from "../layout/toast.tsx";
 import { useProviderConnections } from "../providers/providers-api.ts";
 import { formatMoment, formatSince } from "./campaign-dates.ts";
 import { CampaignBlock } from "./campaign-status.tsx";
-import {
-  useCampaign,
-  useList,
-  useRefreshCampaignPages,
-} from "./campaigns-api.ts";
+import { useCampaign, useRefreshCampaignPages } from "./campaigns-api.ts";
 import { EmailPreview } from "./email-preview.tsx";
 import { SendCampaignDialog } from "./send-campaign-dialog.tsx";
 import type { SendRefusal } from "./send-campaign-dialog.tsx";
@@ -531,12 +529,11 @@ export const CampaignPage = ({
   ]);
 
   const waiting =
-    (campaign.isPending && campaign.errorUpdatedAt === 0) ||
-    (connections.isPending && connections.errorUpdatedAt === 0) ||
+    loadingFirstTime(campaign) ||
+    loadingFirstTime(connections) ||
     (campaign.data !== undefined &&
       campaign.data !== null &&
-      list.isPending &&
-      list.errorUpdatedAt === 0);
+      loadingFirstTime(list));
 
   if (waiting) {
     return <PageAreaLoading label="Loading the campaign" />;

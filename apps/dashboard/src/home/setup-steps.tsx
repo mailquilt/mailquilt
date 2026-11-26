@@ -3,6 +3,7 @@ import { OrganizationIdSchema } from "@repo/domain";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
+import { loadingFirstTime } from "../api.ts";
 import { StepBlock } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
 import { PlusIcon } from "../icons/icons.tsx";
@@ -272,7 +273,7 @@ export const useSetupProgress = () => {
     return { doneCount: 0 };
   }
 
-  if (connections.isPending && connections.errorUpdatedAt === 0) {
+  if (loadingFirstTime(connections)) {
     return;
   }
 
