@@ -93,6 +93,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - On Node, pg-boss is both the Queue and the Scheduler.
 - Persistence is never tested with in-memory fakes (see `testing.md`).
 - A failure a caller handles is a typed error: `Schema.TaggedError` in `domain` when the API returns it, `Data.TaggedError` in `core` otherwise. Anything else, such as an unexpected SQL error, becomes a defect through `Effect.orDie`, not `catchTag(…, Effect.die)` or a fallback value that hides it (#43).
+- An API error's HTTP status is set once, in `packages/contract/src/errors.ts`, and every endpoint that returns it takes it from there, so one error has one status everywhere (#43).
 - `@cloudflare/vitest-pool-workers` isn't used while it needs Vitest 4 and `@effect/vitest` needs Vitest 5. The Cloudflare runtime is covered by the smoke test on `wrangler dev`.
 - Every dependency is pinned exactly in one pnpm catalog, with a 7-day `minimumReleaseAge`. `drizzle-orm` and `drizzle-kit` are excluded, because the Effect integration exists only in their newest release candidates.
 - A package pnpm installs only as another's peer, such as `redis` for `@effect/platform-node`, sits outside the catalog. One that ships in the Docker image is added to the catalog, so its version is chosen on purpose (#158) (#43).

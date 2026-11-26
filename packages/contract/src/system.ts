@@ -1,11 +1,13 @@
-import { DatabaseUnreachable, Health } from "@repo/domain";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
+import { Health } from "@repo/domain";
+import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
+
+import { DatabaseUnreachableError } from "./errors.ts";
 
 export class SystemApi extends HttpApiGroup.make("system", {
   topLevel: true,
 }).add(
   HttpApiEndpoint.get("health", "/health", {
-    error: DatabaseUnreachable.pipe(HttpApiSchema.status(503)),
+    error: DatabaseUnreachableError,
     success: Health,
   })
 ) {}

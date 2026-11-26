@@ -1,13 +1,8 @@
 import {
-  CredentialsRequired,
   MailAddress,
-  OrganizationIdSchema,
   ProviderConnection,
   ProviderConnectionIdSchema,
   ProviderConnectionName,
-  ProviderConnectionNotFound,
-  RateLimited,
-  SendFailed,
   Sender,
   SmtpCredentials,
   SmtpServer,
@@ -16,18 +11,20 @@ import {
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
-
-const params = { organizationId: OrganizationIdSchema };
+import {
+  CredentialsRequiredError,
+  OrganizationNotFoundError,
+  ProviderConnectionNotFoundError,
+  RateLimitedError,
+  SendFailedError,
+  SignInRequiredError,
+} from "./errors.ts";
+import { organizationParams } from "./params.ts";
 
 const connectionParams = {
-  ...params,
+  ...organizationParams,
   providerConnectionId: ProviderConnectionIdSchema,
 };
-
-const ProviderConnectionNotFoundError = ProviderConnectionNotFound.pipe(
-  HttpApiSchema.status(404)
-);
 
 /**
  * An Organization's Provider Connections. Credentials are write-only: `create`
@@ -48,7 +45,7 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
       "/organizations/:organizationId/provider-connections",
       {
         error: [SignInRequiredError, OrganizationNotFoundError],
-        params,
+        params: organizationParams,
         success: Schema.Array(ProviderConnection),
       }
     )
@@ -59,7 +56,7 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
       "/organizations/:organizationId/provider-connections",
       {
         error: [SignInRequiredError, OrganizationNotFoundError],
-        params,
+        params: organizationParams,
         payload: Schema.Struct({
           name: ProviderConnectionName,
           from: Sender,
@@ -79,7 +76,7 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
           SignInRequiredError,
           OrganizationNotFoundError,
           ProviderConnectionNotFoundError,
-          CredentialsRequired.pipe(HttpApiSchema.status(422)),
+          CredentialsRequiredError,
         ],
         params: connectionParams,
         payload: Schema.Struct({
@@ -116,8 +113,8 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
           SignInRequiredError,
           OrganizationNotFoundError,
           ProviderConnectionNotFoundError,
-          SendFailed.pipe(HttpApiSchema.status(502)),
-          RateLimited.pipe(HttpApiSchema.status(429)),
+          SendFailedError,
+          RateLimitedError,
         ],
         params: connectionParams,
         payload: Schema.Struct({ to: MailAddress }),

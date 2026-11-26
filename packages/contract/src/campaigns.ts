@@ -2,32 +2,23 @@ import {
   Campaign,
   CampaignDraft,
   CampaignIdSchema,
-  CampaignNotDraft,
-  CampaignNotFound,
   CampaignPage,
-  ListNotFound,
-  NoSubscribedContacts,
-  OrganizationIdSchema,
-  ProviderConnectionNotFound,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
+import {
+  CampaignNotDraftError,
+  CampaignNotFoundError,
+  ListNotFoundError,
+  NoSubscribedContactsError,
+  OrganizationNotFoundError,
+  ProviderConnectionNotFoundError,
+  SignInRequiredError,
+} from "./errors.ts";
+import { organizationParams } from "./params.ts";
 
-const params = { organizationId: OrganizationIdSchema };
-
-const campaignParams = { ...params, campaignId: CampaignIdSchema };
-
-const CampaignNotFoundError = CampaignNotFound.pipe(HttpApiSchema.status(404));
-
-const CampaignNotDraftError = CampaignNotDraft.pipe(HttpApiSchema.status(409));
-
-const ListNotFoundError = ListNotFound.pipe(HttpApiSchema.status(404));
-
-const ProviderConnectionNotFoundError = ProviderConnectionNotFound.pipe(
-  HttpApiSchema.status(404)
-);
+const campaignParams = { ...organizationParams, campaignId: CampaignIdSchema };
 
 /** Which page of Campaigns to list: the `next` or `previous` cursor of another page (ADR 0008). */
 export const CampaignQuery = Schema.Struct({
@@ -54,7 +45,7 @@ export class CampaignsApi extends HttpApiGroup.make("campaigns")
   .add(
     HttpApiEndpoint.get("list", "/organizations/:organizationId/campaigns", {
       error: [SignInRequiredError, OrganizationNotFoundError],
-      params,
+      params: organizationParams,
       query: CampaignQuery,
       success: CampaignPage,
     })
@@ -67,7 +58,7 @@ export class CampaignsApi extends HttpApiGroup.make("campaigns")
         ListNotFoundError,
         ProviderConnectionNotFoundError,
       ],
-      params,
+      params: organizationParams,
       payload: CampaignDraft,
       success: Campaign.pipe(HttpApiSchema.status(201)),
     })
@@ -117,7 +108,7 @@ export class CampaignsApi extends HttpApiGroup.make("campaigns")
           CampaignNotFoundError,
           CampaignNotDraftError,
           ProviderConnectionNotFoundError,
-          NoSubscribedContacts.pipe(HttpApiSchema.status(409)),
+          NoSubscribedContactsError,
         ],
         params: campaignParams,
         success: Campaign,

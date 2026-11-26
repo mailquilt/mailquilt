@@ -1,24 +1,23 @@
 import {
   AddedToList,
   ContactIdSchema,
-  ContactNotFound,
   List,
   ListIdSchema,
   ListName,
-  ListNotFound,
   MAX_CONTACTS_ADDED_AT_ONCE,
-  OrganizationIdSchema,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
+import {
+  ContactNotFoundError,
+  ListNotFoundError,
+  OrganizationNotFoundError,
+  SignInRequiredError,
+} from "./errors.ts";
+import { organizationParams } from "./params.ts";
 
-const ListNotFoundError = ListNotFound.pipe(HttpApiSchema.status(404));
-
-const params = { organizationId: OrganizationIdSchema };
-
-const listParams = { ...params, listId: ListIdSchema };
+const listParams = { ...organizationParams, listId: ListIdSchema };
 
 /**
  * An Organization's Lists. `addContacts` subscribes Contacts to a List. A
@@ -30,14 +29,14 @@ export class ListsApi extends HttpApiGroup.make("lists")
   .add(
     HttpApiEndpoint.get("list", "/organizations/:organizationId/lists", {
       error: [SignInRequiredError, OrganizationNotFoundError],
-      params,
+      params: organizationParams,
       success: Schema.Array(List),
     })
   )
   .add(
     HttpApiEndpoint.post("create", "/organizations/:organizationId/lists", {
       error: [SignInRequiredError, OrganizationNotFoundError],
-      params,
+      params: organizationParams,
       payload: Schema.Struct({ name: ListName }),
       success: List.pipe(HttpApiSchema.status(201)),
     })
@@ -62,7 +61,7 @@ export class ListsApi extends HttpApiGroup.make("lists")
           SignInRequiredError,
           OrganizationNotFoundError,
           ListNotFoundError,
-          ContactNotFound.pipe(HttpApiSchema.status(404)),
+          ContactNotFoundError,
         ],
         params: listParams,
         payload: Schema.Struct({
