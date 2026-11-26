@@ -1,7 +1,4 @@
-import { ContactEmail } from "@repo/domain";
-import { Schema } from "effect";
-
-const isAddress = Schema.is(ContactEmail);
+import { eachOnce, isAddress } from "./addresses.ts";
 
 const SEPARATORS = [",", ";", "\t"] as const;
 
@@ -33,29 +30,38 @@ const rowsOf = (text: string) => {
   let row: string[] = [];
   let cell = "";
   let quoted = false;
+  let justClosedQuote = false;
+  let justEndedWithReturn = false;
 
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
+  for (const character of text) {
+    const newlineAfterReturn = justEndedWithReturn && character === "\n";
+    const quoteInsideQuotes = justClosedQuote && character === '"';
+
+    justEndedWithReturn = false;
+    justClosedQuote = false;
+
+    if (newlineAfterReturn) {
+      continue;
+    }
 
     if (quoted) {
-      if (character === '"' && text[index + 1] === '"') {
-        cell += '"';
-        index += 1;
-      } else if (character === '"') {
+      if (character === '"') {
         quoted = false;
+        justClosedQuote = true;
       } else {
         cell += character;
       }
     } else if (character === '"') {
+      if (quoteInsideQuotes) {
+        cell += '"';
+      }
+
       quoted = true;
     } else if (character === separator) {
       row.push(cell);
       cell = "";
     } else if (character === "\n" || character === "\r") {
-      if (character === "\r" && text[index + 1] === "\n") {
-        index += 1;
-      }
-
+      justEndedWithReturn = character === "\r";
       row.push(cell);
       rows.push(row);
       row = [];
@@ -73,12 +79,22 @@ const rowsOf = (text: string) => {
   return rows;
 };
 
-/** What a CSV file holds for a Suppression import. */
-export interface CsvAddresses {
+/** A CSV file read for a Suppression import, before a column is chosen. */
+export interface CsvFile {
   /** Each column's header, or "Column 2" when the file has no header row. */
   readonly columns: readonly string[];
-  /** The column the addresses come from, or none when no column holds one. */
+  /** The column the addresses are taken from unless the member picks another, or none when no column holds one. */
   readonly column: number | undefined;
+  /** How many rows hold data, the header and blank rows left out. */
+  readonly rows: number;
+  readonly data: readonly {
+    readonly cells: readonly string[];
+    readonly row: number;
+  }[];
+}
+
+/** One column's addresses, and the rows where it holds none. */
+export interface ColumnAddresses {
   /** Each address once, ignoring case, in the spelling it first appears in. */
   readonly addresses: readonly string[];
   /** The rows whose cell in that column isn't an address, numbered as a spreadsheet numbers them. */
@@ -86,13 +102,13 @@ export interface CsvAddresses {
 }
 
 /**
- * Reads the email addresses in a CSV file's text. A first row with no "@"
- * in it is the header. The addresses come from `chosen`, or else
- * the column headed email, e-mail or address, or else the first column with
- * an address in it. Blank rows are passed over; any other row whose cell
- * isn't an address is skipped and reported.
+ * Reads a CSV file's text once. The first row is the header when it has no
+ * "@" and names the address column, or has a name over every column that
+ * holds addresses below it; otherwise it's data. The column suggested is
+ * the one headed email, e-mail or address, or else the first with an
+ * address in it. Blank rows are passed over.
  */
-export const addressesInCsv = (text: string, chosen?: number) => {
+export const readCsv = (text: string) => {
   const numbered = rowsOf(text.replace(BYTE_ORDER_MARK, ""))
     .map((cells, index) => ({
       cells: cells.map((cell) => cell.trim()),
@@ -102,11 +118,24 @@ export const addressesInCsv = (text: string, chosen?: number) => {
 
   const [first] = numbered;
 
-  const hasHeader =
-    first !== undefined && !first.cells.some((cell) => cell.includes("@"));
-
-  const data = hasHeader ? numbered.slice(1) : numbered;
+  const rest = numbered.slice(1);
   const width = Math.max(0, ...numbered.map(({ cells }) => cells.length));
+
+  const holdsAddresses = (column: number) =>
+    rest.some(({ cells }) => cells[column]?.includes("@") === true);
+
+  const namesEveryAddressColumn = Array.from(
+    { length: width },
+    (_, column) => first?.cells[column] ?? ""
+  ).every((name, column) => name !== "" || !holdsAddresses(column));
+
+  const hasHeader =
+    first !== undefined &&
+    !first.cells.some((cell) => cell.includes("@")) &&
+    (first.cells.some((cell) => ADDRESS_HEADER.test(cell)) ||
+      namesEveryAddressColumn);
+
+  const data = hasHeader ? rest : numbered;
 
   const columns = Array.from({ length: width }, (_, index) => {
     const header = hasHeader ? first.cells[index] : undefined;
@@ -125,34 +154,29 @@ export const addressesInCsv = (text: string, chosen?: number) => {
   );
 
   const found = headed === -1 ? withAddresses : headed;
-  const column = chosen ?? (found === -1 ? undefined : found);
 
-  if (column === undefined) {
-    return {
-      addresses: [],
-      column,
-      columns,
-      skipped: [],
-    } satisfies CsvAddresses;
-  }
+  return {
+    column: found === -1 ? undefined : found,
+    columns,
+    data,
+    rows: data.length,
+  } satisfies CsvFile;
+};
 
-  const byLowerCase = new Map<string, string>();
+/** The addresses in one column of a file `readCsv` read; any other row whose cell isn't an address is skipped and reported. */
+export const addressesIn = (file: CsvFile, column: number) => {
+  const found: string[] = [];
   const skipped: { row: number; value: string }[] = [];
 
-  for (const { cells, row } of data) {
+  for (const { cells, row } of file.data) {
     const value = cells[column] ?? "";
 
-    if (!isAddress(value)) {
+    if (isAddress(value)) {
+      found.push(value);
+    } else {
       skipped.push({ row, value });
-    } else if (!byLowerCase.has(value.toLowerCase())) {
-      byLowerCase.set(value.toLowerCase(), value);
     }
   }
 
-  return {
-    addresses: [...byLowerCase.values()],
-    column,
-    columns,
-    skipped,
-  } satisfies CsvAddresses;
+  return { addresses: eachOnce(found), skipped } satisfies ColumnAddresses;
 };

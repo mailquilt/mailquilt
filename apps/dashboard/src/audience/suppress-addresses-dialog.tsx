@@ -1,38 +1,33 @@
 import { Banner } from "@cloudflare/kumo";
-import { ContactEmail, MAX_SUPPRESSIONS_ADDED_AT_ONCE } from "@repo/domain";
-import type { Organization, SuppressionsAdded } from "@repo/domain";
+import { MAX_SUPPRESSIONS_ADDED_AT_ONCE } from "@repo/domain";
+import type { Organization } from "@repo/domain";
 import { useForm, useStore } from "@tanstack/react-form";
-import { Array as Arr, Schema } from "effect";
+import { Array as Arr } from "effect";
 import { useId, useRef } from "react";
 
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
 import { ActionDialog } from "../layout/action-dialog.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
+import {
+  countOfAddresses,
+  eachOnce,
+  isAddress,
+  suppressedMessage,
+} from "./addresses.ts";
 import { useSuppressAddresses } from "./audience-api.ts";
-import { formatCount, wrappableAddress } from "./format.ts";
-
-const isAddress = Schema.is(ContactEmail);
+import { formatCount } from "./format.ts";
 
 const BETWEEN_ADDRESSES = /[\s,;]+/u;
 
-const typedIn = (text: string) => {
-  const byLowerCase = new Map<string, string>();
-
-  for (const part of text.split(BETWEEN_ADDRESSES)) {
-    if (part !== "" && !byLowerCase.has(part.toLowerCase())) {
-      byLowerCase.set(part.toLowerCase(), part);
-    }
-  }
-
-  return [...byLowerCase.values()];
-};
+const typedIn = (text: string) =>
+  eachOnce(text.split(BETWEEN_ADDRESSES).filter((part) => part !== ""));
 
 const problemWith = (text: string) => {
-  const addresses = typedIn(text);
-  const notAnAddress = addresses.find((address) => !isAddress(address));
+  const typed = typedIn(text);
+  const notAnAddress = typed.find((address) => !isAddress(address));
 
-  if (addresses.length === 0) {
+  if (typed.length === 0) {
     return "Enter an email address.";
   }
 
@@ -40,55 +35,9 @@ const problemWith = (text: string) => {
     return `“${notAnAddress}” isn’t an email address.`;
   }
 
-  if (addresses.length > MAX_SUPPRESSIONS_ADDED_AT_ONCE) {
-    return `That’s ${formatCount(addresses.length)} addresses. Suppress up to ${MAX_SUPPRESSIONS_ADDED_AT_ONCE} at a time, or import them from a CSV.`;
+  if (typed.length > MAX_SUPPRESSIONS_ADDED_AT_ONCE) {
+    return `That’s ${formatCount(typed.length)} addresses. Suppress up to ${MAX_SUPPRESSIONS_ADDED_AT_ONCE} at a time, or import them from a CSV.`;
   }
-};
-
-/** "1 address", "1,204 addresses". */
-export const addresses = (count: number) =>
-  `${formatCount(count)} ${count === 1 ? "address" : "addresses"}`;
-
-/**
- * What a toast says once addresses were Suppressed: the one address by
- * name, or how many, with those that already were and `alsoSkipped`, such
- * as an import's rows that weren't addresses.
- */
-export const suppressedMessage = (
-  { added, alreadySuppressed }: SuppressionsAdded,
-  { alsoSkipped, only }: { alsoSkipped?: string; only?: string } = {}
-) => {
-  const total = added + alreadySuppressed;
-
-  if (added === 0) {
-    return {
-      description:
-        alsoSkipped === undefined ? "Nothing changed." : `${alsoSkipped}.`,
-      title:
-        only === undefined
-          ? `All ${formatCount(total)} were already suppressed`
-          : `${wrappableAddress(only)} was already suppressed`,
-    };
-  }
-
-  if (only !== undefined) {
-    return { title: `Suppressed ${wrappableAddress(only)}` };
-  }
-
-  const already =
-    alreadySuppressed === 0
-      ? undefined
-      : `${formatCount(alreadySuppressed)} ${alreadySuppressed === 1 ? "was" : "were"} already suppressed`;
-
-  const notes = [already, alsoSkipped].filter((note) => note !== undefined);
-
-  return {
-    description:
-      notes.length === 0
-        ? undefined
-        : `${new Intl.ListFormat("en").format(notes)}.`,
-    title: `${addresses(added)} suppressed`,
-  };
 };
 
 /**
@@ -145,7 +94,9 @@ export const SuppressAddressesDialog = ({
   return (
     <ActionDialog
       actionLabel={
-        count === 0 ? "Suppress addresses" : `Suppress ${addresses(count)}`
+        count === 0
+          ? "Suppress addresses"
+          : `Suppress ${countOfAddresses(count)}`
       }
       busy={suppress.isPending}
       description="No campaign will reach them from now on, even one that’s already sending."

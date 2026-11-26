@@ -57,7 +57,7 @@ const confirmSend = async () => {
   fireEvent.click(await screen.findByRole("button", { name: "Send now" }));
 
   const dialog = await screen.findByRole("dialog", {
-    name: "Send to 3 contacts?",
+    name: "Send this campaign now?",
   });
 
   fireEvent.submit(dialog.querySelector("form") ?? document.body);
@@ -229,6 +229,25 @@ describe("one campaign's page", () => {
       expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
     }
   );
+
+  it("says no one can be sent to when everyone subscribed has stopped marketing email or is suppressed", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
+      http.post(SEND, () =>
+        HttpResponse.json({ _tag: "NoSubscribedContacts" }, { status: 409 })
+      )
+    );
+    renderPage();
+
+    await confirmSend();
+
+    await expect(
+      screen.findByText(
+        `Everyone subscribed to ${ROAST.name} has stopped all marketing email or has a suppressed address. Add contacts to it, or edit the draft to choose another list.`
+      )
+    ).resolves.toBeDefined();
+  });
 
   it("offers Send now again once a list that had no one subscribed has contacts", async () => {
     const lists = [ROAST, NOBODY, ROAST];

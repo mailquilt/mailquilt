@@ -1,6 +1,7 @@
 import { Banner, Button, Loader, Select } from "@cloudflare/kumo";
 import { MAX_SUPPRESSIONS_ADDED_AT_ONCE } from "@repo/domain";
 import type { Organization } from "@repo/domain";
+import { useBlocker } from "@tanstack/react-router";
 import { Array as Arr } from "effect";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -8,11 +9,11 @@ import { FileArrowUpIcon, FileCsvIcon } from "../icons/icons.tsx";
 import { ActionDialog } from "../layout/action-dialog.tsx";
 import { SlotArt } from "../layout/empty-state.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
+import { countOfAddresses, suppressedMessage } from "./addresses.ts";
 import { useRefreshSuppressions, useSuppressBatch } from "./audience-api.ts";
-import { addressesInCsv } from "./csv-addresses.ts";
-import type { CsvAddresses } from "./csv-addresses.ts";
+import { addressesIn, readCsv } from "./csv-addresses.ts";
+import type { ColumnAddresses, CsvFile } from "./csv-addresses.ts";
 import { formatCount } from "./format.ts";
-import { addresses, suppressedMessage } from "./suppress-addresses-dialog.tsx";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -36,13 +37,14 @@ type Step =
   | {
       readonly kind: "read";
       readonly file: ChosenFile;
-      readonly text: string;
-      readonly found: CsvAddresses;
+      readonly csv: CsvFile;
+      readonly column: number | undefined;
+      readonly found: ColumnAddresses;
     }
   | {
-      readonly kind: "importing" | "failed";
+      readonly kind: "importing" | "failed" | "done";
       readonly file: ChosenFile;
-      readonly found: CsvAddresses;
+      readonly found: ColumnAddresses;
       readonly sent: number;
       readonly totals: Totals;
     };
@@ -78,15 +80,18 @@ const actionLabelOf = (step: Step) => {
     case "read": {
       return step.found.addresses.length === 0
         ? "Choose another file"
-        : `Suppress ${addresses(step.found.addresses.length)}`;
+        : `Suppress ${countOfAddresses(step.found.addresses.length)}`;
     }
 
-    case "importing": {
-      return `Suppress ${addresses(step.found.addresses.length)}`;
+    case "importing":
+    case "done": {
+      return `Suppress ${countOfAddresses(step.found.addresses.length)}`;
     }
 
     default: {
-      return `Suppress the other ${formatCount(step.found.addresses.length - step.sent)}`;
+      return step.sent === 0
+        ? `Suppress ${countOfAddresses(step.found.addresses.length)}`
+        : `Suppress the other ${formatCount(step.found.addresses.length - step.sent)}`;
     }
   }
 };
@@ -100,15 +105,15 @@ const FileRow = ({
   detail: React.ReactNode;
   name: string;
 }) => (
-  <div className="flex items-center gap-3 rounded-lg bg-kumo-elevated py-2.5 pr-2 pl-3 ring ring-kumo-hairline">
+  <div className="flex flex-wrap items-center gap-x-3 rounded-lg bg-kumo-elevated py-2.5 pr-2 pl-3 ring ring-kumo-hairline">
     <span
       aria-hidden="true"
       className="flex size-9 shrink-0 items-center justify-center rounded-md bg-(--mq-block-ink) text-kumo-inverse"
     >
       <FileCsvIcon className="size-5" />
     </span>
-    <span className="min-w-0 flex-1">
-      <span className="block font-medium wrap-anywhere text-kumo-strong">
+    <span className="min-w-0 flex-1 basis-40">
+      <span className="block font-medium break-words text-kumo-strong">
         {name}
       </span>
       <span className="block text-sm text-kumo-subtle">{detail}</span>
@@ -122,7 +127,7 @@ const SkippedRows = ({
   skipped,
 }: {
   column: string;
-  skipped: CsvAddresses["skipped"];
+  skipped: ColumnAddresses["skipped"];
 }) => {
   const more = skipped.length - SKIPPED_SHOWN;
 
@@ -159,6 +164,16 @@ const SkippedRows = ({
       ) : null}
     </div>
   );
+};
+
+const noteWhileSending = (kind: Step["kind"], sent: number) => {
+  if (kind !== "failed") {
+    return `Keep this page open until it’s done. Mailquilt sends the addresses in parts of ${MAX_SUPPRESSIONS_ADDED_AT_ONCE} from your browser.`;
+  }
+
+  return sent === 0
+    ? "Nothing was suppressed yet, so trying again is safe."
+    : `Those ${formatCount(sent)} stay suppressed, whatever you do next. Suppressing the rest is safe to repeat: an address that went through already is counted, not added twice.`;
 };
 
 const MOST_SEGMENTS = 20;
@@ -201,11 +216,17 @@ const ImportProgress = ({
         ))}
       </div>
       <output className="block text-sm text-kumo-default tabular-nums">
-        {failed ? null : "Suppressing "}
-        <span className="font-medium text-kumo-strong">
-          {formatCount(sent)} of {formatCount(total)}
-        </span>
-        {failed ? " suppressed before it stopped" : "…"}
+        {failed && sent === 0 ? (
+          "Nothing was suppressed before it stopped"
+        ) : (
+          <>
+            {failed ? null : "Suppressing "}
+            <span className="font-medium text-kumo-strong">
+              {formatCount(sent)} of {formatCount(total)}
+            </span>
+            {failed ? " suppressed before it stopped" : "…"}
+          </>
+        )}
       </output>
     </div>
   );
@@ -258,6 +279,23 @@ export const ImportSuppressionsDialog = ({
     };
   }, [open]);
 
+  const importing = step.kind === "importing";
+
+  useBlocker({
+    enableBeforeUnload: () => importing,
+    shouldBlockFn: () => importing,
+  });
+
+  const shown = useRef(true);
+
+  useEffect(() => {
+    shown.current = true;
+
+    return () => {
+      shown.current = false;
+    };
+  }, []);
+
   const read = async (file: File) => {
     const refused = refusalOf(file);
 
@@ -281,10 +319,28 @@ export const ImportSuppressionsDialog = ({
       return;
     }
 
-    setStep({ file: chosen, found: addressesInCsv(text), kind: "read", text });
+    const csv = readCsv(text);
+
+    setStep({
+      column: csv.column,
+      csv,
+      file: chosen,
+      found:
+        csv.column === undefined
+          ? { addresses: [], skipped: [] }
+          : addressesIn(csv, csv.column),
+      kind: "read",
+    });
   };
 
-  const finish = (found: CsvAddresses, totals: Totals) => {
+  const finish = (file: ChosenFile, found: ColumnAddresses, totals: Totals) => {
+    setStep({
+      file,
+      found,
+      kind: "done",
+      sent: found.addresses.length,
+      totals,
+    });
     refresh();
     onOpenChange(false);
     toasts.add(
@@ -299,7 +355,7 @@ export const ImportSuppressionsDialog = ({
 
   const send: (
     file: ChosenFile,
-    found: CsvAddresses,
+    found: ColumnAddresses,
     sent: number,
     totals: Totals
   ) => Promise<void> = async (file, found, sent, totals) => {
@@ -308,8 +364,12 @@ export const ImportSuppressionsDialog = ({
       sent + MAX_SUPPRESSIONS_ADDED_AT_ONCE
     );
 
+    if (!shown.current) {
+      return;
+    }
+
     if (!Arr.isReadonlyArrayNonEmpty(batch)) {
-      finish(found, totals);
+      finish(file, found, totals);
 
       return;
     }
@@ -359,7 +419,7 @@ export const ImportSuppressionsDialog = ({
 
   const chooseAnother = (
     <Button
-      className="shrink-0"
+      className="shrink-0 max-sm:ml-9"
       onClick={() => picker.current?.click()}
       type="button"
       variant="ghost"
@@ -380,7 +440,15 @@ export const ImportSuppressionsDialog = ({
               className="mq-dropzone flex flex-col items-center justify-center gap-1 px-6 py-8 text-center max-sm:hidden"
               data-dragging={dragging ? "" : undefined}
               data-invalid={step.refused === undefined ? undefined : ""}
-              onDragLeave={() => setDragging(false)}
+              onDragLeave={(event) => {
+                const stillInside =
+                  event.relatedTarget instanceof Node &&
+                  event.currentTarget.contains(event.relatedTarget);
+
+                if (!stillInside) {
+                  setDragging(false);
+                }
+              }}
               onDragOver={(event) => {
                 event.preventDefault();
                 setDragging(true);
@@ -432,12 +500,14 @@ export const ImportSuppressionsDialog = ({
       }
 
       case "read": {
-        const { column, columns } = step.found;
+        const { column } = step;
+        const { columns } = step.csv;
+        const detail = `${rows(step.csv.rows)}, ${sizeOf(step.file.size)}`;
 
         if (column === undefined) {
           return (
             <>
-              <FileRow detail={sizeOf(step.file.size)} name={step.file.name} />
+              <FileRow detail={detail} name={step.file.name} />
               <div className="flex gap-3 px-1">
                 <span className="pt-0.5">
                   <SlotArt size={20} />
@@ -462,7 +532,7 @@ export const ImportSuppressionsDialog = ({
           <>
             <FileRow
               action={chooseAnother}
-              detail={sizeOf(step.file.size)}
+              detail={detail}
               name={step.file.name}
             />
             <Select
@@ -471,7 +541,8 @@ export const ImportSuppressionsDialog = ({
               onValueChange={(value) =>
                 setStep({
                   ...step,
-                  found: addressesInCsv(step.text, Number(value)),
+                  column: Number(value),
+                  found: addressesIn(step.csv, Number(value)),
                 })
               }
               renderValue={() => columnName}
@@ -487,7 +558,7 @@ export const ImportSuppressionsDialog = ({
               <p className="font-display text-display-sm font-semibold text-kumo-strong tabular-nums">
                 {step.found.addresses.length === 0
                   ? `No addresses in the ${columnName} column`
-                  : `${addresses(step.found.addresses.length)} to suppress`}
+                  : `${countOfAddresses(step.found.addresses.length)} to suppress`}
               </p>
               {step.found.skipped.length === 0 ? null : (
                 <SkippedRows column={columnName} skipped={step.found.skipped} />
@@ -499,6 +570,7 @@ export const ImportSuppressionsDialog = ({
 
       default: {
         const total = step.found.addresses.length;
+        const note = noteWhileSending(step.kind, step.sent);
 
         return (
           <>
@@ -509,17 +581,13 @@ export const ImportSuppressionsDialog = ({
                 variant="error"
               />
             ) : null}
-            <FileRow detail={addresses(total)} name={step.file.name} />
+            <FileRow detail={countOfAddresses(total)} name={step.file.name} />
             <ImportProgress
               failed={step.kind === "failed"}
               sent={step.sent}
               total={total}
             />
-            <p className="text-sm text-pretty text-kumo-subtle">
-              {step.kind === "failed"
-                ? `Those ${formatCount(step.sent)} stay suppressed, whatever you do next. Suppressing the rest is safe to repeat: an address that went through already is counted, not added twice.`
-                : `Keep this page open until it’s done. Mailquilt sends the addresses in parts of ${MAX_SUPPRESSIONS_ADDED_AT_ONCE} from your browser.`}
-            </p>
+            <p className="text-sm text-pretty text-kumo-subtle">{note}</p>
           </>
         );
       }

@@ -346,7 +346,10 @@ const ProblemBanner = ({
       title: "Choose a list before sending",
     },
     nobody: {
-      description: `No contacts are subscribed to ${list?.name ?? "its list"}. Add some to it, or edit the draft to choose another list.`,
+      description:
+        list === null || list.subscriptions.subscribed === 0
+          ? `No contacts are subscribed to ${list?.name ?? "its list"}. Add some to it, or edit the draft to choose another list.`
+          : `Everyone subscribed to ${list.name} has stopped all marketing email or has a suppressed address. Add contacts to it, or edit the draft to choose another list.`,
       title: "No one to send to yet",
     },
   }[problem];
@@ -513,7 +516,7 @@ const CampaignView = ({
           <SettingsSection
             about={
               draft
-                ? "Everyone subscribed to the list at the moment you send. Pending and unsubscribed contacts don’t get it."
+                ? "Everyone subscribed to the list at the moment you send, except anyone who stopped all marketing email or whose address is suppressed. Pending and unsubscribed contacts don’t get it."
                 : "The contacts subscribed to the list when it was sent. Anyone who subscribes later doesn’t get it."
             }
             title={draft ? "Who gets it" : "Who got it"}

@@ -289,6 +289,25 @@ describe("suppressions page", () => {
     expect(batches[1]?.[0]).toBe("reader-250@example.com");
   });
 
+  it("says nothing was suppressed when an import stops at its first request", async () => {
+    withSuppressions(() => [ADA]);
+    api.use(http.post(SUPPRESSIONS, () => HttpResponse.error()));
+    renderPage();
+
+    await chooseFile(
+      csvFile(["email", "ada@example.com", "grace@example.com"])
+    );
+    await screen.findByRole("button", { name: "Suppress 2 addresses" });
+    submitDialog("Suppress 2 addresses");
+
+    await expect(
+      screen.findByText("Nothing was suppressed yet, so trying again is safe.")
+    ).resolves.toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Suppress 2 addresses" })
+    ).toBeTruthy();
+  });
+
   it("refuses a file that isn't a CSV before reading it", async () => {
     withSuppressions(() => [ADA]);
     renderPage();
@@ -332,5 +351,114 @@ describe("suppressions page", () => {
       "Removed the suppression of ada@example.com."
     );
     expect(screen.queryByRole("row", { name: /ada@/u })).toBeNull();
+  });
+
+  it("offers Try again when the suppressions don't load, and shows them once they do", async () => {
+    let failing = true;
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(SUPPRESSIONS, () =>
+        failing ? HttpResponse.error() : HttpResponse.json(page([ADA]))
+      )
+    );
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    failing = false;
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await expect(
+      screen.findByRole("row", { name: /ada@/u })
+    ).resolves.toBeTruthy();
+  });
+
+  it("asks for more than 250 typed addresses to be split or imported, and suppresses none", async () => {
+    let posted = false;
+    withSuppressions(() => [ADA]);
+    api.use(
+      http.post(SUPPRESSIONS, () => {
+        posted = true;
+
+        return HttpResponse.json({ added: 1, alreadySuppressed: 0 });
+      })
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Suppress addresses" })
+    );
+    fireEvent.change(await screen.findByLabelText("Email addresses"), {
+      target: {
+        value: Array.from(
+          { length: 251 },
+          (_, index) => `reader-${index}@example.com`
+        ).join("\n"),
+      },
+    });
+    submitDialog("Suppress 251 addresses");
+
+    await expect(
+      screen.findByText(
+        "That’s 251 addresses. Suppress up to 250 at a time, or import them from a CSV."
+      )
+    ).resolves.toBeTruthy();
+    expect(posted).toBeFalsy();
+  });
+
+  it("reads the addresses from the column the member chooses", async () => {
+    let sent: unknown;
+    withSuppressions(() => [ADA]);
+    api.use(
+      http.post(SUPPRESSIONS, async ({ request }) => {
+        sent = await request.json();
+
+        return HttpResponse.json({ added: 1, alreadySuppressed: 0 });
+      })
+    );
+    renderPage();
+
+    await chooseFile(
+      csvFile(["Billing contact,Email", "billing@example.com,ada@example.com"])
+    );
+    fireEvent.click(
+      await screen.findByRole("combobox", { name: "Addresses from column" })
+    );
+
+    const billing = await screen.findByRole("option", {
+      name: "Billing contact",
+    });
+
+    fireEvent.pointerDown(billing, { pointerType: "mouse" });
+    fireEvent.pointerUp(billing, { pointerType: "mouse" });
+    fireEvent.click(billing);
+    submitDialog("Suppress 1 address");
+
+    await expect(
+      screen.findByText("1 address suppressed")
+    ).resolves.toBeTruthy();
+    expect(sent).toStrictEqual({ emails: ["billing@example.com"] });
+  });
+
+  it("says the suppression couldn't be removed when the server can't be reached, and keeps it", async () => {
+    withSuppressions(() => [ADA]);
+    api.use(
+      http.delete(`${SUPPRESSIONS}/:suppressionId`, () => HttpResponse.error())
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Remove suppression of ada@example.com",
+      })
+    );
+    submitDialog("Remove suppression");
+
+    await expect(screen.findByRole("alert")).resolves.toHaveProperty(
+      "textContent",
+      "Mailquilt couldn’t remove the suppression. Check your connection, then try again."
+    );
+    expect(
+      screen.getByRole("row", { hidden: true, name: /ada@/u })
+    ).toBeTruthy();
   });
 });

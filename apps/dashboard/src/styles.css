@@ -75,6 +75,11 @@
   --mq-logo-ink: #111113;
   --mq-logo-grey: #71717a;
   --mq-logo-slot: #a1a1aa;
+  /* The dashed slot's line: a piece not there yet. */
+  --mq-slot-dash: 1.5px;
+  /* An import's progress segments: the seam between them and their corners. */
+  --mq-batch-gap: 3px;
+  --mq-batch-radius: 2.5px;
   --mq-block-ink: #111113;
   --mq-body: #52525b;
   --mq-seam: #d4d4d8;
@@ -903,7 +908,7 @@ aside.mq-frame {
 }
 
 .mq-done-block::before {
-  border: 1.5px dashed var(--mq-logo-slot);
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
 }
 
 .mq-done-block::after {
@@ -1065,8 +1070,8 @@ aside.mq-frame {
 
 /* Where a CSV file is dropped: the logo's dashed slot, a piece not there yet. */
 .mq-dropzone {
-  border: 1.5px dashed var(--mq-logo-slot);
-  border-radius: 0.75rem;
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
+  border-radius: var(--radius-xl);
   background: var(--color-kumo-elevated);
 }
 
@@ -1082,13 +1087,12 @@ aside.mq-frame {
 .mq-batches {
   display: flex;
   height: 0.75rem;
-  gap: 3px;
+  gap: var(--mq-batch-gap);
 }
 
 .mq-batches > i {
   flex: 1;
-  min-width: 2px;
-  border-radius: 2.5px;
+  border-radius: var(--mq-batch-radius);
 }
 
 .mq-batches > [data-state="done"],
@@ -1108,7 +1112,7 @@ aside.mq-frame {
 }
 
 .mq-batches > [data-state="waiting"] {
-  border: 1.5px dashed var(--mq-logo-slot);
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
 }
 
 /* What arrives after its place is drawn, such as a count, fades in rather than popping. */
@@ -1400,7 +1404,7 @@ aside.mq-frame {
 }
 
 .mq-makeup > [data-status="pending"] {
-  border: 1.5px dashed var(--mq-logo-slot);
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
 }
 
 .mq-makeup > [data-status="unsubscribed"] {
