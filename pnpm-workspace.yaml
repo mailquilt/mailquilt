@@ -58,6 +58,7 @@ catalog:
   "@testcontainers/postgresql": 12.2.1
   "@testing-library/dom": 10.4.2
   "@testing-library/react": 16.3.3
+  "@types/html-to-text": 9.0.4 # html-to-text 10 ships no types, and 10.0 added no options, so 9.0's still fit
   "@types/node": 24.19.2
   "@types/react": 19.3.0
   "@types/react-dom": 19.3.0
@@ -68,6 +69,7 @@ catalog:
   drizzle-orm: 1.0.0-rc.6
   effect: 4.1.4
   happy-dom: 21.0.4
+  html-to-text: 10.0.1
   kysely: 0.29.9
   msw: 3.0.5
   nanostores: 1.5.5

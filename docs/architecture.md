@@ -25,7 +25,7 @@ Each entry app serves the JSON API, the public pages, and the dashboard's static
 | --- | --- | --- |
 | `domain` | Schemas, branded and prefixed IDs, domain errors. No input or output | — |
 | `contract` | Effect `HttpApi` groups; the single public contract and the source of the OpenAPI spec and the dashboard's typed client | `domain` |
-| `core` | Use cases, written only against ports (Effect services) | `domain` |
+| `core` | Use cases, written only against ports (Effect services) | `domain`, and `html-to-text` for a Campaign's plain-text part |
 | `api` | `HttpApi` handlers: each endpoint calls a `core` use case. Better Auth behind our allow list ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)). One `ApiLive` Layer that every entry app serves | `domain`, `contract`, `core` |
 | `db` | Drizzle Postgres schema, migrations, repository implementations | `domain`, ports in `core` |
 | `providers` | One adapter per Provider, implementing its Provider port from `core`. Use cases reach them through `sendThrough` ([ADR 0015](adr/0015-use-cases-send-through-a-provider-connection-with-one-function.md)). Parsing Provider webhooks is planned (#19, #21) | `domain`, ports in `core` |

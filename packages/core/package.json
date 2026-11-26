@@ -13,11 +13,13 @@
   },
   "dependencies": {
     "@repo/domain": "workspace:*",
-    "effect": "catalog:"
+    "effect": "catalog:",
+    "html-to-text": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@repo/typescript-config": "workspace:*",
+    "@types/html-to-text": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

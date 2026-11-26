@@ -187,6 +187,11 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
           ada?.html ?? "",
           /Unsubscribe<\/a><\/p><\/body><\/html>$/u
         );
+        assert.isTrue(
+          ada?.text?.endsWith(
+            `Don’t want these emails? Unsubscribe:\n${APP_URL}${adaPath}`
+          )
+        );
       })
   );
 
