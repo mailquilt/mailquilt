@@ -10,6 +10,7 @@ import {
   PASSWORD,
   send,
   sessionCookie,
+  signedInPerson,
   signIn,
   signUp,
   uniqueEmail,
@@ -38,6 +39,8 @@ const ACCOUNT_EMAILS = [
 ];
 
 const SIGN_UPS = 3;
+
+const OTHER_SITE = "https://elsewhere.example";
 
 const decodeErrorCode = Schema.decodeUnknownOption(
   Schema.Struct({ code: Schema.String })
@@ -157,6 +160,48 @@ layer(TestApp, { timeout: "2 minutes" })("authentication", (test) => {
 
         assert.strictEqual(signedOut.status, 200);
         assert.isNull(yield* sessionFor(cookie));
+      })
+  );
+
+  test.effect(
+    "refuses a signed-in change from another site, such as a sign-out, and keeps the session",
+    () =>
+      Effect.gen(function* crossSiteSignOut() {
+        const cookie = yield* signedInPerson;
+
+        const signedOut = yield* send("POST", "/api/auth/sign-out", {
+          body: {},
+          headers: { cookie, origin: OTHER_SITE },
+        });
+
+        assert.strictEqual(signedOut.status, 403);
+        assert.isNotNull(yield* sessionFor(cookie));
+      })
+  );
+
+  test.effect(
+    "sends a person back only to this Mailquilt after signing in",
+    () =>
+      Effect.gen(function* callbackUrls() {
+        const email = uniqueEmail();
+        yield* signUp(email);
+        const link = yield* verificationLinkFor(email);
+        yield* send("GET", (link ?? "").slice(APP_URL.length));
+
+        const elsewhere = yield* send("POST", "/api/auth/sign-in/email", {
+          body: { callbackURL: `${OTHER_SITE}/`, email, password: PASSWORD },
+          headers: { [TRUSTED_IP_HEADER]: uniqueIp() },
+        });
+
+        assert.strictEqual(elsewhere.status, 403);
+        assert.strictEqual(sessionCookie(elsewhere), "");
+
+        const here = yield* send("POST", "/api/auth/sign-in/email", {
+          body: { callbackURL: `${APP_URL}/`, email, password: PASSWORD },
+          headers: { [TRUSTED_IP_HEADER]: uniqueIp() },
+        });
+
+        assert.strictEqual(here.status, 200);
       })
   );
 

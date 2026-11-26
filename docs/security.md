@@ -38,7 +38,7 @@ A control marked **planned** isn't built yet and names the issue that builds it.
 - **Sign-in methods:** email and password. Email verification is required. Planned (#32): the Have I Been Pwned leaked-password check, magic link, Google and GitHub.
 - **Two-factor sign-in** (planned, #33): optional in P1 (authenticator app plus backup codes). Organizations can require it from P2.
 - **Responses don't reveal whether an account exists.**
-- **Cookies:** httpOnly, Secure, SameSite=Lax. The CSRF check stays on, and `trustedOrigins` is explicit. Better Auth turns its origin and CSRF checks off under tests unless they're pinned on; pinning them, so tests cover them, is #155.
+- **Cookies:** httpOnly, Secure, SameSite=Lax. Better Auth's origin and CSRF checks are pinned on, because Better Auth turns both off when `NODE_ENV` is `test` or `TEST` is set, and `trustedOrigins` is explicit. API tests show a signed-in change from another site, such as a sign-out, is refused, and so is a sign-in that would send the person to another site (#155).
 - **Sessions** (planned, #32): members see their active sessions and can sign each one out.
 - **Client IP header** is set explicitly: `cf-connecting-ip` on Cloudflare, the reverse proxy's header (`CLIENT_IP_HEADER`) on Docker, and the directly connected peer when Docker has no proxy. The default `x-forwarded-for` can be forged by clients, so Better Auth never reads it.
 - **Re-confirmation** (planned, #35): sensitive actions need a sign-in within the last 10 minutes, and Organization owners get an email:

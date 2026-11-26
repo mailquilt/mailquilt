@@ -100,6 +100,9 @@ export const makeAuth = Effect.gen(function* makeAuth() {
     advanced: {
       cookiePrefix: "mailquilt",
       database: { validateSchema: false },
+      // WARNING: Better Auth turns both checks off by default when NODE_ENV is "test" or TEST is set, so they're pinned on for every run and every install.
+      disableCSRFCheck: false,
+      disableOriginCheck: false,
       defaultCookieAttributes: {
         httpOnly: true,
         sameSite: "lax",
