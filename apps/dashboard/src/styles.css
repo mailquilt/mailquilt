@@ -851,6 +851,13 @@ aside.mq-frame {
   z-index: 61;
 }
 
+/* A popup opened from inside a dialog, such as a Select's list, sits above the dialog's window (61); none of them has a z-index of its own. */
+[data-theme="mailquilt"]:has([role="dialog"] [data-popup-open])
+  [data-base-ui-portal]
+  > [data-side][data-align] {
+  z-index: 62;
+}
+
 /*
  * LayerDialog pads its body below the description even when there is
  * nothing in it, as in a delete confirmation, which left a lopsided gap. Such
@@ -1054,6 +1061,54 @@ aside.mq-frame {
   50% {
     opacity: 0.45;
   }
+}
+
+/* Where a CSV file is dropped: the logo's dashed slot, a piece not there yet. */
+.mq-dropzone {
+  border: 1.5px dashed var(--mq-logo-slot);
+  border-radius: 0.75rem;
+  background: var(--color-kumo-elevated);
+}
+
+.mq-dropzone[data-dragging] {
+  border-color: var(--mq-block-ink);
+}
+
+.mq-dropzone[data-invalid] {
+  border-color: var(--color-kumo-danger);
+}
+
+/* An import's progress in at most 20 segments, each a share of its requests: ink once sent, the dashed slot until then. */
+.mq-batches {
+  display: flex;
+  height: 0.75rem;
+  gap: 3px;
+}
+
+.mq-batches > i {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2.5px;
+}
+
+.mq-batches > [data-state="done"],
+.mq-batches > [data-state="sending"] {
+  background: var(--mq-block-ink);
+}
+
+.mq-batches > [data-state="sending"] {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mq-batches > [data-state="sending"] {
+    animation: mq-pulse 1600ms ease-in-out infinite;
+    opacity: 1;
+  }
+}
+
+.mq-batches > [data-state="waiting"] {
+  border: 1.5px dashed var(--mq-logo-slot);
 }
 
 /* What arrives after its place is drawn, such as a count, fades in rather than popping. */

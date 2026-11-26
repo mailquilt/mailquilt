@@ -1,6 +1,10 @@
 import type { OrganizationId } from "@repo/domain";
 
-import { useContactPage, useLists } from "../audience/audience-api.ts";
+import {
+  useContactPage,
+  useLists,
+  useSuppressionPage,
+} from "../audience/audience-api.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { useCampaignPage } from "../campaigns/campaigns-api.ts";
 import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
@@ -23,6 +27,7 @@ const OrganizationNavigation = ({
   const contacts = useContactPage(organizationId, {});
   const lists = useLists(organizationId);
   const providers = useProviderConnections(organizationId);
+  const suppressions = useSuppressionPage(organizationId, {});
 
   return (
     <Navigation
@@ -31,6 +36,7 @@ const OrganizationNavigation = ({
         contacts: contacts.data?.total,
         lists: lists.data?.length,
         providers: providers.data?.length,
+        suppressions: suppressions.data?.total,
       }}
     />
   );

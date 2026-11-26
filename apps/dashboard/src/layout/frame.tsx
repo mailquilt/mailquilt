@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { formatCount } from "../audience/format.ts";
 import { MailquiltLogo, MailquiltMark } from "../brand/logo.tsx";
 import {
+  EnvelopeBlockIcon,
   GlobeHemisphereWestIcon,
   HardDrivesIcon,
   HouseIcon,
@@ -19,7 +20,12 @@ import {
 import { OrganizationPatch } from "../organizations/organization-patch.tsx";
 import { PageAreaLoading } from "./page-states.tsx";
 
-type CountedPage = "campaigns" | "contacts" | "lists" | "providers";
+type CountedPage =
+  | "campaigns"
+  | "contacts"
+  | "lists"
+  | "providers"
+  | "suppressions";
 
 interface NavItem {
   readonly label: string;
@@ -46,6 +52,12 @@ const NAV: readonly {
         href: "/lists",
         icon: ListBulletsIcon,
         label: "Lists",
+      },
+      {
+        counted: "suppressions",
+        href: "/suppressions",
+        icon: EnvelopeBlockIcon,
+        label: "Suppressions",
       },
     ],
     label: "Audience",
