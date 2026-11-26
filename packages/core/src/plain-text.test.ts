@@ -53,4 +53,11 @@ describe("a Campaign's plain-text part", () => {
       "Hello!"
     );
   });
+
+  it("keeps a list numbered in Roman numerals as its items, however high it starts", () => {
+    assert.strictEqual(
+      plainTextOf('<ol type="i" start="10000"><li>Hello</li></ol>'),
+      "* Hello"
+    );
+  });
 });

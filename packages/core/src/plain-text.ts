@@ -1,6 +1,9 @@
 import { convert } from "html-to-text";
 import type { FormatCallback } from "html-to-text";
 
+// WARNING: html-to-text numbers a Roman-numeral list only up to 3,999 and throws past it, which would fail the batch on every retry, so such lists are bulleted instead.
+const ROMAN_LISTS = ["ol[type='i']", "ol[type='I']"];
+
 // WARNING: html-to-text reads nested elements recursively, so HTML nested thousands deep overflows the stack and fails the whole batch; an email nests a few dozen deep, and text deeper than this is left out.
 const MAX_DEPTH = 100;
 
@@ -17,8 +20,9 @@ const altTextOnly: FormatCallback = (element, _walk, builder) => {
  * paragraphs and lists as text, a link's address in brackets after its
  * words, and an image as its alt text, never its address, so a spacer or
  * tracking image leaves nothing. Each table row and cell is a block of its
- * own, since most email layouts are tables. The page title, and anything
- * hidden with `display: none`, such as a preview line, aren't shown.
+ * own, since most email layouts are tables, and a Roman-numeral list is
+ * bulleted. The page title, and anything hidden with `display: none`, such
+ * as a preview line, aren't shown.
  */
 export const plainTextOf = (html: string) =>
   convert(html, {
@@ -29,6 +33,10 @@ export const plainTextOf = (html: string) =>
       { format: "skip", selector: "title" },
       { format: "skip", selector: "[style*='display:none']" },
       { format: "skip", selector: "[style*='display: none']" },
+      ...ROMAN_LISTS.map((selector) => ({
+        format: "unorderedList",
+        selector,
+      })),
       { format: "block", selector: "table" },
       { format: "block", selector: "tr" },
       { format: "block", selector: "td" },
