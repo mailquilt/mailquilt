@@ -19,6 +19,7 @@ We chose a cursor over offsets because a list of 150,000 Contacts changes while 
 
 ## Consequences
 
+- A repository reads a page with `newestFirstPage` (`packages/db/src/newest-first-page.ts`), which adds the cursor, the order, the limit, the counts and the first-page fallback to the rows it selects. It requires the Organization scope as its own argument, so a page can't leave it out. Contacts and Campaigns use it, and its tests run through Contacts.
 - Within one millisecond, IDs made by different requests sort in an order that isn't creation order, because on Workers each request has its own ID generator. Paging stays correct: each item appears exactly once.
 - Every page counts the matching rows. On an Organization's whole audience that is an index-only count, tens of milliseconds at 150,000 Contacts. If it grows too slow, `total` can become an estimate without changing the shape.
 - A client can't jump to page N; the dashboard offers Previous and Next.
