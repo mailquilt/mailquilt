@@ -10,12 +10,19 @@ export interface RecordedSend {
   readonly email: OutgoingEmail;
 }
 
-/** What the recording SMTP Provider was asked to send, and how to make its next send fail. */
+/**
+ * What the recording SMTP Provider was asked to send, how to make its next
+ * send fail, and something to do right after its next send, such as a
+ * recipient unsubscribing while a batch is still sending.
+ */
 export class SmtpOutbox extends Context.Service<
   SmtpOutbox,
   {
     readonly sent: Effect.Effect<readonly RecordedSend[]>;
     readonly failNextSend: (error: SendFailed) => Effect.Effect<void>;
+    readonly afterNextSend: (
+      effect: Effect.Effect<void>
+    ) => Effect.Effect<void>;
   }
 >()("@repo/core/testing/SmtpOutbox") {}
 
@@ -28,6 +35,7 @@ export const RecordingSmtpProviderLive = Layer.effectContext(
   Effect.gen(function* recordingSmtpProvider() {
     const sent = yield* Ref.make<readonly RecordedSend[]>([]);
     const nextFailure = yield* Ref.make(Option.none<SendFailed>());
+    const afterNext = yield* Ref.make(Option.none<Effect.Effect<void>>());
 
     return Context.make(SmtpProvider, {
       send: (settings, email) =>
@@ -43,10 +51,17 @@ export const RecordingSmtpProviderLive = Layer.effectContext(
             { email, settings },
           ]);
 
+          const after = yield* Ref.getAndSet(afterNext, Option.none());
+
+          if (Option.isSome(after)) {
+            yield* after.value;
+          }
+
           return { messageId: `<${all.length}@smtp.test>` };
         }),
     }).pipe(
       Context.add(SmtpOutbox, {
+        afterNextSend: (effect) => Ref.set(afterNext, Option.some(effect)),
         failNextSend: (error) => Ref.set(nextFailure, Option.some(error)),
         sent: Ref.get(sent),
       })

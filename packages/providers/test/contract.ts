@@ -53,6 +53,31 @@ export const providerContract = <R>(
     })
   );
 
+  test.effect("sends the email's own headers, such as List-Unsubscribe", () =>
+    Effect.gen(function* ownHeaders() {
+      const { received, send } = yield* provider;
+      const to = "contract-headers@example.com";
+
+      yield* send({
+        ...EMAIL,
+        headers: {
+          "List-Unsubscribe": "<https://mail.example.com/unsubscribe/token>",
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        },
+        to,
+      });
+
+      const [email] = yield* received(to);
+
+      assert.deepStrictEqual(email?.headers["List-Unsubscribe"], [
+        "<https://mail.example.com/unsubscribe/token>",
+      ]);
+      assert.deepStrictEqual(email?.headers["List-Unsubscribe-Post"], [
+        "List-Unsubscribe=One-Click",
+      ]);
+    })
+  );
+
   test.effect("returns the ID the message arrives with", () =>
     Effect.gen(function* messageId() {
       const { received, send } = yield* provider;

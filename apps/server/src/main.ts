@@ -9,6 +9,7 @@ import {
   SystemMailerLive,
 } from "@repo/core";
 import {
+  EmailLinksFromEnv,
   migrateOnBoot,
   PostgresPortsLive,
   QueueWorkersLive,
@@ -47,6 +48,7 @@ const PortsLive = SystemMailerAfterResponding.pipe(
   Layer.provide(SystemMailerLive),
   Layer.provideMerge(
     Layer.mergeAll(
+      EmailLinksFromEnv,
       PostgresPortsLive,
       SmtpProviderLive,
       SystemMailerConfigFromEnv

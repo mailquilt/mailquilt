@@ -10,6 +10,7 @@ import { ListsLive } from "./lists.ts";
 import { OrganizationsLive } from "./organizations.ts";
 import { ProviderConnectionsLive } from "./provider-connections.ts";
 import { RateLimiterLive } from "./rate-limiter.ts";
+import { UnsubscribesLive } from "./unsubscribes.ts";
 
 export { CampaignsLive } from "./campaigns.ts";
 
@@ -33,6 +34,8 @@ export type { EncodedQueueMessage } from "./queue-outbox.ts";
 
 export { RateLimiterLive } from "./rate-limiter.ts";
 
+export { UnsubscribesLive } from "./unsubscribes.ts";
+
 /**
  * Every port backed by Postgres. Needs a `PgClient` and the
  * `CredentialCipher`, which each runtime provides.
@@ -46,5 +49,6 @@ export const DatabasePortsLive = Layer.mergeAll(
   ListsLive,
   OrganizationsLive,
   ProviderConnectionsLive,
-  RateLimiterLive
+  RateLimiterLive,
+  UnsubscribesLive
 ).pipe(Layer.provide(DatabaseLive), Layer.provide(SecureRandom.layerWebCrypto));

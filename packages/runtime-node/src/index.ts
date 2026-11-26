@@ -1,3 +1,5 @@
+export { EmailLinksFromEnv } from "./email-links.ts";
+
 export { migrateOnBoot } from "./migrate.ts";
 
 export { PostgresPortsLive } from "./postgres.ts";

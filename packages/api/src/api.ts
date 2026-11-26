@@ -11,12 +11,13 @@ import { ListsHandlers } from "./lists.ts";
 import { OrganizationsHandlers } from "./organizations.ts";
 import { ProviderConnectionsHandlers } from "./provider-connections.ts";
 import { SystemHandlers } from "./system.ts";
+import { UnsubscribeRoutes } from "./unsubscribe/routes.ts";
 
 const MAX_API_BODY_SIZE = ByteSize.kibibytes(64);
 
 /**
- * Every route the app serves: the public API, and Better Auth behind our
- * allow list. The ports its use cases call are request requirements: each
+ * Every route the app serves: the public API, Better Auth behind our allow
+ * list, and the unsubscribe pages links in emails open. The ports its use cases call are request requirements: each
  * runtime provides them per request. A request body larger than 64 KiB is
  * refused with 413, before anyone is signed in: at once when its
  * `Content-Length` says so, or else as soon as more than 64 KiB of it has
@@ -39,5 +40,6 @@ export const ApiLive = Layer.mergeAll(
       Layer.succeed(HttpIncomingMessage.MaxBodySize, MAX_API_BODY_SIZE)
     )
   ),
-  AuthRoutes
+  AuthRoutes,
+  UnsubscribeRoutes
 );

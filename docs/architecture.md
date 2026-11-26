@@ -38,7 +38,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 - **Postgres only** ([ADR 0001](adr/0001-postgres-only.md)), through Drizzle 1.0's Effect integration (`drizzle-orm/effect-postgres`).
 - **IDs:** a type prefix plus a UUIDv7 in the TypeID format, for example `org_01h455vb4pex5vsknk084sn02q` for an Organization and `cmp_…` for a Campaign ([ADR 0006](adr/0006-ids-follow-the-typeid-format.md)). They are part of the public API and never change format.
-- **Tenant isolation:** endpoints for one Organization's data name it in the path (`/api/organizations/:organizationId/…`). `asMemberOf` checks membership on every request and provides `CurrentOrganization`, which every repository method for tenant data requires, so no such query runs without one ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). A CI test suite tries to read across Organizations.
+- **Tenant isolation:** endpoints for one Organization's data name it in the path (`/api/organizations/:organizationId/…`). `asMemberOf` checks membership on every request and provides `CurrentOrganization`, which every repository method for tenant data requires, so no such query runs without one ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). The one exception is unsubscribe (`/unsubscribe`), which has no session: its signed token names the Organization, Campaign and Contact, and it changes only that Contact's Subscriptions to the Campaign's Lists and their Opt-out ([ADR 0016](adr/0016-links-in-emails-carry-tokens-signed-with-keys-derived-from-encryption-keys.md)). A CI test suite tries to read across Organizations, including through unsubscribe links.
 - **Paging:** collections that grow with an Organization's audience, such as Contacts, come a page at a time, newest first, with IDs as the cursors and a total ([ADR 0008](adr/0008-long-collections-are-paged-by-id.md)).
 - **Delivery events:** one table partitioned by month. A scheduled job creates future partitions. Retention will drop whole partitions, 13 months by default (planned, #22). Drizzle can't declare partitioned tables, so that migration is written by hand.
 - **Campaign totals and Contact engagement summaries** (last opened, counts) are stored separately and outlive raw events.
@@ -47,7 +47,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Sending pipeline (outline)
 
-Today a Campaign is sent now to the subscribed Contacts of one List, in batches through its Provider Connection. Targeting several Lists and exclusions (#15), Opt-outs (#12), Suppressions (#14), scheduling (#16), throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
+Today a Campaign is sent now to the subscribed Contacts of one List without an Opt-out, in batches through its Provider Connection. Targeting several Lists and exclusions (#15), Suppressions (#14), scheduling (#16), throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
 
 1. **Start:** a Campaign starts (now or when the scheduler finds it due).
 2. **Resolve recipients in one set-based query:**
@@ -71,10 +71,10 @@ Today a Campaign is sent now to the subscribed Contacts of one List, in batches 
 
 ## Public pages
 
-Planned, with the features they serve: #12, #13, #23, #29, #30 and #38.
-
-- Unsubscribe, preference center, double opt-in confirmation, signup form, web archive, tracking pixel and click redirects.
-- Rendered on the server by the entry app (React and Kumo rendered to HTML), with no client JavaScript required.
+- Built: unsubscribe (`/unsubscribe`, `packages/api/src/unsubscribe/`), with the one-click post and the Opt-out (#12).
+- Planned: preference center, double opt-in confirmation, signup form, web archive, tracking pixel and click redirects (#13, #23, #29, #30, #38).
+- Rendered on the server by the entry app with React and Kumo (`renderToStaticMarkup`), with no client JavaScript needed; only a theme script, allowed by its hash, picks light or dark. They're written in `.ts` with `createElement`, not JSX, because the Node server runs its TypeScript with Node's type stripping, which can't read JSX. They link the dashboard's own stylesheet, which its build also publishes as `/public-pages.css` (`apps/dashboard/vite.config.ts`), so Kumo and the Mailquilt theme look the same as in the dashboard.
+- On Cloudflare each public path is listed in `run_worker_first` (ADR 0004).
 - On hosted, they are served from a separate domain that never receives cookies. On a single-domain self-host, archive pages are served with `Content-Security-Policy: sandbox`.
 
 ## Observability

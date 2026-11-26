@@ -3,6 +3,8 @@ import { MailquiltApi } from "@repo/contract";
 import {
   credentialCipherLayer,
   handleQueueMessage,
+  PublicUrl,
+  signedTokensLayer,
   SystemMailerConfig,
   SystemMailerLive,
 } from "@repo/core";
@@ -59,7 +61,9 @@ export const TEST_ENCRYPTION_KEYS = Redacted.make(
 type DatabasePorts =
   | Layer.Success<typeof DatabasePortsLive>
   | PgClient.PgClient
-  | SqlClient.SqlClient;
+  | SqlClient.SqlClient
+  | PublicUrl
+  | Layer.Success<ReturnType<typeof signedTokensLayer>>;
 
 type Fakes =
   | SystemMailer
@@ -270,7 +274,9 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
           Layer.provideMerge(
             PgClient.layer({ url: Redacted.make(databaseUrl) })
           ),
-          Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS))
+          Layer.provide(credentialCipherLayer(TEST_ENCRYPTION_KEYS)),
+          Layer.provideMerge(signedTokensLayer(TEST_ENCRYPTION_KEYS)),
+          Layer.provideMerge(Layer.succeed(PublicUrl, { origin: APP_URL }))
         )
       );
 

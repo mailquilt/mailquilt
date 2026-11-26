@@ -1,0 +1,37 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "59625a40-2f18-4d12-b879-6979392105b0",
+  "prevIds": ["089f3b2f-0453-4f82-82f9-434d54e7d8b0"],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "contacts", "opted_out_at"],
+      "writes": [
+        "s|col|public.contacts.opted_out_at",
+        "n|col|public.contacts.opted_out_at",
+        "e|col|public.contacts.opted_out_at"
+      ],
+      "reads": ["n|tbl|public.contacts", "n|sch|public"]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "contacts",
+        "name": "opted_out_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

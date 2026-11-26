@@ -24,6 +24,11 @@ import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
 import { asQueuedFor, Queue } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
+import {
+  unsubscribeHeaders,
+  unsubscribeUrl,
+  withUnsubscribeLink,
+} from "./unsubscribe.ts";
 
 /** How many of a Campaign's recipients one queue message sends to. */
 export const SEND_BATCH_SIZE = 100;
@@ -118,6 +123,11 @@ export class Campaigns extends Context.Service<
       never,
       CurrentOrganization
     >;
+    /** Whether the Contact is still subscribed to the Campaign's List and has no Opt-out. */
+    readonly stillConsents: (
+      id: CampaignId,
+      contactId: ContactId
+    ) => Effect.Effect<boolean, never, CurrentOrganization>;
     /**
      * Records what the Provider did for each recipient still queued, adds
      * them to the Campaign's counts and writes a `sent` delivery event for
@@ -202,6 +212,12 @@ const SERVER_FAILURES = new Set<SendFailureReason>([
   "unreachable",
 ]);
 
+const NO_LONGER_CONSENTS = new SendFailed({
+  detail:
+    "They unsubscribed or stopped marketing email before it was sent to them.",
+  reason: "failed",
+});
+
 const NO_CONNECTION = new SendFailed({
   detail: "The Campaign's provider connection was deleted.",
   reason: "failed",
@@ -234,34 +250,42 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
             .withCredentials(batch.providerConnectionId)
             .pipe(Effect.option);
 
-    const sendTo = (to: string) => {
-      const email: Types.Mutable<OutgoingEmail> = {
-        from: batch.from,
-        html: batch.html,
-        subject: batch.subject,
-        to,
-      };
-
-      if (batch.replyTo !== null) {
-        email.replyTo = batch.replyTo;
-      }
-
-      const sent: Effect.Effect<SentEmail, SendFailed, SmtpProvider> =
-        Option.match(connection, {
-          onNone: () => Effect.fail(NO_CONNECTION),
-          onSome: (opened) => sendThrough(opened, email),
+    const sendTo = (recipient: QueuedRecipient) =>
+      Effect.gen(function* sendToRecipient() {
+        const unsubscribe = yield* unsubscribeUrl({
+          campaignId: message.campaignId,
+          contactId: recipient.contactId,
+          organizationId: message.organizationId,
         });
 
-      return sent;
-    };
+        const email: Types.Mutable<OutgoingEmail> = {
+          from: batch.from,
+          headers: unsubscribeHeaders(unsubscribe),
+          html: withUnsubscribeLink(batch.html, unsubscribe),
+          subject: batch.subject,
+          to: recipient.email,
+        };
+
+        if (batch.replyTo !== null) {
+          email.replyTo = batch.replyTo;
+        }
+
+        const sent: Effect.Effect<SentEmail, SendFailed, SmtpProvider> =
+          Option.match(connection, {
+            onNone: () => Effect.fail(NO_CONNECTION),
+            onSome: (opened) => sendThrough(opened, email),
+          });
+
+        return yield* sent;
+      });
 
     const serverFailure = yield* Ref.make(Option.none<SendFailed>());
 
-    const sendOrSkip = (to: string) =>
+    const sendUnlessServerFailed = (recipient: QueuedRecipient) =>
       Effect.flatMap(Ref.get(serverFailure), (earlier) =>
         Option.match(earlier, {
           onNone: () =>
-            sendTo(to).pipe(
+            sendTo(recipient).pipe(
               Effect.tapError((failed) =>
                 SERVER_FAILURES.has(failed.reason)
                   ? Ref.set(serverFailure, Option.some(failed))
@@ -272,25 +296,33 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         })
       );
 
-    const outcomes = yield* pipe(
-      batch.recipients,
-      Effect.forEach((recipient) =>
-        sendOrSkip(recipient.email).pipe(
-          Effect.match({
-            onFailure: (failed) =>
-              ({
-                contactId: recipient.contactId,
-                failed,
-              }) satisfies RecipientOutcome,
-            onSuccess: (sent) =>
-              ({
-                contactId: recipient.contactId,
-                sent,
-              }) satisfies RecipientOutcome,
-          })
-        )
-      )
-    );
+    // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes or opts out partway through still gets it.
+    const sendOrSkip = (recipient: QueuedRecipient) =>
+      Effect.flatMap(
+        campaigns.stillConsents(message.campaignId, recipient.contactId),
+        (consents) =>
+          consents
+            ? sendUnlessServerFailed(recipient)
+            : Effect.fail(NO_LONGER_CONSENTS)
+      );
+
+    const outcomeFor = (recipient: QueuedRecipient) =>
+      sendOrSkip(recipient).pipe(
+        Effect.match({
+          onFailure: (failed) =>
+            ({
+              contactId: recipient.contactId,
+              failed,
+            }) satisfies RecipientOutcome,
+          onSuccess: (sent) =>
+            ({
+              contactId: recipient.contactId,
+              sent,
+            }) satisfies RecipientOutcome,
+        })
+      );
+
+    const outcomes = yield* pipe(batch.recipients, Effect.forEach(outcomeFor));
 
     yield* campaigns.recordOutcomes(message.campaignId, outcomes);
   }).pipe(asQueuedFor(message));

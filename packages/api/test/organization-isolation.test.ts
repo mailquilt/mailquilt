@@ -1,5 +1,6 @@
 import { assert, layer } from "@effect/vitest";
 import { MailquiltApi } from "@repo/contract";
+import { SignedTokens, signedTokensLayer } from "@repo/core";
 import { OrganizationIdSchema } from "@repo/domain";
 import type {
   CampaignId,
@@ -12,7 +13,7 @@ import { Effect, Redacted } from "effect";
 import { HttpApi } from "effect/http-api";
 
 import { signedInClient } from "./accounts.ts";
-import { TestApp } from "./harness.ts";
+import { APP_URL, AppFetch, TEST_ENCRYPTION_KEYS, TestApp } from "./harness.ts";
 
 type Client = Effect.Success<typeof signedInClient>;
 
@@ -21,6 +22,7 @@ interface Target {
   readonly campaignId: CampaignId;
   readonly listId: ListId;
   readonly contactId: ContactId;
+  readonly contactEmail: string;
   readonly providerConnectionId: ProviderConnectionId;
 }
 
@@ -154,8 +156,12 @@ const NO_SUCH_ORGANIZATION = OrganizationIdSchema.make(
   "org_00000000000000000000000000"
 );
 
+let readers = 0;
+
 const ownedData = (owner: Client) =>
   Effect.gen(function* organizationWithData() {
+    readers += 1;
+
     const organization = yield* owner.organizations.create({
       payload: { name: "Acme" },
     });
@@ -169,7 +175,7 @@ const ownedData = (owner: Client) =>
 
     const contact = yield* owner.contacts.create({
       params,
-      payload: { email: "ada@example.com", listIds: [list.id] },
+      payload: { email: `reader-${readers}@example.com`, listIds: [list.id] },
     });
 
     const connection = yield* owner.providerConnections.create({
@@ -194,11 +200,44 @@ const ownedData = (owner: Client) =>
 
     return {
       campaignId: campaign.id,
+      contactEmail: contact.email,
       contactId: contact.id,
       listId: list.id,
       organizationId: organization.id,
       providerConnectionId: connection.id,
     } satisfies Target;
+  });
+
+const unsubscribeToken = (ids: readonly string[]) =>
+  Effect.gen(function* signUnsubscribeToken() {
+    const tokens = yield* SignedTokens;
+
+    return yield* tokens.sign("unsubscribe", ids.join("."));
+  }).pipe(Effect.provide(signedTokensLayer(TEST_ENCRYPTION_KEYS)));
+
+const unsubscribeRequests = (token: string) =>
+  Effect.gen(function* everyUnsubscribeRequest() {
+    const fetch = yield* AppFetch;
+    const query = `?token=${encodeURIComponent(token)}`;
+
+    const oneClick = {
+      body: "List-Unsubscribe=One-Click",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      method: "POST",
+    };
+
+    const responses = yield* Effect.promise(() =>
+      Promise.all([
+        fetch(`${APP_URL}/unsubscribe${query}`),
+        fetch(`${APP_URL}/unsubscribe${query}`, oneClick),
+        fetch(`${APP_URL}/unsubscribe/all${query}`, oneClick),
+      ])
+    );
+
+    return {
+      page: yield* Effect.promise(() => responses[0]?.text() ?? ""),
+      statuses: responses.map((response) => response.status),
+    };
   });
 
 const tenantEndpointsInContract = () => {
@@ -391,6 +430,52 @@ layer(TestApp, { timeout: "2 minutes" })(
             lists.map((list) => [list.id, list.subscriptions.subscribed]),
             [[own.listId, 1]]
           );
+        })
+    );
+
+    test.effect(
+      "never unsubscribes or opts out a Contact through a link that mixes in another Organization's IDs",
+      () =>
+        Effect.gen(function* foreignUnsubscribe() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+
+          const mixed = [
+            [own.organizationId, target.campaignId, target.contactId],
+            [own.organizationId, own.campaignId, target.contactId],
+            [own.organizationId, target.campaignId, own.contactId],
+            [target.organizationId, own.campaignId, target.contactId],
+          ];
+
+          for (const ids of mixed) {
+            const token = yield* unsubscribeToken(ids);
+
+            const { page, statuses } = yield* unsubscribeRequests(token);
+
+            assert.deepStrictEqual(statuses, [404, 404, 404], ids.join("."));
+            assert.notInclude(page, target.contactEmail);
+            assert.notInclude(page, own.contactEmail);
+          }
+
+          const fetch = yield* AppFetch;
+
+          for (const data of [target, own]) {
+            const token = yield* unsubscribeToken([
+              data.organizationId,
+              data.campaignId,
+              data.contactId,
+            ]);
+
+            const response = yield* Effect.promise(() =>
+              fetch(`${APP_URL}/unsubscribe?token=${encodeURIComponent(token)}`)
+            );
+
+            const page = yield* Effect.promise(() => response.text());
+
+            assert.include(page, "Unsubscribe from Weekly news?");
+          }
         })
     );
 

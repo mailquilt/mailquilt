@@ -39,8 +39,11 @@ const Message = Schema.Struct({
   HTML: Schema.String,
 });
 
+const Headers = Schema.Record(Schema.String, Schema.Array(Schema.String));
+
 export type ReceivedEmail = typeof Message.Type & {
   readonly messageId: string;
+  readonly headers: typeof Headers.Type;
 };
 
 /** One running Mailpit: where its SMTP server listens, and the emails it received. */
@@ -116,10 +119,17 @@ const toMailpit = (container: StartedTestContainer) => {
 
         return yield* Effect.all(
           messages.map((summary) =>
-            fetchJson(`${api}/message/${summary.ID}`).pipe(
-              Effect.flatMap(Schema.decodeUnknownEffect(Message)),
-              Effect.map((message) => ({
+            Effect.all({
+              headers: fetchJson(`${api}/message/${summary.ID}/headers`).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(Headers))
+              ),
+              message: fetchJson(`${api}/message/${summary.ID}`).pipe(
+                Effect.flatMap(Schema.decodeUnknownEffect(Message))
+              ),
+            }).pipe(
+              Effect.map(({ headers, message }) => ({
                 ...message,
+                headers,
                 messageId: summary.MessageID,
               }))
             )

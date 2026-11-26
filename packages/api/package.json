@@ -11,12 +11,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@cloudflare/kumo": "catalog:",
     "@repo/contract": "workspace:*",
     "@repo/core": "workspace:*",
     "@repo/domain": "workspace:*",
     "better-auth": "catalog:",
     "effect": "catalog:",
-    "kysely": "catalog:"
+    "kysely": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
     "@effect/sql-pg": "catalog:",
@@ -25,6 +28,8 @@
     "@repo/typescript-config": "workspace:*",
     "@testcontainers/postgresql": "catalog:",
     "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -209,6 +209,10 @@ const messageFor = (email: OutgoingEmail) => {
     message.replyTo = email.replyTo;
   }
 
+  if (email.headers !== undefined) {
+    message.headers = { ...email.headers };
+  }
+
   return message;
 };
 

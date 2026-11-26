@@ -54,7 +54,7 @@ A control marked **planned** isn't built yet and names the issue that builds it.
 ### Authorization and tenant isolation
 
 - Every endpoint declares the role it needs (planned, #34). Until then, every member of an Organization can do everything in it.
-- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)).
+- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). The exception is unsubscribe, which a recipient uses without a session: its signed token is the only credential, and it changes only the named Contact's Subscriptions to that Campaign's Lists and their Opt-out (ADR 0016).
 - Every repository method for tenant data requires the Organization from the request context.
 - A CI test suite attempts cross-Organization reads and writes, and fails when an endpoint for one Organization's data has no case in it.
 - A write that uses the session cookie is refused when its `Origin` is another site.
@@ -83,9 +83,11 @@ Backends are listed in [architecture.md](architecture.md#deployment-targets).
 
 ### Public endpoints
 
+- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe links use it now (#12); preference, tracking and bounce (VERP) tokens will (#13, #21, #23).
+- **Unsubscribe pages** send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and a Content Security Policy that loads nothing from elsewhere, because the token is in the address. They escape every value they show.
+
 Planned, with the features they protect.
 
-- **Signed tokens** (#12, #21, #23): unsubscribe, preference, tracking and bounce (VERP) tokens are HMAC-signed with rotating keys. They never expose sequential IDs.
 - **Click redirects** (#23) go only to the URL inside the signed token, so they can't be used as open redirects.
 - **Signup forms** (#30):
   - Turnstile, with hCaptcha as an alternative from P2. No reCAPTCHA.

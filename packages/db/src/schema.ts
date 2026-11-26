@@ -186,7 +186,9 @@ export const members = pgTable(
  * One person in an Organization (`cnt_…`). The address is kept as entered and
  * unique per Organization regardless of case. `(organization_id, id)` is
  * unique so a Subscription's foreign keys can require its List and its
- * Contact to belong to the same Organization.
+ * Contact to belong to the same Organization. `opted_out_at` is when the
+ * Contact chose to stop all email from the Organization (an Opt-out); no
+ * Campaign is sent to them after it.
  */
 export const contacts = pgTable(
   "contacts",
@@ -196,6 +198,7 @@ export const contacts = pgTable(
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
+    optedOutAt: timestamp("opted_out_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

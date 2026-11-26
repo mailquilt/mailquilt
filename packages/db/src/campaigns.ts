@@ -305,6 +305,30 @@ export const CampaignsLive = Layer.effect(
           });
         }).pipe(Effect.orDie),
 
+      stillConsents: (id, contactId) =>
+        Effect.gen(function* stillConsents() {
+          const organization = yield* currentOrganizationId;
+
+          const { rows } = yield* db.execute<{
+            readonly consents: boolean;
+          }>(sql`
+            select exists (
+              select 1
+              from contacts c
+              join campaigns cmp on cmp.organization_id = c.organization_id and cmp.id = ${id}
+              join subscriptions s on s.organization_id = c.organization_id
+                and s.contact_id = c.id
+                and s.list_id = cmp.list_id
+              where c.organization_id = ${organization}
+                and c.id = ${contactId}
+                and c.opted_out_at is null
+                and s.status = 'subscribed'
+            ) as consents
+          `);
+
+          return rows[0]?.consents === true;
+        }).pipe(Effect.orDie),
+
       // WARNING: the Campaign is marked sent in a statement after the outcomes commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
       recordOutcomes: (id, outcomes) =>
         Effect.gen(function* recordOutcomes() {
@@ -399,6 +423,7 @@ export const CampaignsLive = Layer.effect(
                     where s.organization_id = ${organization}
                       and s.list_id = ${started.listId}
                       and s.status = 'subscribed'
+                      and c.opted_out_at is null
                     returning 1
                   )
                   select count(*)::int as recipients from snapshot

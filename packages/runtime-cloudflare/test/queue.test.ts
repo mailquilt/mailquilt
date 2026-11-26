@@ -2,7 +2,9 @@ import { assert, describe, it } from "@effect/vitest";
 import {
   Campaigns,
   ProviderConnections,
+  PublicUrl,
   SendCampaignBatch,
+  SignedTokens,
   SmtpProvider,
 } from "@repo/core";
 import { CampaignIdSchema, OrganizationIdSchema } from "@repo/domain";
@@ -40,6 +42,8 @@ const ports = (campaigns: Layer.Layer<Campaigns>) =>
   Layer.mergeAll(
     campaigns,
     Layer.mock(ProviderConnections, {}),
+    Layer.succeed(PublicUrl, { origin: "https://mail.example.com" }),
+    Layer.mock(SignedTokens, {}),
     Layer.mock(SmtpProvider, {})
   );
 
