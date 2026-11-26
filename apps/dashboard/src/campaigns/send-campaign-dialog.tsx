@@ -1,10 +1,11 @@
 import { Banner } from "@cloudflare/kumo";
-import type { Campaign, Organization } from "@repo/domain";
+import type { Campaign, List, Organization } from "@repo/domain";
 import { Predicate } from "effect";
 import { useId } from "react";
 
 import { formatCount } from "../audience/format.ts";
 import { ActionDialog } from "../layout/action-dialog.tsx";
+import { ListLines } from "./campaign-lists.tsx";
 import { useSendCampaign } from "./campaigns-api.ts";
 
 /** Why the API wouldn't send it; each changes what the Campaign's page shows. */
@@ -42,9 +43,12 @@ const problemOf = (failure: Error) =>
     ? "You’ve been signed out. Sign in again, then send it. It hasn’t been sent."
     : "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be sent twice.";
 
+const contacts = (count: number) =>
+  `${formatCount(count)} ${count === 1 ? "contact" : "contacts"}`;
+
 /**
- * Asks before sending a draft to everyone subscribed to its List, and sends
- * it. It stays open, with Send now busy, until the API has taken it, and a
+ * Asks before sending a draft, saying how many it goes to now and which Lists
+ * it goes to and leaves out, and sends it. It stays open, with Send now busy, until the API has taken it, and a
  * second press does nothing. A failure to reach the server stays in the
  * dialog to try again: sending is one transaction, so it can't go out
  * twice. A refusal that changes what the page shows, such as no one being
@@ -53,27 +57,28 @@ const problemOf = (failure: Error) =>
 export const SendCampaignDialog = ({
   campaign,
   connectionName,
+  count,
   finalFocus,
-  listName,
+  lists,
   onExited,
   onOpenChange,
   onRefused,
   onSent,
   open,
   organization,
-  subscribed,
 }: {
   campaign: Campaign;
   connectionName: string;
+  /** How many it goes to now; undefined when it couldn't be counted. */
+  count: number | undefined;
   finalFocus: React.RefObject<HTMLElement | null>;
-  listName: string;
+  lists: readonly List[];
   onExited: () => void;
   onOpenChange: (open: boolean) => void;
   onRefused: (refusal: SendRefusal) => void;
   onSent: () => void;
   open: boolean;
   organization: Organization;
-  subscribed: number;
 }) => {
   const send = useSendCampaign(organization.id, campaign.id);
   const formId = useId();
@@ -105,7 +110,11 @@ export const SendCampaignDialog = ({
     <ActionDialog
       actionLabel="Send now"
       busy={send.isPending}
-      description={`It goes now, through ${connectionName}, to the ${formatCount(subscribed)} ${subscribed === 1 ? "contact" : "contacts"} subscribed to ${listName}, except anyone who stopped all marketing email or whose address is suppressed. Once it starts, it can’t be stopped.`}
+      description={
+        count === undefined
+          ? `It goes now, through ${connectionName}, to everyone subscribed to its lists, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address. Once it starts, it can’t be stopped.`
+          : `It goes now, through ${connectionName}, to the ${contacts(count)} who would get it. Once it starts, it can’t be stopped.`
+      }
       finalFocus={finalFocus}
       formId={formId}
       onExited={onExited}
@@ -125,7 +134,7 @@ export const SendCampaignDialog = ({
         {problem === undefined ? null : (
           <Banner role="alert" title={problem} variant="error" />
         )}
-        <dl className="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-base">
+        <dl className="grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-base">
           <dt className="text-kumo-subtle">Subject</dt>
           <dd className="font-medium text-pretty break-words text-kumo-strong">
             {campaign.subject}
@@ -137,6 +146,18 @@ export const SendCampaignDialog = ({
             )}
             <span className="text-kumo-subtle">{campaign.from.email}</span>
           </dd>
+          <dt className="text-kumo-subtle">Sends to</dt>
+          <dd className="text-kumo-default">
+            <ListLines ids={campaign.listIds} lists={lists} />
+          </dd>
+          {campaign.excludedListIds.length === 0 ? null : (
+            <>
+              <dt className="text-kumo-subtle">Leaves out</dt>
+              <dd className="text-kumo-default">
+                <ListLines ids={campaign.excludedListIds} lists={lists} />
+              </dd>
+            </>
+          )}
         </dl>
       </form>
     </ActionDialog>

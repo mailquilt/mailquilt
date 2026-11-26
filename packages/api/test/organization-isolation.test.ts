@@ -61,7 +61,20 @@ const TENANT_ENDPOINTS = {
   ) =>
     client.campaigns.create({
       params: { organizationId },
-      payload: { ...intruderCampaign, listId, providerConnectionId },
+      payload: {
+        ...intruderCampaign,
+        excludedListIds: [],
+        listIds: [listId],
+        providerConnectionId,
+      },
+    }),
+  "GET /api/organizations/:organizationId/campaigns/recipient-count": (
+    client: Client,
+    { listId, organizationId }: Target
+  ) =>
+    client.campaigns.countRecipients({
+      params: { organizationId },
+      query: { excludedListIds: [], listIds: [listId] },
     }),
   "GET /api/organizations/:organizationId/campaigns/:campaignId": (
     client: Client,
@@ -73,7 +86,12 @@ const TENANT_ENDPOINTS = {
   ) =>
     client.campaigns.update({
       params: { campaignId, organizationId },
-      payload: { ...intruderCampaign, listId, providerConnectionId },
+      payload: {
+        ...intruderCampaign,
+        excludedListIds: [],
+        listIds: [listId],
+        providerConnectionId,
+      },
     }),
   "POST /api/organizations/:organizationId/campaigns/:campaignId/send": (
     client: Client,
@@ -219,7 +237,8 @@ const ownedData = (owner: Client) =>
       payload: {
         from: { email: "news@acme.example" },
         html: "<p>This week at Acme</p>",
-        listId: list.id,
+        excludedListIds: [],
+        listIds: [list.id],
         providerConnectionId: connection.id,
         subject: "This week at Acme",
       },
@@ -651,12 +670,30 @@ layer(TestApp, { timeout: "2 minutes" })(
 
           const draft = {
             ...intruderCampaign,
-            listId: own.listId,
+            excludedListIds: [],
+            listIds: [own.listId],
             providerConnectionId: own.providerConnectionId,
           };
 
           const toForeignList = yield* outsider.campaigns
-            .create({ params, payload: { ...draft, listId: target.listId } })
+            .create({
+              params,
+              payload: { ...draft, listIds: [target.listId] },
+            })
+            .pipe(Effect.flip);
+
+          const leavingOutForeignList = yield* outsider.campaigns
+            .create({
+              params,
+              payload: { ...draft, excludedListIds: [target.listId] },
+            })
+            .pipe(Effect.flip);
+
+          const countingForeignList = yield* outsider.campaigns
+            .countRecipients({
+              params,
+              query: { excludedListIds: [], listIds: [target.listId] },
+            })
             .pipe(Effect.flip);
 
           const throughForeignConnection = yield* outsider.campaigns
@@ -682,6 +719,8 @@ layer(TestApp, { timeout: "2 minutes" })(
             .pipe(Effect.flip);
 
           assert.strictEqual(toForeignList._tag, "ListNotFound");
+          assert.strictEqual(leavingOutForeignList._tag, "ListNotFound");
+          assert.strictEqual(countingForeignList._tag, "ListNotFound");
           assert.strictEqual(
             throughForeignConnection._tag,
             "ProviderConnectionNotFound"

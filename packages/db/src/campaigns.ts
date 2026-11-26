@@ -3,6 +3,7 @@ import { Campaigns, currentOrganizationId } from "@repo/core";
 import type {
   CampaignDraft,
   CampaignId,
+  CampaignLists,
   OrganizationId,
   ProviderConnectionId,
 } from "@repo/domain";
@@ -18,7 +19,8 @@ import {
   ProviderConnectionIdSchema,
   ProviderConnectionNotFound,
 } from "@repo/domain";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
@@ -27,6 +29,7 @@ import { Database } from "./database.ts";
 import { newestFirstPage } from "./newest-first-page.ts";
 import { requireLists } from "./require-lists.ts";
 import {
+  campaignLists,
   campaignRecipients,
   campaigns,
   organizations,
@@ -42,8 +45,13 @@ const summaryColumns = {
   failed: campaigns.recipientsFailed,
   fromEmail: campaigns.fromEmail,
   fromName: campaigns.fromName,
+  excludedListIds: sql<
+    string[]
+  >`array(select list_id from ${campaignLists} where campaign_id = ${campaigns.id} and excluded order by list_id)`,
   id: campaigns.id,
-  listId: campaigns.listId,
+  listIds: sql<
+    string[]
+  >`array(select list_id from ${campaignLists} where campaign_id = ${campaigns.id} and not excluded order by list_id)`,
   providerConnectionId: campaigns.providerConnectionId,
   replyTo: campaigns.replyTo,
   sendingStartedAt: campaigns.sendingStartedAt,
@@ -62,7 +70,8 @@ interface SummaryRow {
   readonly fromName: string | null;
   readonly fromEmail: string;
   readonly replyTo: string | null;
-  readonly listId: string;
+  readonly listIds: readonly string[];
+  readonly excludedListIds: readonly string[];
   readonly providerConnectionId: string | null;
   readonly status: string;
   readonly total: number;
@@ -82,8 +91,9 @@ const toSummary = (row: SummaryRow) => ({
     row.fromName === null
       ? { email: row.fromEmail }
       : { email: row.fromEmail, name: row.fromName },
+  excludedListIds: row.excludedListIds,
   id: row.id,
-  listId: row.listId,
+  listIds: row.listIds,
   providerConnectionId: row.providerConnectionId,
   recipients: { failed: row.failed, sent: row.sent, total: row.total },
   replyTo: row.replyTo,
@@ -105,11 +115,76 @@ const draftColumns = (draft: typeof CampaignDraft.Type) => ({
   fromEmail: draft.from.email,
   fromName: draft.from.name ?? null,
   html: draft.html,
-  listId: draft.listId,
   providerConnectionId: draft.providerConnectionId,
   replyTo: draft.replyTo ?? null,
   subject: draft.subject,
 });
+
+const listRows = (
+  organization: OrganizationId,
+  id: CampaignId,
+  draft: typeof CampaignDraft.Type
+) => [
+  ...draft.listIds.map((listId) => ({
+    campaignId: id,
+    excluded: false,
+    listId,
+    organizationId: organization,
+  })),
+  ...draft.excludedListIds.map((listId) => ({
+    campaignId: id,
+    excluded: true,
+    listId,
+    organizationId: organization,
+  })),
+];
+
+type ListCondition = (listId: SQL, excluded: boolean) => SQL;
+
+const listsOfCampaign =
+  (organization: OrganizationId, id: CampaignId) =>
+  (listId: SQL, excluded: boolean) =>
+    sql`${listId} in (
+      select list_id from ${campaignLists}
+      where organization_id = ${organization} and campaign_id = ${id} and excluded = ${excluded}
+    )`;
+
+// WARNING: the check before each email is about consent, and its failure says so; who a Campaign leaves out is fixed when it starts sending, so a Contact added to an excluded List partway through still gets it.
+const targetedListsOfCampaign =
+  (organization: OrganizationId, id: CampaignId) =>
+  (listId: SQL, excluded: boolean) =>
+    excluded ? sql`false` : listsOfCampaign(organization, id)(listId, false);
+
+const listsChosen =
+  (lists: typeof CampaignLists.Type) => (listId: SQL, excluded: boolean) =>
+    inArray(listId, excluded ? lists.excludedListIds : lists.listIds);
+
+// WARNING: the one definition of who a Campaign goes to (subscribed to any List it goes to, once; never anyone with a Subscription of any status to a List it leaves out, an Opt-out or a Suppressed address); its count, its snapshot and the check before each email all read it, so they can't disagree.
+const recipientsOf = (organization: OrganizationId, lists: ListCondition) =>
+  sql`
+    select c.id, c.email
+    from contacts c
+    where c.organization_id = ${organization}
+      and c.opted_out_at is null
+      and exists (
+        select 1 from subscriptions s
+        where s.organization_id = c.organization_id
+          and s.contact_id = c.id
+          and s.status = 'subscribed'
+          and ${lists(sql`s.list_id`, false)}
+      )
+      and not exists (
+        select 1 from subscriptions s
+        where s.organization_id = c.organization_id
+          and s.contact_id = c.id
+          and ${lists(sql`s.list_id`, true)}
+      )
+      and not exists (
+        select 1 from suppressions x
+        where x.organization_id = c.organization_id
+          and lower(x.email) = lower(c.email)
+      )
+  `;
 
 const requireConnection = (
   db: EffectPgDatabase,
@@ -190,7 +265,10 @@ export const CampaignsLive = Layer.effect(
         Effect.gen(function* createCampaign() {
           const organization = yield* currentOrganizationId;
 
-          yield* requireLists(db, organization, [draft.listId]);
+          yield* requireLists(db, organization, [
+            ...draft.listIds,
+            ...draft.excludedListIds,
+          ]);
           yield* requireConnection(
             db,
             organization,
@@ -202,15 +280,41 @@ export const CampaignsLive = Layer.effect(
           );
 
           yield* db
-            .insert(campaigns)
-            .values({
-              ...draftColumns(draft),
-              id,
-              organizationId: organization,
-            })
+            .transaction(() =>
+              Effect.gen(function* insertCampaign() {
+                yield* db.insert(campaigns).values({
+                  ...draftColumns(draft),
+                  id,
+                  organizationId: organization,
+                });
+
+                yield* db
+                  .insert(campaignLists)
+                  .values(listRows(organization, id, draft));
+              })
+            )
             .pipe(Effect.orDie);
 
           return yield* one(organization, id).pipe(Effect.orDie);
+        }),
+
+      countRecipients: (lists) =>
+        Effect.gen(function* countRecipients() {
+          const organization = yield* currentOrganizationId;
+
+          yield* requireLists(db, organization, [
+            ...lists.listIds,
+            ...lists.excludedListIds,
+          ]);
+
+          const { rows } = yield* db
+            .execute<{ readonly recipients: number }>(sql`
+              select count(*)::int as recipients
+              from (${recipientsOf(organization, listsChosen(lists))}) as r
+            `)
+            .pipe(Effect.orDie);
+
+          return rows[0]?.recipients ?? 0;
         }),
 
       get: (id) =>
@@ -324,20 +428,8 @@ export const CampaignsLive = Layer.effect(
           }>(sql`
             select exists (
               select 1
-              from contacts c
-              join campaigns cmp on cmp.organization_id = c.organization_id and cmp.id = ${id}
-              join subscriptions s on s.organization_id = c.organization_id
-                and s.contact_id = c.id
-                and s.list_id = cmp.list_id
-              where c.organization_id = ${organization}
-                and c.id = ${contactId}
-                and c.opted_out_at is null
-                and s.status = 'subscribed'
-                and not exists (
-                  select 1 from suppressions x
-                  where x.organization_id = c.organization_id
-                    and lower(x.email) = lower(c.email)
-                )
+              from (${recipientsOf(organization, targetedListsOfCampaign(organization, id))}) as r
+              where r.id = ${contactId}
             ) as consents
           `);
 
@@ -414,7 +506,6 @@ export const CampaignsLive = Layer.effect(
                   )
                 )
                 .returning({
-                  listId: campaigns.listId,
                   providerConnectionId: campaigns.providerConnectionId,
                 })
                 .pipe(Effect.orDie);
@@ -441,19 +532,9 @@ export const CampaignsLive = Layer.effect(
                 .execute<{ readonly recipients: number }>(sql`
                   with snapshot as (
                     insert into ${campaignRecipients} (organization_id, campaign_id, contact_id, email, batch)
-                    select ${organization}, ${id}, c.id, c.email,
-                      (row_number() over (order by c.id) - 1) / ${batchSize}
-                    from subscriptions s
-                    join contacts c on c.organization_id = s.organization_id and c.id = s.contact_id
-                    where s.organization_id = ${organization}
-                      and s.list_id = ${started.listId}
-                      and s.status = 'subscribed'
-                      and c.opted_out_at is null
-                      and not exists (
-                        select 1 from suppressions x
-                        where x.organization_id = c.organization_id
-                          and lower(x.email) = lower(c.email)
-                      )
+                    select ${organization}, ${id}, r.id, r.email,
+                      (row_number() over (order by r.id) - 1) / ${batchSize}
+                    from (${recipientsOf(organization, listsOfCampaign(organization, id))}) as r
                     returning 1
                   )
                   select count(*)::int as recipients from snapshot
@@ -483,7 +564,10 @@ export const CampaignsLive = Layer.effect(
         Effect.gen(function* updateCampaign() {
           const organization = yield* currentOrganizationId;
 
-          yield* requireLists(db, organization, [draft.listId]);
+          yield* requireLists(db, organization, [
+            ...draft.listIds,
+            ...draft.excludedListIds,
+          ]);
           yield* requireConnection(
             db,
             organization,
@@ -491,18 +575,41 @@ export const CampaignsLive = Layer.effect(
           );
 
           const updated = yield* db
-            .update(campaigns)
-            .set({ ...draftColumns(draft), updatedAt: sql`now()` })
-            .where(
-              and(
-                inOrganization(organization, id),
-                eq(campaigns.status, "draft")
-              )
+            .transaction(() =>
+              Effect.gen(function* replaceDraft() {
+                const [row] = yield* db
+                  .update(campaigns)
+                  .set({ ...draftColumns(draft), updatedAt: sql`now()` })
+                  .where(
+                    and(
+                      inOrganization(organization, id),
+                      eq(campaigns.status, "draft")
+                    )
+                  )
+                  .returning({ id: campaigns.id });
+
+                if (row === undefined) {
+                  return false;
+                }
+
+                yield* db
+                  .delete(campaignLists)
+                  .where(
+                    and(
+                      eq(campaignLists.organizationId, organization),
+                      eq(campaignLists.campaignId, id)
+                    )
+                  );
+                yield* db
+                  .insert(campaignLists)
+                  .values(listRows(organization, id, draft));
+
+                return true;
+              })
             )
-            .returning({ id: campaigns.id })
             .pipe(Effect.orDie);
 
-          if (updated.length === 0) {
+          if (!updated) {
             return yield* notDraftOrMissing(organization, id);
           }
 

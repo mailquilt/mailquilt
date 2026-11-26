@@ -9,6 +9,8 @@ export const CAMPAIGNS = `${ORGANIZATION}/campaigns`;
 
 export const CAMPAIGN = `${CAMPAIGNS}/:campaignId`;
 
+export const RECIPIENT_COUNT = `${CAMPAIGNS}/recipient-count`;
+
 export const POSTMARK = {
   createdAt: "2026-11-22T09:00:00.000Z",
   from: { email: "news@acme.example", name: "Acme News" },
@@ -26,12 +28,20 @@ export const ROAST = {
   subscriptions: { pending: 0, subscribed: 3, unsubscribed: 0 },
 };
 
+export const OFFERS = {
+  createdAt: "2026-11-03T09:00:00.000Z",
+  id: "lst_01h455vb4pex5vsknk084sn02r",
+  name: "Offers",
+  subscriptions: { pending: 0, subscribed: 40, unsubscribed: 2 },
+};
+
 export const DRAFT = {
   createdAt: "2026-11-24T09:14:00.000Z",
   from: { email: "news@acme.example", name: "Acme News" },
   html: "<p>Hello</p>",
+  excludedListIds: [],
   id: "cmp_01h455vb4pex5vsknk084sn02q",
-  listId: ROAST.id,
+  listIds: [ROAST.id],
   providerConnectionId: POSTMARK.id,
   recipients: { failed: 0, sent: 0, total: 0 },
   replyTo: null,
@@ -55,26 +65,20 @@ export const SENT = {
   status: "sent",
 };
 
-/** The Organization, its one connection and its one List. */
+/** The Organization, its one connection, its one List, and how many a Campaign to its Lists reaches. */
 export const ready = ({
   connections = [POSTMARK],
   lists = [ROAST],
+  recipients = 3,
 }: {
   connections?: readonly object[];
   lists?: readonly object[];
+  recipients?: number;
 } = {}) => [
   http.get("*/api/organizations", () => HttpResponse.json([ACME])),
   http.get(`${ORGANIZATION}/provider-connections`, () =>
     HttpResponse.json(connections)
   ),
   http.get(`${ORGANIZATION}/lists`, () => HttpResponse.json(lists)),
-  http.get(`${ORGANIZATION}/lists/:listId`, ({ params }) => {
-    const list = lists.find(
-      (candidate) => "id" in candidate && candidate.id === params.listId
-    );
-
-    return list === undefined
-      ? HttpResponse.json({ _tag: "ListNotFound" }, { status: 404 })
-      : HttpResponse.json(list);
-  }),
+  http.get(RECIPIENT_COUNT, () => HttpResponse.json({ recipients })),
 ];

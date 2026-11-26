@@ -11,7 +11,14 @@ import {
 } from "../organizations/test-organizations.tsx";
 import type { CampaignSearch } from "./campaign-search.ts";
 import { CampaignsPage } from "./campaigns-page.tsx";
-import { CAMPAIGNS, DRAFT, ready, SENT } from "./test-campaigns.ts";
+import {
+  CAMPAIGNS,
+  DRAFT,
+  OFFERS,
+  ready,
+  ROAST,
+  SENT,
+} from "./test-campaigns.ts";
 
 const api = setupServer();
 
@@ -22,6 +29,7 @@ const OLDER = "cmp_01h455vb4pex5vsknk084sn02p";
 const NOVEMBER = {
   ...SENT,
   id: "cmp_01h455vb4pex5vsknk084sn02r",
+  listIds: [ROAST.id, OFFERS.id],
   subject: "November roast: Colombia Huila",
 };
 
@@ -95,9 +103,9 @@ describe("campaigns page", () => {
     expect(screen.queryByRole("link", { name: "New campaign" })).toBeNull();
   });
 
-  it("lists each campaign's status, list and how many it was sent to", async () => {
+  it("lists each campaign's status, lists and how many it was sent to", async () => {
     api.use(
-      ...ready(),
+      ...ready({ lists: [ROAST, OFFERS] }),
       withCampaigns(page([DRAFT, NOVEMBER], { next: OLDER, total: 51 }))
     );
     renderPage();
@@ -111,6 +119,12 @@ describe("campaigns page", () => {
     expect(draft.textContent).toContain("DraftRoast of the month");
     expect(within(sent).getByText("Sent")).toBeDefined();
     expect(within(sent).getByText("2")).toBeDefined();
+    expect(sent.textContent).toMatch(
+      new RegExp(
+        `${ROAST.name}\\+1, ${OFFERS.name}.*${ROAST.name} and 1 more, sent`,
+        "u"
+      )
+    );
   });
 
   it("counts every campaign and pages on to the older ones", async () => {

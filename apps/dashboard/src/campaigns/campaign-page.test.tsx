@@ -7,7 +7,7 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import { Schema } from "effect";
+import { Deferred, Effect, Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { useState } from "react";
@@ -31,7 +31,9 @@ import {
   CAMPAIGN,
   CAMPAIGNS,
   DRAFT,
+  OFFERS,
   ready,
+  RECIPIENT_COUNT,
   ROAST,
   SENDING,
   SENT,
@@ -181,7 +183,7 @@ describe("one campaign's page", () => {
       { _tag: "NoSubscribedContacts" },
       409,
       DRAFT,
-      { lists: [NOBODY] },
+      { lists: [NOBODY], recipients: 0 },
       "No one to send to yet",
     ],
     [
@@ -230,36 +232,103 @@ describe("one campaign's page", () => {
     }
   );
 
-  it("says no one can be sent to when everyone subscribed has stopped marketing email or is suppressed", async () => {
+  it.each([
+    [
+      "no one is subscribed to its lists",
+      NOBODY,
+      `No contacts are subscribed to ${ROAST.name}. Add some, or edit the draft to choose other lists.`,
+    ],
+    [
+      "everyone subscribed is left out",
+      ROAST,
+      `Everyone subscribed to ${ROAST.name} is or was on a list it leaves out, stopped all marketing email, or has a suppressed address. Add contacts, or edit the draft to choose other lists.`,
+    ],
+  ])(
+    "says there's no one to send to yet, with only Edit, when %s",
+    async (_, list, why) => {
+      api.use(
+        ...ready({ lists: [list], recipients: 0 }),
+        http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+      );
+      renderPage();
+
+      await expect(screen.findByText(why)).resolves.toBeDefined();
+      expect(screen.getByText("No one now")).toBeDefined();
+      expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+      expect(screen.getByRole("link", { name: "Edit" })).toBeDefined();
+    }
+  );
+
+  it("says when it couldn't count who it goes to, keeps Send now, and counts again with Try again", async () => {
+    let asked = 0;
+    const released = Deferred.makeUnsafe<number>();
+
     api.use(
+      http.get(RECIPIENT_COUNT, async () => {
+        asked += 1;
+
+        if (asked === 1) {
+          return HttpResponse.error();
+        }
+
+        const recipients = await Effect.runPromise(Deferred.await(released));
+
+        return HttpResponse.json({ recipients });
+      }),
       ...ready(),
-      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
-      http.post(SEND, () =>
-        HttpResponse.json({ _tag: "NoSubscribedContacts" }, { status: 409 })
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
+    renderPage();
+
+    const failed = await screen.findByText("Couldn’t count them");
+    const fact = failed.closest("[tabindex='-1']");
+    const tryAgain = screen.getByRole("button", { name: "Try again" });
+
+    expect(screen.getByRole("button", { name: "Send now" })).toBeDefined();
+
+    tryAgain.focus();
+    fireEvent.click(tryAgain);
+
+    await expect(
+      screen.findByRole("button", { name: "Trying again…" })
+    ).resolves.toBeDefined();
+    expect(fact?.textContent).not.toMatch(/\d/u);
+
+    Deferred.doneUnsafe(released, Effect.succeed(1204));
+
+    await expect(screen.findByText("1,204 contacts")).resolves.toBeDefined();
+    expect(document.activeElement).toBe(fact);
+  });
+
+  it("names how many it goes to, and the lists it goes to and leaves out, before sending", async () => {
+    api.use(
+      ...ready({ lists: [ROAST, OFFERS], recipients: 1204 }),
+      http.get(CAMPAIGN, () =>
+        HttpResponse.json({ ...DRAFT, excludedListIds: [OFFERS.id] })
       )
     );
     renderPage();
 
-    await confirmSend();
+    fireEvent.click(await screen.findByRole("button", { name: "Send now" }));
 
-    await expect(
-      screen.findByText(
-        `Everyone subscribed to ${ROAST.name} has stopped all marketing email or has a suppressed address. Add contacts to it, or edit the draft to choose another list.`
-      )
-    ).resolves.toBeDefined();
+    const dialog = await screen.findByRole("dialog", {
+      name: "Send this campaign now?",
+    });
+
+    expect(dialog.textContent).toContain(
+      "It goes now, through Postmark, to the 1,204 contacts who would get it."
+    );
+    expect(dialog.textContent).toContain(`Sends to${ROAST.name}`);
+    expect(dialog.textContent).toContain(`Leaves out${OFFERS.name}`);
   });
 
-  it("offers Send now again once a list that had no one subscribed has contacts", async () => {
-    const lists = [ROAST, NOBODY, ROAST];
-    let asked = 0;
+  it("offers Send now again once its lists, refused for having no one, have someone to send to", async () => {
     api.use(
+      http.get(
+        RECIPIENT_COUNT,
+        answering({ recipients: 3 }, { recipients: 0 }, { recipients: 3 })
+      ),
       ...ready(),
-      http.get(`*/lists/${ROAST.id}`, () => {
-        const list = lists[Math.min(asked, lists.length - 1)];
-        asked += 1;
-
-        return HttpResponse.json(list);
-      }),
       http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
       http.post(SEND, () =>
         HttpResponse.json({ _tag: "NoSubscribedContacts" }, { status: 409 })
@@ -281,23 +350,6 @@ describe("one campaign's page", () => {
       screen.findByRole("button", { name: "Send now" })
     ).resolves.toBeDefined();
     expect(screen.queryByText("No one to send to yet")).toBeNull();
-  });
-
-  it("offers only Edit for a draft whose list was deleted", async () => {
-    api.use(
-      ...ready({ lists: [] }),
-      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
-    );
-    renderPage();
-
-    await expect(
-      screen.findByText("Choose a list before sending")
-    ).resolves.toBeDefined();
-    expect(screen.getByText("The list was deleted")).toBeDefined();
-    expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
-    expect(
-      screen.getByRole("link", { name: "Edit" }).getAttribute("href")
-    ).toBe(`/campaigns/${DRAFT.id}/edit`);
   });
 
   it("asks for a postal address, with a link to add it, before a draft can be sent", async () => {

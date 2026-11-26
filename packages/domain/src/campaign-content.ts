@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 
 import { ListIdSchema, ProviderConnectionIdSchema } from "./ids.ts";
 import { MailAddress, Sender } from "./provider-connection.ts";
@@ -72,15 +72,61 @@ export const CampaignStatusSchema = Schema.Literals([
 export type CampaignStatus = typeof CampaignStatusSchema.Type;
 
 /**
+ * The most Lists a Campaign can go to, and the most it can leave out. Both
+ * full fit in a request beside 60 KiB of HTML.
+ */
+export const MAX_CAMPAIGN_LISTS = 25;
+
+const atMostCampaignLists = Schema.isMaxLength(MAX_CAMPAIGN_LISTS, {
+  message: `Choose at most ${MAX_CAMPAIGN_LISTS} lists.`,
+});
+
+const eachOnce = Schema.isUnique({ message: "Choose each list once." });
+
+/** The Lists a Campaign goes to: at least one, each once. */
+export const CampaignListIds = Schema.Array(ListIdSchema).check(
+  Schema.isMinLength(1, { message: "Choose at least one list." }),
+  atMostCampaignLists,
+  eachOnce
+);
+
+/** The Lists whose Contacts a Campaign leaves out, each once; none is fine. */
+export const ExcludedListIds = Schema.Array(ListIdSchema).check(
+  atMostCampaignLists,
+  eachOnce
+);
+
+const neverBoth = Schema.makeFilter(
+  (lists: {
+    readonly listIds: readonly string[];
+    readonly excludedListIds: readonly string[];
+  }) => !lists.excludedListIds.some((id) => lists.listIds.includes(id)),
+  { message: "A list can’t be both sent to and left out." }
+);
+
+/**
+ * Who a Campaign goes to: every Contact with a subscribed Subscription to
+ * any of `listIds`, once, except anyone with a Subscription to one of
+ * `excludedListIds`, whatever its status. A List can't be in both.
+ * `excludedListIds` may be left out for none.
+ */
+export const CampaignLists = Schema.Struct({
+  listIds: CampaignListIds,
+  excludedListIds: ExcludedListIds.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([]))
+  ),
+}).check(neverBoth);
+
+/**
  * What a member writes into a Campaign: its subject, who it's from and who
- * replies go to, the one List it goes to, the Provider Connection it's sent
- * through, and its HTML.
+ * replies go to, the Lists it goes to and leaves out (`CampaignLists`), the
+ * Provider Connection it's sent through, and its HTML.
  */
 export const CampaignDraft = Schema.Struct({
   subject: CampaignSubject,
   from: Sender,
   replyTo: Schema.optionalKey(MailAddress),
-  listId: ListIdSchema,
+  ...CampaignLists.fields,
   providerConnectionId: ProviderConnectionIdSchema,
   html: CampaignHtml,
-});
+}).check(neverBoth);

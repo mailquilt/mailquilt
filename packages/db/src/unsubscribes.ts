@@ -32,14 +32,24 @@ export const UnsubscribesLive = Layer.effect(
               o.name as organization_name,
               c.email,
               array(
-                select l.name from lists l
-                where l.organization_id = cmp.organization_id and l.id = cmp.list_id
+                select l.name from campaign_lists cl
+                join lists l on l.organization_id = cl.organization_id and l.id = cl.list_id
+                join subscriptions s on s.organization_id = cl.organization_id
+                  and s.list_id = cl.list_id
+                  and s.contact_id = c.id
+                where cl.organization_id = cmp.organization_id
+                  and cl.campaign_id = cmp.id
+                  and not cl.excluded
+                order by l.name
               ) as list_names,
               exists(
                 select 1 from subscriptions s
+                join campaign_lists cl on cl.organization_id = s.organization_id
+                  and cl.list_id = s.list_id
+                  and cl.campaign_id = cmp.id
+                  and not cl.excluded
                 where s.organization_id = cmp.organization_id
                   and s.contact_id = c.id
-                  and s.list_id = cmp.list_id
                   and s.status <> 'unsubscribed'
               ) as subscribed,
               c.opted_out_at is not null as opted_out
@@ -80,8 +90,10 @@ export const UnsubscribesLive = Layer.effect(
               and contact_id = ${contactId}
               and status <> 'unsubscribed'
               and list_id in (
-                select list_id from campaigns
-                where organization_id = ${organization} and id = ${campaignId}
+                select list_id from campaign_lists
+                where organization_id = ${organization}
+                  and campaign_id = ${campaignId}
+                  and not excluded
               )
           `);
         }).pipe(Effect.orDie),

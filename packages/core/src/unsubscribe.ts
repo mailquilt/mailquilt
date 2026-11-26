@@ -24,6 +24,7 @@ export interface UnsubscribeTarget {
 export interface Unsubscription {
   readonly organizationName: string;
   readonly email: string;
+  /** The Campaign's Lists the Contact has a Subscription to; a recipient never sees the others' names. */
   readonly listNames: readonly string[];
   readonly subscribed: boolean;
   readonly optedOut: boolean;

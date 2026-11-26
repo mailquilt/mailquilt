@@ -1416,6 +1416,121 @@ aside.mq-frame {
   margin-right: 1.5rem;
 }
 
+/* ---------- Choosing a Campaign's Lists ---------- */
+
+/* A checklist of Lists in one hairline card, as a table's rows are: 44px rows, hairlines between. */
+.mq-pick {
+  display: flex;
+  flex-direction: column;
+  border-radius: 0.75rem;
+  background: var(--color-kumo-base);
+  box-shadow: 0 0 0 1px var(--color-kumo-hairline);
+  overflow: hidden;
+}
+
+.mq-pick[data-invalid] {
+  box-shadow: 0 0 0 1px var(--color-kumo-danger);
+}
+
+.mq-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.625rem 1rem;
+  cursor: pointer;
+}
+
+.mq-pick-row + .mq-pick-row {
+  border-top: 1px solid var(--color-kumo-hairline);
+}
+
+.mq-pick-row:hover {
+  background: var(--color-kumo-tint);
+}
+
+.mq-pick-count {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-color-kumo-subtle);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The reach line under the checklists: a block, the count in the display face, one quiet line. */
+.mq-reach {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--color-kumo-elevated);
+  padding: 0.875rem 1rem;
+  box-shadow: 0 0 0 1px var(--color-kumo-hairline);
+}
+
+.mq-reach[data-dimmed] .mq-reach-main,
+.mq-reach[data-dimmed] .mq-reach-number {
+  color: var(--text-color-kumo-subtle);
+}
+
+.mq-reach-main {
+  color: var(--text-color-kumo-default);
+  line-height: 1.5rem;
+  text-wrap: pretty;
+}
+
+.mq-reach-mark {
+  display: flex;
+  height: 1.5rem;
+  align-items: center;
+}
+
+.mq-reach-number {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
+  color: var(--text-color-kumo-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.mq-reach-block {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: var(--mq-batch-radius);
+  background: var(--mq-block-ink);
+}
+
+/* A small ring that turns while something is counted; still when motion is reduced. */
+.mq-spin {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 2px solid var(--color-kumo-hairline);
+  border-top-color: var(--mq-block-ink);
+  border-radius: 9999px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mq-spin {
+    animation: mq-turn 800ms linear infinite;
+  }
+}
+
+@keyframes mq-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* A Campaign's Lists on its page and in Send now's dialog: one per line. */
+.mq-list-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
 /* ---------- The selection bar: ink, floating at the foot of the page area ---------- */
 
 :root[data-theme="mailquilt"] {

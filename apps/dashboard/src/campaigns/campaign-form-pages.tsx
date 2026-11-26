@@ -60,7 +60,7 @@ const saveFailureMessage = (failure: Error | null, saving: string) => {
   }
 
   if (Predicate.isTagged(failure, "ListNotFound")) {
-    return "The list you chose was deleted. Choose another.";
+    return "A list you chose was deleted. Choose another.";
   }
 
   if (Predicate.isTagged(failure, "ProviderConnectionNotFound")) {
@@ -176,6 +176,7 @@ export const NewCampaignPage = ({
         connections={choices.connections}
         failureMessage={saveFailureMessage(create.error, "the draft")}
         lists={choices.lists}
+        organizationId={organization.id}
         onSubmit={(draft) =>
           create.mutate(draft, {
             onError: choices.refetchDeleted,
@@ -280,6 +281,7 @@ export const EditCampaignPage = ({
         connections={choices.connections}
         failureMessage={saveFailureMessage(update.error, "your changes")}
         lists={choices.lists}
+        organizationId={organization.id}
         onSubmit={(changed) =>
           update.mutate(changed, {
             onError: (failure) => {

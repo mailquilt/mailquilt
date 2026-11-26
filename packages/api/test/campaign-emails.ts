@@ -13,10 +13,12 @@ let campaigns = 0;
 export const newList = ({ client, params }: Owner, name: string) =>
   client.lists.create({ params, payload: { name } });
 
+/** Subscribes `emails` to `listId` and sends a Campaign to it and to `alsoListIds`. */
 export const startCampaign = (
   owner: Owner,
   listId: ListId,
-  emails: readonly string[]
+  emails: readonly string[],
+  alsoListIds: readonly ListId[] = []
 ) =>
   Effect.gen(function* startSendingToList() {
     campaigns += 1;
@@ -48,7 +50,8 @@ export const startCampaign = (
       payload: {
         from: { email: "news@acme.example", name: "Acme News" },
         html: "<html><body><p>Hello!</p></body></html>",
-        listId,
+        excludedListIds: [],
+        listIds: [listId, ...alsoListIds],
         providerConnectionId: connection.id,
         replyTo: "replies@acme.example",
         subject,
@@ -78,10 +81,16 @@ export const sentWith = (subject: string) =>
 export const sendCampaign = (
   owner: Owner,
   listId: ListId,
-  emails: readonly string[]
+  emails: readonly string[],
+  alsoListIds: readonly ListId[] = []
 ) =>
   Effect.gen(function* sendToList() {
-    const { subject } = yield* startCampaign(owner, listId, emails);
+    const { subject } = yield* startCampaign(
+      owner,
+      listId,
+      emails,
+      alsoListIds
+    );
 
     yield* (yield* QueueWorker).deliverAll;
 

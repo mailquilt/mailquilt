@@ -1,5 +1,6 @@
 export {
   Campaigns,
+  countRecipients,
   createCampaign,
   getCampaign,
   handleQueueMessage,

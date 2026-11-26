@@ -7,10 +7,11 @@ import type {
   Organization,
   ProviderConnection,
 } from "@repo/domain";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
-import { useList } from "../audience/audience-api.ts";
+import { useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
 import { PaperPlaneTiltIcon, PencilSimpleIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
@@ -23,9 +24,20 @@ import { TableRegion } from "../layout/table-region.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
 import { useProviderConnections } from "../providers/providers-api.ts";
 import { formatMoment, formatSince } from "./campaign-dates.ts";
+import {
+  ListLines,
+  listSummary,
+  listsInWords,
+  namesOf,
+} from "./campaign-lists.tsx";
 import { CampaignBlock } from "./campaign-status.tsx";
-import { useCampaign, useRefreshCampaignPages } from "./campaigns-api.ts";
+import {
+  useCampaign,
+  useRecipientCount,
+  useRefreshCampaignPages,
+} from "./campaigns-api.ts";
 import { EmailPreview } from "./email-preview.tsx";
+import { failedToCount, TryAgain } from "./list-choice.tsx";
 import { SendCampaignDialog } from "./send-campaign-dialog.tsx";
 import type { SendRefusal } from "./send-campaign-dialog.tsx";
 
@@ -164,36 +176,71 @@ const Facts = ({ rows }: { rows: FactRows }) => (
   </dl>
 );
 
-type Problem = "list" | "connection" | "nobody" | "address" | "already";
+type Problem = "connection" | "nobody" | "address" | "already";
 
 type FactRows = readonly (readonly [string, React.ReactNode])[];
 
-const audienceFacts = (campaign: Campaign, list: List | null) => {
-  const listFact =
-    list === null ? <Missing>The list was deleted</Missing> : list.name;
+type RecipientCount = UseQueryResult<number>;
 
-  if (campaign.status !== "draft") {
-    return [
-      ["List", listFact],
-      campaign.status === "sent"
-        ? ["Sent to", sentTo(campaign)]
-        : ["Sending to", contacts(campaign.recipients.total)],
-    ] satisfies FactRows;
+// WARNING: one element for every state, so focus can move to it when Try again leaves the page; a new element per state would leave with it.
+const GoesToNow = ({ count }: { count: RecipientCount }) => {
+  let shown: React.ReactNode = contacts(count.data ?? 0);
+
+  if (failedToCount(count)) {
+    shown = (
+      <>
+        <Missing>Couldn’t count them</Missing>
+        <TryAgain onRetry={() => count.refetch()} retrying={count.isFetching} />
+      </>
+    );
+  } else if (count.isPlaceholderData) {
+    shown = <span className="text-kumo-subtle">Counting again…</span>;
+  } else if (count.data === 0) {
+    shown = <Missing>No one now</Missing>;
   }
 
-  if (list === null) {
-    return [["List", listFact]] satisfies FactRows;
-  }
+  return (
+    <span
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 outline-none"
+      tabIndex={-1}
+    >
+      {shown}
+    </span>
+  );
+};
 
-  const { subscribed } = list.subscriptions;
+const audienceFacts = (
+  campaign: Campaign,
+  lists: readonly List[],
+  count: RecipientCount
+) => {
+  const draft = campaign.status === "draft";
 
-  return [
-    ["List", listFact],
+  const rows: (readonly [string, React.ReactNode])[] = [
     [
-      "Subscribed now",
-      subscribed === 0 ? <Missing>No one yet</Missing> : contacts(subscribed),
+      { draft: "Sends to", sending: "Sending to lists", sent: "Sent to lists" }[
+        campaign.status
+      ],
+      <ListLines ids={campaign.listIds} key="to" lists={lists} />,
     ],
-  ] satisfies FactRows;
+  ];
+
+  if (campaign.excludedListIds.length > 0) {
+    rows.push([
+      draft ? "Leaves out" : "Left out",
+      <ListLines ids={campaign.excludedListIds} key="out" lists={lists} />,
+    ]);
+  }
+
+  if (draft) {
+    rows.push(["Goes to now", <GoesToNow count={count} key="now" />]);
+  } else if (campaign.status === "sending") {
+    rows.push(["Sending to", contacts(campaign.recipients.total)]);
+  } else {
+    rows.push(["Sent to", sentTo(campaign)]);
+  }
+
+  return rows satisfies FactRows;
 };
 
 const senderFacts = (
@@ -234,9 +281,9 @@ const senderFacts = (
 
 const problemOf = (
   campaign: Campaign,
-  list: List | null,
   connection: ProviderConnection | undefined,
   organization: Organization,
+  count: number | undefined,
   refusal: SendRefusal | undefined
 ) => {
   if (refusal === "already") {
@@ -247,10 +294,6 @@ const problemOf = (
     return;
   }
 
-  if (list === null) {
-    return "list" satisfies Problem;
-  }
-
   if (connection === undefined || refusal === "connection") {
     return "connection" satisfies Problem;
   }
@@ -259,7 +302,7 @@ const problemOf = (
     return "address" satisfies Problem;
   }
 
-  if (list.subscriptions.subscribed === 0 || refusal === "nobody") {
+  if (count === 0 || refusal === "nobody") {
     return "nobody" satisfies Problem;
   }
 };
@@ -304,14 +347,27 @@ const alreadySentWhen = (campaign: Campaign) => {
   return `It started sending ${formatMoment(campaign.sendingStartedAt)}`;
 };
 
+const nobodyWhy = (campaign: Campaign, lists: readonly List[]) => {
+  const names = listsInWords(namesOf(campaign.listIds, lists));
+
+  const anyoneSubscribed = lists.some(
+    (list) =>
+      campaign.listIds.includes(list.id) && list.subscriptions.subscribed > 0
+  );
+
+  return anyoneSubscribed
+    ? `Everyone subscribed to ${names} is or was on a list it leaves out, stopped all marketing email, or has a suppressed address. Add contacts, or edit the draft to choose other lists.`
+    : `No contacts are subscribed to ${names}. Add some, or edit the draft to choose other lists.`;
+};
+
 const ProblemBanner = ({
   campaign,
-  list,
+  lists,
   organization,
   problem,
 }: {
   campaign: Campaign;
-  list: List | null;
+  lists: readonly List[];
   organization: Organization;
   problem: Problem;
 }) => {
@@ -340,16 +396,8 @@ const ProblemBanner = ({
         "The provider connection this draft went through was deleted. Edit the draft to choose another.",
       title: "Choose a provider connection before sending",
     },
-    list: {
-      description:
-        "The list this draft went to was deleted. Edit the draft to choose another.",
-      title: "Choose a list before sending",
-    },
     nobody: {
-      description:
-        list === null || list.subscriptions.subscribed === 0
-          ? `No contacts are subscribed to ${list?.name ?? "its list"}. Add some to it, or edit the draft to choose another list.`
-          : `Everyone subscribed to ${list.name} has stopped all marketing email or has a suppressed address. Add contacts to it, or edit the draft to choose another list.`,
+      description: nobodyWhy(campaign, lists),
       title: "No one to send to yet",
     },
   }[problem];
@@ -393,56 +441,64 @@ const BlockedActions = ({
     <EditLink href={editHref} variant="primary" />
   );
 
-interface Refused {
-  readonly reason: SendRefusal;
+interface Loaded {
   readonly connections: readonly ProviderConnection[];
-  readonly list: List | null;
+  readonly countedAt: number;
   readonly organization: Organization;
 }
 
-const stillHolds = (
-  refused: Refused,
-  list: List | null,
-  connections: readonly ProviderConnection[],
-  organization: Organization
-) => {
+interface Refused extends Loaded {
+  readonly reason: SendRefusal;
+}
+
+const stillHolds = (refused: Refused, loaded: Loaded) => {
   if (refused.reason === "already") {
     return true;
   }
 
   if (refused.reason === "address") {
-    return refused.organization === organization;
+    return refused.organization === loaded.organization;
   }
 
-  return refused.list === list && refused.connections === connections;
+  if (refused.reason === "nobody") {
+    return refused.countedAt === loaded.countedAt;
+  }
+
+  return refused.connections === loaded.connections;
 };
 
-// WARNING: a refusal other than "already sent" holds only until what it was about loads again (the List or connections, or the Organization for its postal address); after that the page goes by them, or a List that gained subscribers would stay blocked.
-const stillRefused = (
-  refused: Refused | undefined,
-  list: List | null,
-  connections: readonly ProviderConnection[],
-  organization: Organization
-) =>
-  refused !== undefined && stillHolds(refused, list, connections, organization)
+// WARNING: a refusal other than "already sent" holds only until what it was about loads again (the recipient count, the connections, or the Organization for its postal address); after that the page goes by them, or Lists that gained subscribers would stay blocked.
+const stillRefused = (refused: Refused | undefined, loaded: Loaded) =>
+  refused !== undefined && stillHolds(refused, loaded)
     ? refused.reason
     : undefined;
 
 const CampaignView = ({
   campaign,
   connections,
-  list,
+  count,
+  lists,
   onRefusal,
   organization,
 }: {
   campaign: Campaign;
   connections: readonly ProviderConnection[];
-  list: List | null;
+  count: RecipientCount;
+  lists: readonly List[];
   onRefusal: () => void;
   organization: Organization;
 }) => {
   const [refused, setRefused] = useState<Refused>();
-  const refusal = stillRefused(refused, list, connections, organization);
+
+  const loaded: Loaded = {
+    connections,
+    countedAt: count.dataUpdatedAt,
+    organization,
+  };
+
+  const counted = count.isPlaceholderData ? undefined : count.data;
+
+  const refusal = stillRefused(refused, loaded);
 
   const sending = useDialog();
   const sendButton = useRef<HTMLButtonElement>(null);
@@ -455,7 +511,15 @@ const CampaignView = ({
   );
 
   const connectionName = connection?.name ?? "the provider";
-  const problem = problemOf(campaign, list, connection, organization, refusal);
+
+  const problem = problemOf(
+    campaign,
+    connection,
+    organization,
+    counted,
+    refusal
+  );
+
   const draft = campaign.status === "draft";
   const editHref = `/campaigns/${campaign.id}/edit`;
 
@@ -506,7 +570,7 @@ const CampaignView = ({
           {problem === undefined ? null : (
             <ProblemBanner
               campaign={campaign}
-              list={list}
+              lists={lists}
               organization={organization}
               problem={problem}
             />
@@ -516,12 +580,12 @@ const CampaignView = ({
           <SettingsSection
             about={
               draft
-                ? "Everyone subscribed to the list at the moment you send, except anyone who stopped all marketing email or whose address is suppressed. Pending and unsubscribed contacts don’t get it."
-                : "The contacts subscribed to the list when it was sent. Anyone who subscribes later doesn’t get it."
+                ? "Everyone subscribed to its lists at the moment you send, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address."
+                : "The contacts it went to when it was sent, once each. Anyone who subscribed later doesn’t get it."
             }
             title={draft ? "Who gets it" : "Who got it"}
           >
-            <Facts rows={audienceFacts(campaign, list)} />
+            <Facts rows={audienceFacts(campaign, lists, count)} />
           </SettingsSection>
           <SettingsSection
             about="Who it says it’s from, and the provider connection it goes out through."
@@ -548,13 +612,14 @@ const CampaignView = ({
       <SendCampaignDialog
         campaign={campaign}
         connectionName={connectionName}
+        count={counted}
         finalFocus={returnFocus}
         key={sending.key}
-        listName={list?.name ?? "its list"}
+        lists={lists}
         onExited={sending.handleExited}
         onOpenChange={sending.handleOpenChange}
         onRefused={(reason) => {
-          setRefused({ connections, list, organization, reason });
+          setRefused({ ...loaded, reason });
           onRefusal();
           returnFocus.current = problemRegion.current;
           sending.setOpen(false);
@@ -566,7 +631,6 @@ const CampaignView = ({
         }}
         open={sending.open}
         organization={organization}
-        subscribed={list?.subscriptions.subscribed ?? 0}
       />
     </PageFrame>
   );
@@ -590,7 +654,18 @@ export const CampaignPage = ({
 }) => {
   const campaign = useCampaign(organization.id, campaignId);
   const connections = useProviderConnections(organization.id);
-  const list = useList(organization.id, campaign.data?.listId);
+  const lists = useLists(organization.id);
+  const draft = campaign.data?.status === "draft";
+
+  const count = useRecipientCount(
+    organization.id,
+    {
+      excludedListIds: campaign.data?.excludedListIds ?? [],
+      listIds: campaign.data?.listIds ?? [],
+    },
+    draft
+  );
+
   const toasts = useConfirmationToast();
   const refreshPages = useRefreshCampaignPages(organization.id);
   const seenStatus = useRef(campaign.data?.status);
@@ -611,27 +686,27 @@ export const CampaignPage = ({
 
     toasts.add({
       description:
-        list.data === undefined || list.data === null || name === undefined
+        lists.data === undefined || name === undefined
           ? undefined
-          : `${list.data.name}, through ${name}`,
+          : `${listSummary(namesOf(campaign.data.listIds, lists.data))}, through ${name}`,
       title: `Sent to ${sentTo(campaign.data)}`,
     });
     refreshPages();
   }, [
     campaign.data,
     connections.data,
-    list.data,
+    lists.data,
     refreshPages,
     status,
     toasts,
   ]);
 
+  // WARNING: a draft's page waits for its recipient count too; drawn later, its "No one to send to yet" and Send now would change after the page appeared.
   const waiting =
     loadingFirstTime(campaign) ||
     loadingFirstTime(connections) ||
-    (campaign.data !== undefined &&
-      campaign.data !== null &&
-      loadingFirstTime(list));
+    loadingFirstTime(lists) ||
+    (draft && loadingFirstTime(count));
 
   if (waiting) {
     return <PageAreaLoading label="Loading the campaign" />;
@@ -665,7 +740,7 @@ export const CampaignPage = ({
   if (
     campaign.data === undefined ||
     connections.data === undefined ||
-    list.data === undefined
+    lists.data === undefined
   ) {
     return (
       <PageFrame>
@@ -678,14 +753,16 @@ export const CampaignPage = ({
           <TableRegion label="Campaign">
             <LoadFailed
               onRetry={() => {
-                for (const query of [campaign, connections, list]) {
+                for (const query of [campaign, connections, lists]) {
                   if (query.isError) {
                     query.refetch();
                   }
                 }
               }}
               retrying={
-                campaign.isFetching || connections.isFetching || list.isFetching
+                campaign.isFetching ||
+                connections.isFetching ||
+                lists.isFetching
               }
               title="This campaign didn’t load"
             />
@@ -699,11 +776,13 @@ export const CampaignPage = ({
     <CampaignView
       campaign={campaign.data}
       connections={connections.data}
-      list={list.data}
+      count={count}
+      lists={lists.data}
       onRefusal={() => {
         campaign.refetch();
         connections.refetch();
-        list.refetch();
+        lists.refetch();
+        count.refetch();
       }}
       organization={organization}
     />

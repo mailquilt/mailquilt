@@ -1,6 +1,7 @@
 import { MailquiltApi } from "@repo/contract";
 import {
   asMemberOf,
+  countRecipients,
   createCampaign,
   getCampaign,
   listCampaigns,
@@ -25,6 +26,9 @@ export const CampaignsHandlers = HttpApiBuilder.group(
           asMemberOf(params.organizationId),
           signedIn
         )
+      )
+      .handle("countRecipients", ({ params, query }) =>
+        countRecipients(query).pipe(asMemberOf(params.organizationId), signedIn)
       )
       .handle("get", ({ params }) =>
         getCampaign(params.campaignId).pipe(

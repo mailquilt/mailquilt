@@ -109,6 +109,49 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
       })
   );
 
+  test.effect(
+    "names and unsubscribes from only the Campaign's Lists the Contact is on, never its other Lists",
+    () =>
+      Effect.gen(function* onlyTheirLists() {
+        const owner = yield* ownOrganization;
+        const list = yield* newList(owner, "Weekly picks");
+        const vip = yield* newList(owner, "Lapsed VIPs");
+
+        yield* owner.client.contacts.create({
+          params: owner.params,
+          payload: { email: "grace@example.com", listIds: [vip.id] },
+        });
+
+        const sent = yield* sendCampaign(
+          owner,
+          list.id,
+          ["ada@example.com"],
+          [vip.id]
+        );
+
+        const pathTo = (email: string) =>
+          unsubscribePath(sent.find((one) => one.to === email) ?? {});
+
+        const adaPage = yield* open(pathTo("ada@example.com"));
+        const gracePage = yield* open(pathTo("grace@example.com"));
+
+        yield* post(pathTo("grace@example.com"), ONE_CLICK);
+
+        assert.include(adaPage.html, "Unsubscribe from Weekly picks?");
+        assert.notInclude(adaPage.html, "Lapsed VIPs");
+        assert.include(gracePage.html, "Unsubscribe from Lapsed VIPs?");
+        assert.notInclude(gracePage.html, "Weekly picks");
+        assert.strictEqual(
+          yield* statusOn(owner, vip.id, "grace@example.com"),
+          "unsubscribed"
+        );
+        assert.strictEqual(
+          yield* statusOn(owner, list.id, "ada@example.com"),
+          "subscribed"
+        );
+      })
+  );
+
   test.effect("refuses a link that was changed, and changes nothing", () =>
     Effect.gen(function* changedLink() {
       const owner = yield* ownOrganization;

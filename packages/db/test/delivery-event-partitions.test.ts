@@ -21,10 +21,9 @@ const databaseWithCampaign = Effect.gen(function* databaseWithCampaign() {
   yield* Effect.gen(function* insertCampaign() {
     const sql = yield* SqlClient.SqlClient;
     yield* sql`insert into organizations (id, name) values ('org_1', 'Acme')`;
-    yield* sql`insert into lists (id, organization_id, name) values ('lst_1', 'org_1', 'News')`;
     yield* sql`
-      insert into campaigns (id, organization_id, subject, from_email, list_id, html)
-      values ('cmp_1', 'org_1', 'Hello', 'news@acme.example', 'lst_1', '<p>Hello</p>')`;
+      insert into campaigns (id, organization_id, subject, from_email, html)
+      values ('cmp_1', 'org_1', 'Hello', 'news@acme.example', '<p>Hello</p>')`;
   }).pipe(Effect.provide(client));
 
   return Layer.mergeAll(
