@@ -14,6 +14,7 @@ import {
   ContactIdSchema,
   newCampaignId,
   NoSubscribedContacts,
+  PostalAddressRequired,
   ProviderConnectionIdSchema,
   ProviderConnectionNotFound,
 } from "@repo/domain";
@@ -28,6 +29,7 @@ import { requireLists } from "./require-lists.ts";
 import {
   campaignRecipients,
   campaigns,
+  organizations,
   providerConnections,
 } from "./schema.ts";
 
@@ -257,11 +259,17 @@ export const CampaignsLive = Layer.effect(
               fromEmail: campaigns.fromEmail,
               fromName: campaigns.fromName,
               html: campaigns.html,
+              organizationName: organizations.name,
+              postalAddress: organizations.postalAddress,
               providerConnectionId: campaigns.providerConnectionId,
               replyTo: campaigns.replyTo,
               subject: campaigns.subject,
             })
             .from(campaigns)
+            .innerJoin(
+              organizations,
+              eq(organizations.id, campaigns.organizationId)
+            )
             .where(inOrganization(organization, id));
 
           if (campaign === undefined) {
@@ -290,6 +298,8 @@ export const CampaignsLive = Layer.effect(
                 ? { email: campaign.fromEmail }
                 : { email: campaign.fromEmail, name: campaign.fromName },
             html: campaign.html,
+            organizationName: campaign.organizationName,
+            postalAddress: campaign.postalAddress,
             providerConnectionId:
               campaign.providerConnectionId === null
                 ? null
@@ -410,6 +420,16 @@ export const CampaignsLive = Layer.effect(
 
               if (started.providerConnectionId === null) {
                 return yield* new ProviderConnectionNotFound();
+              }
+
+              const [sender] = yield* db
+                .select({ postalAddress: organizations.postalAddress })
+                .from(organizations)
+                .where(eq(organizations.id, organization))
+                .pipe(Effect.orDie);
+
+              if (sender === undefined || sender.postalAddress === null) {
+                return yield* new PostalAddressRequired();
               }
 
               const snapshot = yield* db

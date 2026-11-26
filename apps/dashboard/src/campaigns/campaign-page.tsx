@@ -1,4 +1,5 @@
 import { Banner, Button, LinkButton } from "@cloudflare/kumo";
+import { postalAddressLine, withFooterHtml } from "@repo/domain";
 import type {
   Campaign,
   CampaignId,
@@ -163,7 +164,7 @@ const Facts = ({ rows }: { rows: FactRows }) => (
   </dl>
 );
 
-type Problem = "list" | "connection" | "nobody" | "already";
+type Problem = "list" | "connection" | "nobody" | "address" | "already";
 
 type FactRows = readonly (readonly [string, React.ReactNode])[];
 
@@ -235,6 +236,7 @@ const problemOf = (
   campaign: Campaign,
   list: List | null,
   connection: ProviderConnection | undefined,
+  organization: Organization,
   refusal: SendRefusal | undefined
 ) => {
   if (refusal === "already") {
@@ -253,9 +255,39 @@ const problemOf = (
     return "connection" satisfies Problem;
   }
 
+  if (organization.postalAddress === null || refusal === "address") {
+    return "address" satisfies Problem;
+  }
+
   if (list.subscriptions.subscribed === 0 || refusal === "nobody") {
     return "nobody" satisfies Problem;
   }
+};
+
+const ADDRESS_SLOT = "Your postal address goes here";
+
+const DASHED_SLOT =
+  "display:inline-block;padding:2px 10px;border:1.5px dashed #a1a1aa;border-radius:6px";
+
+// WARNING: the slot is the preview's own and is never sent; `withFooterHtml` leaves its plain text as it is, so it's found by that text and drawn as the dashed missing piece.
+const asSent = (campaign: Campaign, organization: Organization) => {
+  if (organization.postalAddress === null) {
+    return withFooterHtml(campaign.html, {
+      addressLine: ADDRESS_SLOT,
+      unsubscribeUrl: "#",
+    }).replace(
+      `>${ADDRESS_SLOT}</p>`,
+      `><span style="${DASHED_SLOT}">${ADDRESS_SLOT}</span></p>`
+    );
+  }
+
+  return withFooterHtml(campaign.html, {
+    addressLine: postalAddressLine(
+      organization.name,
+      organization.postalAddress
+    ),
+    unsubscribeUrl: "#",
+  });
 };
 
 const alreadySentWhen = (campaign: Campaign) => {
@@ -297,6 +329,10 @@ const ProblemBanner = ({
   }
 
   const blocked = {
+    address: {
+      description: `Every campaign ends with ${organization.name}’s postal address, as anti-spam laws require. Add it once in Organization settings.`,
+      title: "Add a postal address before sending",
+    },
     connection: {
       description:
         "The provider connection this draft went through was deleted. Edit the draft to choose another.",
@@ -322,6 +358,60 @@ const ProblemBanner = ({
   );
 };
 
+const EditLink = ({
+  href,
+  variant,
+}: {
+  href: string;
+  variant: "primary" | "secondary";
+}) => (
+  <LinkButton href={href} icon={PencilSimpleIcon} variant={variant}>
+    Edit
+  </LinkButton>
+);
+
+const BlockedActions = ({
+  editHref,
+  problem,
+}: {
+  editHref: string;
+  problem: Problem;
+}) =>
+  problem === "address" ? (
+    <>
+      <EditLink href={editHref} variant="secondary" />
+      <LinkButton href="/settings" variant="primary">
+        Add postal address
+      </LinkButton>
+    </>
+  ) : (
+    <EditLink href={editHref} variant="primary" />
+  );
+
+interface Refused {
+  readonly reason: SendRefusal;
+  readonly connections: readonly ProviderConnection[];
+  readonly list: List | null;
+}
+
+const LASTING_REFUSALS = new Set<SendRefusal>(["already", "address"]);
+
+// WARNING: "no one subscribed" and "connection deleted" hold only until the List or connections load again; after that the page goes by them, or a List that gained subscribers would stay blocked.
+const stillRefused = (
+  refused: Refused | undefined,
+  list: List | null,
+  connections: readonly ProviderConnection[]
+) => {
+  if (refused === undefined) {
+    return;
+  }
+
+  return LASTING_REFUSALS.has(refused.reason) ||
+    (refused.list === list && refused.connections === connections)
+    ? refused.reason
+    : undefined;
+};
+
 const CampaignView = ({
   campaign,
   connections,
@@ -335,18 +425,8 @@ const CampaignView = ({
   onRefusal: () => void;
   organization: Organization;
 }) => {
-  const [refused, setRefused] = useState<{
-    readonly reason: SendRefusal;
-    readonly connections: readonly ProviderConnection[];
-    readonly list: List | null;
-  }>();
-
-  // WARNING: "no one subscribed" and "connection deleted" hold only until the List or connections load again; after that the page goes by them, or a List that gained subscribers would stay blocked.
-  const refusal =
-    refused?.reason === "already" ||
-    (refused?.list === list && refused.connections === connections)
-      ? refused?.reason
-      : undefined;
+  const [refused, setRefused] = useState<Refused>();
+  const refusal = stillRefused(refused, list, connections);
 
   const sending = useDialog();
   const sendButton = useRef<HTMLButtonElement>(null);
@@ -359,24 +439,18 @@ const CampaignView = ({
   );
 
   const connectionName = connection?.name ?? "the provider";
-  const problem = problemOf(campaign, list, connection, refusal);
+  const problem = problemOf(campaign, list, connection, organization, refusal);
   const draft = campaign.status === "draft";
   const editHref = `/campaigns/${campaign.id}/edit`;
-
-  const edit = (variant: "primary" | "secondary") => (
-    <LinkButton href={editHref} icon={PencilSimpleIcon} variant={variant}>
-      Edit
-    </LinkButton>
-  );
 
   let actions: React.ReactNode;
 
   if (draft && problem !== undefined) {
-    actions = edit("primary");
+    actions = <BlockedActions editHref={editHref} problem={problem} />;
   } else if (draft) {
     actions = (
       <>
-        {edit("secondary")}
+        <EditLink href={editHref} variant="secondary" />
         <Button
           icon={PaperPlaneTiltIcon}
           onClick={() => {
@@ -443,7 +517,11 @@ const CampaignView = ({
             about="The email exactly as it’s sent, in a preview that runs no scripts."
             title="Email"
           >
-            <EmailPreview className="h-[38rem]" fit html={campaign.html} />
+            <EmailPreview
+              className="h-[38rem]"
+              fit
+              html={asSent(campaign, organization)}
+            />
           </SettingsSection>
         </div>
       </div>

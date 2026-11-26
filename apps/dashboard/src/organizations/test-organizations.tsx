@@ -15,12 +15,14 @@ import { OrganizationsProvider } from "./organizations.tsx";
 export const ACME = {
   id: "org_01h455vb4pex5vsknk084sn02q",
   name: "Acme Newsletter",
+  postalAddress: "14 Mill Lane\nBristol BS1 4XE",
   role: "owner",
 } as const;
 
 export const BOLT = {
   id: "org_01h455vb4pex5vsknk084sn02r",
   name: "Bolt Weekly",
+  postalAddress: null,
   role: "owner",
 } as const;
 

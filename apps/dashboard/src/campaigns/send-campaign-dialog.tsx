@@ -8,7 +8,12 @@ import { ActionDialog } from "../layout/action-dialog.tsx";
 import { useSendCampaign } from "./campaigns-api.ts";
 
 /** Why the API wouldn't send it; each changes what the Campaign's page shows. */
-export type SendRefusal = "already" | "connection" | "gone" | "nobody";
+export type SendRefusal =
+  | "address"
+  | "already"
+  | "connection"
+  | "gone"
+  | "nobody";
 
 const refusalOf = (failure: Error) => {
   if (Predicate.isTagged(failure, "CampaignNotDraft")) {
@@ -21,6 +26,10 @@ const refusalOf = (failure: Error) => {
 
   if (Predicate.isTagged(failure, "NoSubscribedContacts")) {
     return "nobody" satisfies SendRefusal;
+  }
+
+  if (Predicate.isTagged(failure, "PostalAddressRequired")) {
+    return "address" satisfies SendRefusal;
   }
 
   if (Predicate.isTagged(failure, "CampaignNotFound")) {

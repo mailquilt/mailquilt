@@ -59,6 +59,10 @@ const startCampaign = (
       },
     });
 
+    yield* client.organizations.updatePostalAddress({
+      params,
+      payload: { postalAddress: "14 Mill Lane\nBristol BS1 4XE" },
+    });
     yield* client.campaigns.send({
       params: { ...params, campaignId: campaign.id },
     });
@@ -183,14 +187,9 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
           "List-Unsubscribe=One-Click"
         );
         assert.include(ada?.html, `href="${APP_URL}${adaPath}"`);
-        assert.match(
-          ada?.html ?? "",
-          /Unsubscribe<\/a><\/p><\/body><\/html>$/u
-        );
-        assert.isTrue(
-          ada?.text?.endsWith(
-            `Don’t want these emails? Unsubscribe:\n${APP_URL}${adaPath}`
-          )
+        assert.include(
+          ada?.text,
+          `Don’t want these emails? Unsubscribe:\n${APP_URL}${adaPath}\n`
         );
       })
   );

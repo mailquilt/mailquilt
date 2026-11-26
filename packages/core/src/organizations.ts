@@ -22,6 +22,14 @@ export class Organizations extends Context.Service<
       user: UserId,
       organization: OrganizationId
     ) => Effect.Effect<Option.Option<Role>>;
+    /** Saves the postal address every Campaign of the Organization ends with. */
+    readonly updatePostalAddress: (
+      postalAddress: string
+    ) => Effect.Effect<
+      Organization,
+      never,
+      CurrentOrganization | CurrentMembership
+    >;
     /** The Organization this request acts in, with the signed-in person's role. */
     readonly current: Effect.Effect<
       Organization,
@@ -77,3 +85,11 @@ export const asMemberOf =
         Effect.provideService(CurrentMembership, { role: role.value })
       );
     });
+
+/** Saves the postal address every Campaign of the Organization ends with. */
+export const updatePostalAddress = (postalAddress: string) =>
+  Effect.gen(function* updateOrganizationPostalAddress() {
+    const organizations = yield* Organizations;
+
+    return yield* organizations.updatePostalAddress(postalAddress);
+  });

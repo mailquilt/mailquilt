@@ -1,7 +1,7 @@
 import { DropdownMenu, useSidebar } from "@cloudflare/kumo";
 import { useId, useRef } from "react";
 
-import { CaretUpDownIcon } from "../icons/icons.tsx";
+import { CaretUpDownIcon, GearSixIcon } from "../icons/icons.tsx";
 import { ActionDialog, useDialog } from "../layout/action-dialog.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
 import { CreateOrganizationForm } from "./create-organization-form.tsx";
@@ -13,7 +13,8 @@ const MENU_ROW = "gap-2.5 py-1";
 
 /**
  * The Organization this tab works in, at the top of the frame, with the
- * person's role in it under its name. Its menu switches to another one or creates a new one.
+ * person's role in it under its name. Its menu switches to another one,
+ * creates a new one, or opens this one's settings.
  * Hidden until the person has an Organization: the home page asks them to
  * name their first.
  */
@@ -115,6 +116,18 @@ export const OrganizationSwitcher = () => {
             <NewPatchSlot className="size-6" />
             <span className="leading-4.5 font-medium text-kumo-strong">
               New organization
+            </span>
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item className={MENU_ROW} href="/settings">
+            <span
+              aria-hidden="true"
+              className="flex size-6 shrink-0 items-center justify-center text-kumo-subtle"
+            >
+              <GearSixIcon className="size-4.5" />
+            </span>
+            <span className="leading-4.5 font-medium text-kumo-strong">
+              Organization settings
             </span>
           </DropdownMenu.Item>
         </DropdownMenu.Content>

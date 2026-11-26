@@ -5,7 +5,7 @@ import {
   Organization,
   RoleSchema,
 } from "@repo/domain";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { Effect, Layer, Option, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
 
@@ -44,7 +44,12 @@ export const OrganizationsLive = Layer.effect(
                 userId: owner,
               });
 
-              return yield* decodeOrganization({ id, name, role: "owner" });
+              return yield* decodeOrganization({
+                id,
+                name,
+                postalAddress: null,
+                role: "owner",
+              });
             })
           )
           .pipe(Effect.orDie),
@@ -54,7 +59,11 @@ export const OrganizationsLive = Layer.effect(
         const role = yield* currentRole;
 
         const [row] = yield* db
-          .select({ id: organizations.id, name: organizations.name })
+          .select({
+            id: organizations.id,
+            name: organizations.name,
+            postalAddress: organizations.postalAddress,
+          })
           .from(organizations)
           .where(eq(organizations.id, organizationId));
 
@@ -66,6 +75,7 @@ export const OrganizationsLive = Layer.effect(
           .select({
             id: organizations.id,
             name: organizations.name,
+            postalAddress: organizations.postalAddress,
             role: members.role,
           })
           .from(members)
@@ -79,6 +89,24 @@ export const OrganizationsLive = Layer.effect(
             Effect.flatMap(Effect.forEach((row) => decodeOrganization(row))),
             Effect.orDie
           ),
+
+      updatePostalAddress: (postalAddress) =>
+        Effect.gen(function* updatePostalAddress() {
+          const organizationId = yield* currentOrganizationId;
+          const role = yield* currentRole;
+
+          const [row] = yield* db
+            .update(organizations)
+            .set({ postalAddress, updatedAt: sql`now()` })
+            .where(eq(organizations.id, organizationId))
+            .returning({
+              id: organizations.id,
+              name: organizations.name,
+              postalAddress: organizations.postalAddress,
+            });
+
+          return yield* decodeOrganization({ ...row, role });
+        }).pipe(Effect.orDie),
 
       roleOf: (user, organization) =>
         db

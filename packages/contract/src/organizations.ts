@@ -1,4 +1,4 @@
-import { Organization, OrganizationName } from "@repo/domain";
+import { Organization, OrganizationName, PostalAddress } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
@@ -30,4 +30,16 @@ export class OrganizationsApi extends HttpApiGroup.make("organizations")
       params: organizationParams,
       success: Organization,
     })
+  )
+  .add(
+    HttpApiEndpoint.put(
+      "updatePostalAddress",
+      "/organizations/:organizationId/postal-address",
+      {
+        error: [SignInRequiredError, OrganizationNotFoundError],
+        params: organizationParams,
+        payload: Schema.Struct({ postalAddress: PostalAddress }),
+        success: Organization,
+      }
+    )
   ) {}

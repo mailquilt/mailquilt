@@ -78,27 +78,6 @@ export const unsubscribeUrl = (target: UnsubscribeTarget) =>
     return `${origin}/unsubscribe?token=${token}`;
   });
 
-const CLOSING_BODY = /<\/body>/giu;
-
-/**
- * The Campaign's HTML with an unsubscribe link at its foot, inside `<body>`
- * when it has one. The link is a URL this install made, so it needs no
- * escaping beyond what it already is.
- */
-export const withUnsubscribeLink = (html: string, url: string) => {
-  const footer = `<p style="margin:32px 0 0;font-family:Arial,sans-serif;font-size:13px;line-height:1.5;color:#52525b;text-align:center">Don’t want these emails? <a href="${url}" style="color:#52525b">Unsubscribe</a></p>`;
-  const closings = [...html.matchAll(CLOSING_BODY)];
-  const last = closings.at(-1);
-
-  return last === undefined
-    ? `${html}${footer}`
-    : `${html.slice(0, last.index)}${footer}${html.slice(last.index)}`;
-};
-
-/** The Campaign's plain-text part with an unsubscribe line at its foot, matching `withUnsubscribeLink`. */
-export const withUnsubscribeLine = (text: string, url: string) =>
-  `${text}\n\nDon’t want these emails? Unsubscribe:\n${url}`;
-
 /** The headers that let a mail app offer its own one-click unsubscribe (RFC 8058). */
 export const unsubscribeHeaders = (url: string) => ({
   "List-Unsubscribe": `<${url}>`,

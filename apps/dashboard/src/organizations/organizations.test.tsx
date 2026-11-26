@@ -71,6 +71,7 @@ const GRACE_SESSION = {
 const LATE = {
   id: "org_01h455vb4pex5vsknk084sn02s",
   name: "Late Gazette",
+  postalAddress: null,
   role: "owner",
 } as const;
 

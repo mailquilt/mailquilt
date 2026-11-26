@@ -81,6 +81,14 @@ const TENANT_ENDPOINTS = {
     client: Client,
     { organizationId }: Target
   ) => client.organizations.get({ params: { organizationId } }),
+  "PUT /api/organizations/:organizationId/postal-address": (
+    client: Client,
+    { organizationId }: Target
+  ) =>
+    client.organizations.updatePostalAddress({
+      params: { organizationId },
+      payload: { postalAddress: "1 Intruder Way" },
+    }),
   "GET /api/organizations/:organizationId/contacts": (
     client: Client,
     { listId, organizationId }: Target

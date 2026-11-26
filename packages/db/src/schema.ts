@@ -151,6 +151,8 @@ export const instance = pgTable(
 export const organizations = pgTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  /** Where it can be reached by post; every Campaign ends with it. `null` until a member adds it. */
+  postalAddress: text("postal_address"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
