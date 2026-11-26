@@ -2,6 +2,8 @@ import type {
   Campaigns,
   DeliveryEventPartitions,
   ProviderConnections,
+  PublicUrl,
+  SignedTokens,
   SmtpProvider,
 } from "@repo/core";
 import {
@@ -134,6 +136,8 @@ type WorkerPorts =
   | Campaigns
   | DeliveryEventPartitions
   | ProviderConnections
+  | PublicUrl
+  | SignedTokens
   | SmtpProvider;
 
 /**

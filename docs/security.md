@@ -83,9 +83,11 @@ Backends are listed in [architecture.md](architecture.md#deployment-targets).
 
 ### Public endpoints
 
+- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe links use it now (#12); preference, tracking and bounce (VERP) tokens will (#13, #21, #23).
+- **Unsubscribe pages** send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and a Content Security Policy that loads nothing from elsewhere, because the token is in the address. They escape every value they show.
+
 Planned, with the features they protect.
 
-- **Signed tokens** (#12, #21, #23): unsubscribe, preference, tracking and bounce (VERP) tokens are HMAC-signed with rotating keys. They never expose sequential IDs.
 - **Click redirects** (#23) go only to the URL inside the signed token, so they can't be used as open redirects.
 - **Signup forms** (#30):
   - Turnstile, with hCaptcha as an alternative from P2. No reCAPTCHA.

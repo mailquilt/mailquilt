@@ -24,6 +24,11 @@ import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
 import { asQueuedFor, Queue } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
+import {
+  unsubscribeHeaders,
+  unsubscribeUrl,
+  withUnsubscribeLink,
+} from "./unsubscribe.ts";
 
 /** How many of a Campaign's recipients one queue message sends to. */
 export const SEND_BATCH_SIZE = 100;
@@ -234,34 +239,42 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
             .withCredentials(batch.providerConnectionId)
             .pipe(Effect.option);
 
-    const sendTo = (to: string) => {
-      const email: Types.Mutable<OutgoingEmail> = {
-        from: batch.from,
-        html: batch.html,
-        subject: batch.subject,
-        to,
-      };
-
-      if (batch.replyTo !== null) {
-        email.replyTo = batch.replyTo;
-      }
-
-      const sent: Effect.Effect<SentEmail, SendFailed, SmtpProvider> =
-        Option.match(connection, {
-          onNone: () => Effect.fail(NO_CONNECTION),
-          onSome: (opened) => sendThrough(opened, email),
+    const sendTo = (recipient: QueuedRecipient) =>
+      Effect.gen(function* sendToRecipient() {
+        const unsubscribe = yield* unsubscribeUrl({
+          campaignId: message.campaignId,
+          contactId: recipient.contactId,
+          organizationId: message.organizationId,
         });
 
-      return sent;
-    };
+        const email: Types.Mutable<OutgoingEmail> = {
+          from: batch.from,
+          headers: unsubscribeHeaders(unsubscribe),
+          html: withUnsubscribeLink(batch.html, unsubscribe),
+          subject: batch.subject,
+          to: recipient.email,
+        };
+
+        if (batch.replyTo !== null) {
+          email.replyTo = batch.replyTo;
+        }
+
+        const sent: Effect.Effect<SentEmail, SendFailed, SmtpProvider> =
+          Option.match(connection, {
+            onNone: () => Effect.fail(NO_CONNECTION),
+            onSome: (opened) => sendThrough(opened, email),
+          });
+
+        return yield* sent;
+      });
 
     const serverFailure = yield* Ref.make(Option.none<SendFailed>());
 
-    const sendOrSkip = (to: string) =>
+    const sendOrSkip = (recipient: QueuedRecipient) =>
       Effect.flatMap(Ref.get(serverFailure), (earlier) =>
         Option.match(earlier, {
           onNone: () =>
-            sendTo(to).pipe(
+            sendTo(recipient).pipe(
               Effect.tapError((failed) =>
                 SERVER_FAILURES.has(failed.reason)
                   ? Ref.set(serverFailure, Option.some(failed))
@@ -275,7 +288,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
     const outcomes = yield* pipe(
       batch.recipients,
       Effect.forEach((recipient) =>
-        sendOrSkip(recipient.email).pipe(
+        sendOrSkip(recipient).pipe(
           Effect.match({
             onFailure: (failed) =>
               ({

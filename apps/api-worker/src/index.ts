@@ -6,6 +6,7 @@ import {
 } from "@repo/core";
 import {
   consumeQueueBatch,
+  emailLinksLive,
   forwardOutboxTo,
   postgresPortsLive,
   providePerRequest,
@@ -62,6 +63,9 @@ const postgresPorts = (env: Env) =>
     env.QUEUE
   );
 
+const emailLinks = (env: Env) =>
+  emailLinksLive(env.APP_URL, Redacted.make(env.ENCRYPTION_KEYS ?? ""));
+
 // WARNING: trust only `cf-connecting-ip`, which Cloudflare sets itself; a client can forge any other IP header.
 const authConfigLive = (env: Env) =>
   authConfigLayer({
@@ -82,7 +86,8 @@ const makeApp = (env: Env) =>
             Layer.provide(SystemMailerConfigFromEnv),
             Layer.provide(configFromEnv(env))
           ),
-          smtpProviderLive(env)
+          smtpProviderLive(env),
+          emailLinks(env)
         )
       ),
       HttpRouter.provideRequest(
@@ -103,11 +108,18 @@ const runWithPorts = <A, E>(
     E,
     | Layer.Success<ReturnType<typeof postgresPorts>>
     | Layer.Success<ReturnType<typeof smtpProviderLive>>
+    | Layer.Success<ReturnType<typeof emailLinks>>
   >
 ) =>
   Effect.runPromise(
     effect.pipe(
-      Effect.provide(Layer.mergeAll(postgresPorts(env), smtpProviderLive(env)))
+      Effect.provide(
+        Layer.mergeAll(
+          postgresPorts(env),
+          smtpProviderLive(env),
+          emailLinks(env)
+        )
+      )
     )
   );
 

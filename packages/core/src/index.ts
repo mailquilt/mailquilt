@@ -62,6 +62,17 @@ export type { SealedSecret } from "./credential-cipher.ts";
 
 export { InvalidToken } from "./invalid-token.ts";
 
+export { PublicUrl } from "./public-url.ts";
+
+export {
+  stopAllEmail,
+  unsubscribe,
+  unsubscribePage,
+  Unsubscribes,
+} from "./unsubscribe.ts";
+
+export type { Unsubscription } from "./unsubscribe.ts";
+
 export { SignedTokens, signedTokensLayer } from "./signed-tokens.ts";
 
 export type { TokenPurpose } from "./signed-tokens.ts";

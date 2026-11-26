@@ -71,10 +71,10 @@ Today a Campaign is sent now to the subscribed Contacts of one List, in batches 
 
 ## Public pages
 
-Planned, with the features they serve: #12, #13, #23, #29, #30 and #38.
-
-- Unsubscribe, preference center, double opt-in confirmation, signup form, web archive, tracking pixel and click redirects.
-- Rendered on the server by the entry app (React and Kumo rendered to HTML), with no client JavaScript required.
+- Built: unsubscribe (`/unsubscribe`, `packages/api/src/unsubscribe/`), with the one-click post and the Opt-out (#12).
+- Planned: preference center, double opt-in confirmation, signup form, web archive, tracking pixel and click redirects (#13, #23, #29, #30, #38).
+- Rendered on the server by the entry app as plain HTML built in TypeScript, every value escaped, with no client JavaScript. Not React: the Node server runs its TypeScript with Node's type stripping, which can't load `.tsx`. Their fonts are copies of the dashboard's in `apps/dashboard/public/fonts/`, served as static files.
+- On Cloudflare each public path is listed in `run_worker_first` (ADR 0004).
 - On hosted, they are served from a separate domain that never receives cookies. On a single-domain self-host, archive pages are served with `Content-Security-Policy: sandbox`.
 
 ## Observability

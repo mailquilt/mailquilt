@@ -399,6 +399,7 @@ export const CampaignsLive = Layer.effect(
                     where s.organization_id = ${organization}
                       and s.list_id = ${started.listId}
                       and s.status = 'subscribed'
+                      and c.opted_out_at is null
                     returning 1
                   )
                   select count(*)::int as recipients from snapshot
