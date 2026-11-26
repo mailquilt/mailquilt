@@ -172,7 +172,7 @@ const noteWhileSending = (kind: Step["kind"], sent: number) => {
   }
 
   return sent === 0
-    ? "Nothing was suppressed yet, so trying again is safe."
+    ? "Mailquilt couldn’t confirm any part of it. Trying again is safe: an address that went through already is counted, not added twice."
     : `Those ${formatCount(sent)} stay suppressed, whatever you do next. Suppressing the rest is safe to repeat: an address that went through already is counted, not added twice.`;
 };
 
@@ -217,7 +217,7 @@ const ImportProgress = ({
       </div>
       <output className="block text-sm text-kumo-default tabular-nums">
         {failed && sent === 0 ? (
-          "Nothing was suppressed before it stopped"
+          "None confirmed before it stopped"
         ) : (
           <>
             {failed ? null : "Suppressing "}

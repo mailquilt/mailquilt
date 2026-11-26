@@ -99,6 +99,21 @@ describe(readCsv, () => {
     expect(skipped).toStrictEqual([{ row: 1, value: "" }]);
   });
 
+  it("reads a file of a quarter of a million rows", () => {
+    const file = readCsv(
+      [
+        "email",
+        ...Array.from(
+          { length: 250_000 },
+          (_, index) => `reader-${index}@example.com`
+        ),
+      ].join("\n")
+    );
+
+    expect(file.rows).toBe(250_000);
+    expect(file.column).toBe(0);
+  });
+
   it("suggests no column in a file without any addresses", () => {
     expect(readCsv("Name,Notes\nAda,likes tea").column).toBeUndefined();
   });

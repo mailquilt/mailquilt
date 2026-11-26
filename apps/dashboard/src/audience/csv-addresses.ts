@@ -119,7 +119,11 @@ export const readCsv = (text: string) => {
   const [first] = numbered;
 
   const rest = numbered.slice(1);
-  const width = Math.max(0, ...numbered.map(({ cells }) => cells.length));
+  let width = 0;
+
+  for (const { cells } of numbered) {
+    width = Math.max(width, cells.length);
+  }
 
   const holdsAddresses = (column: number) =>
     rest.some(({ cells }) => cells[column]?.includes("@") === true);

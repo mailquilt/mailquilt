@@ -289,7 +289,7 @@ describe("suppressions page", () => {
     expect(batches[1]?.[0]).toBe("reader-250@example.com");
   });
 
-  it("says nothing was suppressed when an import stops at its first request", async () => {
+  it("says no part was confirmed when an import stops at its first request", async () => {
     withSuppressions(() => [ADA]);
     api.use(http.post(SUPPRESSIONS, () => HttpResponse.error()));
     renderPage();
@@ -301,7 +301,9 @@ describe("suppressions page", () => {
     submitDialog("Suppress 2 addresses");
 
     await expect(
-      screen.findByText("Nothing was suppressed yet, so trying again is safe.")
+      screen.findByText(
+        "Mailquilt couldn’t confirm any part of it. Trying again is safe: an address that went through already is counted, not added twice."
+      )
     ).resolves.toBeTruthy();
     expect(
       screen.getByRole("button", { name: "Suppress 2 addresses" })
