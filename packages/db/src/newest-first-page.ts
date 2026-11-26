@@ -22,9 +22,10 @@ export interface NewestFirstPage<Row> {
 }
 
 /**
- * Reads one page of the rows of `table` that are `matching`, newest first by
- * `id`, as ADR 0008 describes: `rows` selects them, and this adds the cursor,
- * the order and the limit. A cursor past every matching row returns the
+ * Reads one page of the rows of `table` in `scope`, the condition that keeps
+ * them to one Organization, and `matching`, any filter, newest first by `id`,
+ * as ADR 0008 describes: `rows` selects them, and this adds the cursor, the
+ * order and the limit. `scope` is required, so a page can't leave it out. A cursor past every matching row returns the
  * first page. Run it in the caller's read-only `repeatable read` transaction,
  * so the page and its counts agree. A failed query is a defect.
  */
@@ -35,11 +36,13 @@ export const newestFirstPage = <Row extends { readonly id: string }, E>(
     id,
     matching,
     rows,
+    scope,
     table,
   }: {
     readonly table: PgTable;
     readonly id: PgColumn;
-    readonly matching: SQL | undefined;
+    readonly scope: SQL;
+    readonly matching?: SQL | undefined;
     readonly cursor: PageCursor;
     readonly rows: (
       where: SQL | undefined,
@@ -49,19 +52,21 @@ export const newestFirstPage = <Row extends { readonly id: string }, E>(
   }
 ) =>
   Effect.gen(function* newestFirstPageOfRows() {
-    const firstPage = rows(matching, desc(id), PAGE_SIZE).pipe(Effect.orDie);
+    const inScope = and(scope, matching);
+
+    const firstPage = rows(inScope, desc(id), PAGE_SIZE).pipe(Effect.orDie);
 
     const aroundCursor =
       cursor.before === undefined
         ? rows(
             and(
-              matching,
+              inScope,
               cursor.after === undefined ? undefined : lt(id, cursor.after)
             ),
             desc(id),
             PAGE_SIZE
           ).pipe(Effect.orDie)
-        : rows(and(matching, gt(id, cursor.before)), asc(id), PAGE_SIZE).pipe(
+        : rows(and(inScope, gt(id, cursor.before)), asc(id), PAGE_SIZE).pipe(
             Effect.orDie,
             Effect.map((found) => found.toReversed())
           );
@@ -82,7 +87,7 @@ export const newestFirstPage = <Row extends { readonly id: string }, E>(
         total: sql<number>`count(*)::int`,
       })
       .from(table)
-      .where(matching)
+      .where(inScope)
       .pipe(Effect.orDie);
 
     const start = counted?.start ?? 0;

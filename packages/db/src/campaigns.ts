@@ -228,7 +228,7 @@ export const CampaignsLive = Layer.effect(
                 const { items, ...page } = yield* newestFirstPage(db, {
                   cursor: filter,
                   id: campaigns.id,
-                  matching: eq(campaigns.organizationId, organization),
+                  scope: eq(campaigns.organizationId, organization),
                   rows: (where, order, limit) =>
                     db
                       .select(summaryColumns)

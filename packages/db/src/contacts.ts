@@ -70,12 +70,9 @@ const contactsMatching = (
       ? sql``
       : sql`and ${subscriptions.status} = ${filter.status}`;
 
-  return and(
-    eq(contacts.organizationId, organization),
-    filter.list === undefined
-      ? undefined
-      : sql`exists (select 1 from ${subscriptions} where ${subscriptions.organizationId} = ${organization} and ${subscriptions.contactId} = ${contacts.id} and ${subscriptions.listId} = ${filter.list} ${status})`
-  );
+  return filter.list === undefined
+    ? undefined
+    : sql`exists (select 1 from ${subscriptions} where ${subscriptions.organizationId} = ${organization} and ${subscriptions.contactId} = ${contacts.id} and ${subscriptions.listId} = ${filter.list} ${status})`;
 };
 
 /**
@@ -198,6 +195,7 @@ export const ContactsLive = Layer.effect(
                     cursor: filter,
                     id: contacts.id,
                     matching: contactsMatching(organization, filter),
+                    scope: eq(contacts.organizationId, organization),
                     rows: (where, order, limit) =>
                       db
                         .select(contactColumns)
