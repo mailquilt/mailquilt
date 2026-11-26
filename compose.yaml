@@ -49,6 +49,10 @@ services:
       SYSTEM_MAILER_SMTP_PASSWORD: ${SYSTEM_MAILER_SMTP_PASSWORD:-}
     ports:
       - "${PORT:-3000}:3000"
+    # On stop, the app gives a batch it's sending up to 30 seconds, then hands
+    # it back to the queue to retry. Docker's default 10 seconds would kill it
+    # first, and the batch would wait for its heartbeat to lapse instead.
+    stop_grace_period: 45s
     depends_on:
       postgres:
         condition: service_healthy

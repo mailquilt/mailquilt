@@ -38,10 +38,14 @@ const MARGIN_SECONDS = 300;
 const BATCH_EXPIRES_IN_SECONDS =
   SEND_BATCH_SIZE * SEND_TIMEOUT_SECONDS + MARGIN_SECONDS;
 
+// WARNING: without a heartbeat, a batch whose worker was killed mid-send waits out its expiry, over an hour and a half, before another worker retries it (ADR 0014).
+const HEARTBEAT_SECONDS = 30;
+
 const EVERY_DAY_AT_3_UTC = "0 3 * * *";
 
 const MESSAGES_QUEUE_OPTIONS = {
   expireInSeconds: BATCH_EXPIRES_IN_SECONDS,
+  heartbeatSeconds: HEARTBEAT_SECONDS,
   retryBackoff: true,
   retryDelay: QUEUE_RETRY_DELAY_SECONDS,
   retryDelayMax: queueRetryDelaySeconds(QUEUE_RETRIES),
