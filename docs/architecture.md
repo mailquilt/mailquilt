@@ -28,7 +28,7 @@ Each entry app serves the JSON API, the public pages, and the dashboard's static
 | `core` | Use cases, written only against ports (Effect services) | `domain` |
 | `api` | `HttpApi` handlers: each endpoint calls a `core` use case. Better Auth behind our allow list ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)). One `ApiLive` Layer that every entry app serves | `domain`, `contract`, `core` |
 | `db` | Drizzle Postgres schema, migrations, repository implementations | `domain`, ports in `core` |
-| `providers` | One adapter per Provider: sending plus parsing its webhooks. Each implements a Provider port from `core` | `domain`, ports in `core` |
+| `providers` | One adapter per Provider, implementing its Provider port from `core`. Use cases reach them through `sendThrough` ([ADR 0015](adr/0015-use-cases-send-through-a-provider-connection-with-one-function.md)). Parsing Provider webhooks is planned (#19, #21) | `domain`, ports in `core` |
 | `runtime-cloudflare` | Layers for each port on Cloudflare | `domain`, ports in `core`, `db`, `providers` |
 | `runtime-node` | Layers for each port on Node | ports in `core`, `db`, `providers` |
 

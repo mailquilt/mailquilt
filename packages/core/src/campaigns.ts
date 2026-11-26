@@ -19,8 +19,8 @@ import type { Types } from "effect";
 
 import { CurrentOrganization } from "./current-organization.ts";
 import { ProviderConnections } from "./provider-connections.ts";
-import { SmtpProvider } from "./provider.ts";
-import type { OutgoingEmail, SentEmail } from "./provider.ts";
+import { sendThrough } from "./provider.ts";
+import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
 import { asQueuedFor, Queue } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
@@ -211,7 +211,6 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
   Effect.gen(function* sendBatch() {
     const campaigns = yield* Campaigns;
     const connections = yield* ProviderConnections;
-    const smtp = yield* SmtpProvider;
 
     const found = yield* campaigns.queuedBatch(
       message.campaignId,
@@ -247,14 +246,11 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         email.replyTo = batch.replyTo;
       }
 
-      const sent: Effect.Effect<SentEmail, SendFailed> = Option.match(
-        connection,
-        {
+      const sent: Effect.Effect<SentEmail, SendFailed, SmtpProvider> =
+        Option.match(connection, {
           onNone: () => Effect.fail(NO_CONNECTION),
-          onSome: ({ connection: { smtp: server }, credentials }) =>
-            smtp.send({ credentials, server }, email),
-        }
-      );
+          onSome: (opened) => sendThrough(opened, email),
+        });
 
       return sent;
     };
