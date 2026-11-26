@@ -60,4 +60,13 @@ describe("a Campaign's plain-text part", () => {
       "* Hello"
     );
   });
+
+  it("still leaves out a hidden Roman-numeral list", () => {
+    assert.strictEqual(
+      plainTextOf(
+        '<ol type="i" style="display:none"><li>Hidden</li></ol><p>Hello!</p>'
+      ),
+      "Hello!"
+    );
+  });
 });
