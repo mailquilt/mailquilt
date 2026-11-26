@@ -45,9 +45,27 @@ const FOOTER_STYLE =
 
 const CLOSING_BODY = /<\/body>/giu;
 
+const COMMENT = /<!--[\s\S]*?(?:-->|$)/gu;
+
+const lastClosingBodyOutsideComments = (html: string) => {
+  const comments = [...html.matchAll(COMMENT)].map(
+    (comment) => [comment.index, comment.index + comment[0].length] as const
+  );
+
+  const outside = [...html.matchAll(CLOSING_BODY)].filter(
+    (closing) =>
+      !comments.some(
+        ([start, end]) => closing.index >= start && closing.index < end
+      )
+  );
+
+  return outside.at(-1)?.index;
+};
+
 /**
  * The Campaign's HTML with its footer at the foot, inside `<body>` when it
- * has one. The address is the Organization's own text, so it's escaped.
+ * has one, never inside a comment. The address is the Organization's own
+ * text, so it's escaped.
  */
 export const withFooterHtml = (html: string, footer: CampaignFooter) => {
   const below = footer.addressLine === null ? "32px" : "0";
@@ -58,12 +76,11 @@ export const withFooterHtml = (html: string, footer: CampaignFooter) => {
       ? ""
       : `<p style="margin:6px 0 32px;${FOOTER_STYLE}">${escapeHtml(footer.addressLine)}</p>`;
 
-  const closings = [...html.matchAll(CLOSING_BODY)];
-  const last = closings.at(-1);
+  const at = lastClosingBodyOutsideComments(html);
 
-  return last === undefined
+  return at === undefined
     ? `${html}${unsubscribe}${address}`
-    : `${html.slice(0, last.index)}${unsubscribe}${address}${html.slice(last.index)}`;
+    : `${html.slice(0, at)}${unsubscribe}${address}${html.slice(at)}`;
 };
 
 /** The Campaign's plain-text part with the same footer as `withFooterHtml`. */

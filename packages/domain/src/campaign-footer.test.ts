@@ -58,4 +58,16 @@ describe("a Campaign email's footer", () => {
       `Hi\n\nDon’t want these emails? Unsubscribe:\n${URL}\n\nAcme, 14 Mill Lane`
     );
   });
+
+  it("ends the HTML inside its real body, never inside a comment that mentions one", () => {
+    const html = withFooterHtml(
+      "<html><body><p>Hi</p></body></html><!-- old template </body> -->",
+      { addressLine: "Acme", unsubscribeUrl: URL }
+    );
+
+    assert.match(
+      html,
+      /Acme<\/p><\/body><\/html><!-- old template <\/body> -->$/u
+    );
+  });
 });

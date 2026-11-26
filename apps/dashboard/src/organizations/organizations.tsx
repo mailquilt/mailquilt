@@ -217,7 +217,9 @@ export const useUpdatePostalAddress = (organizationId: OrganizationId) => {
           payload: { postalAddress },
         })
       ),
-    onSuccess: (saved) => {
+    onSuccess: async (saved) => {
+      // WARNING: a list request sent before the save would answer with the old Organization and undo this write, so it's cancelled first.
+      await queryClient.cancelQueries({ queryKey });
       queryClient.setQueryData<readonly Organization[]>(
         queryKey,
         (organizations = []) =>

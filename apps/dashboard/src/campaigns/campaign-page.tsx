@@ -392,25 +392,36 @@ interface Refused {
   readonly reason: SendRefusal;
   readonly connections: readonly ProviderConnection[];
   readonly list: List | null;
+  readonly organization: Organization;
 }
 
-const LASTING_REFUSALS = new Set<SendRefusal>(["already", "address"]);
+const stillHolds = (
+  refused: Refused,
+  list: List | null,
+  connections: readonly ProviderConnection[],
+  organization: Organization
+) => {
+  if (refused.reason === "already") {
+    return true;
+  }
 
-// WARNING: "no one subscribed" and "connection deleted" hold only until the List or connections load again; after that the page goes by them, or a List that gained subscribers would stay blocked.
+  if (refused.reason === "address") {
+    return refused.organization === organization;
+  }
+
+  return refused.list === list && refused.connections === connections;
+};
+
+// WARNING: a refusal other than "already sent" holds only until what it was about loads again (the List or connections, or the Organization for its postal address); after that the page goes by them, or a List that gained subscribers would stay blocked.
 const stillRefused = (
   refused: Refused | undefined,
   list: List | null,
-  connections: readonly ProviderConnection[]
-) => {
-  if (refused === undefined) {
-    return;
-  }
-
-  return LASTING_REFUSALS.has(refused.reason) ||
-    (refused.list === list && refused.connections === connections)
+  connections: readonly ProviderConnection[],
+  organization: Organization
+) =>
+  refused !== undefined && stillHolds(refused, list, connections, organization)
     ? refused.reason
     : undefined;
-};
 
 const CampaignView = ({
   campaign,
@@ -426,7 +437,7 @@ const CampaignView = ({
   organization: Organization;
 }) => {
   const [refused, setRefused] = useState<Refused>();
-  const refusal = stillRefused(refused, list, connections);
+  const refusal = stillRefused(refused, list, connections, organization);
 
   const sending = useDialog();
   const sendButton = useRef<HTMLButtonElement>(null);
@@ -514,7 +525,11 @@ const CampaignView = ({
             <Facts rows={senderFacts(campaign, connection)} />
           </SettingsSection>
           <SettingsSection
-            about="The email exactly as it’s sent, in a preview that runs no scripts."
+            about={
+              draft
+                ? "The email exactly as it’s sent, in a preview that runs no scripts."
+                : "The email as it went out, in a preview that runs no scripts. Its footer shows your postal address as it is now."
+            }
             title="Email"
           >
             <EmailPreview
@@ -534,7 +549,7 @@ const CampaignView = ({
         onExited={sending.handleExited}
         onOpenChange={sending.handleOpenChange}
         onRefused={(reason) => {
-          setRefused({ connections, list, reason });
+          setRefused({ connections, list, organization, reason });
           onRefusal();
           returnFocus.current = problemRegion.current;
           sending.setOpen(false);

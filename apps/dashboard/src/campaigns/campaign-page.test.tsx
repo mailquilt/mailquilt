@@ -10,6 +10,7 @@ import {
 import { Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { useState } from "react";
 import {
   afterAll,
   afterEach,
@@ -73,6 +74,27 @@ const answering = (...answers: readonly object[]) => {
 
     return HttpResponse.json(answer);
   };
+};
+
+const AddressAddedLater = () => {
+  const [current, setCurrent] = useState(organization);
+
+  return (
+    <>
+      <button
+        onClick={() =>
+          setCurrent(Schema.decodeUnknownSync(Organization)({ ...ACME }))
+        }
+        type="button"
+      >
+        Address added elsewhere
+      </button>
+      <CampaignPage
+        campaignId={CampaignIdSchema.make(DRAFT.id)}
+        organization={current}
+      />
+    </>
+  );
 };
 
 describe("one campaign's page", () => {
@@ -280,6 +302,34 @@ describe("one campaign's page", () => {
     expect(
       screen.getByTitle("Preview of the email").getAttribute("srcdoc")
     ).toContain(">Your postal address goes here</span></p>");
+  });
+
+  it("offers Send now again once the postal address it was refused for is added, without leaving the page", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
+      http.post(SEND, () =>
+        HttpResponse.json({ _tag: "PostalAddressRequired" }, { status: 409 })
+      )
+    );
+    renderWithOrganizations(<AddressAddedLater />);
+
+    await confirmSend();
+
+    await expect(
+      screen.findByText("Add a postal address before sending")
+    ).resolves.toBeDefined();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Address added elsewhere" })
+    );
+
+    await expect(
+      screen.findByRole("button", { name: "Send now" })
+    ).resolves.toBeDefined();
+    expect(
+      screen.queryByText("Add a postal address before sending")
+    ).toBeNull();
   });
 
   it("previews the email with the footer it's sent with", async () => {
