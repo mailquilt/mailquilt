@@ -8,12 +8,18 @@ import type {
   ContactId,
   ListNotFound,
   NoSubscribedContacts,
+  PostalAddressRequired,
   ProviderConnectionId,
   ProviderConnectionNotFound,
   SendFailureReason,
   Sender,
 } from "@repo/domain";
-import { SendFailed } from "@repo/domain";
+import {
+  postalAddressLine,
+  SendFailed,
+  withFooterHtml,
+  withFooterText,
+} from "@repo/domain";
 import { Array as Arr, Context, Effect, Option, pipe, Ref } from "effect";
 import type { Types } from "effect";
 
@@ -25,12 +31,7 @@ import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
 import { asQueuedFor, Queue } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
-import {
-  unsubscribeHeaders,
-  unsubscribeUrl,
-  withUnsubscribeLine,
-  withUnsubscribeLink,
-} from "./unsubscribe.ts";
+import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 
 /** How many of a Campaign's recipients one queue message sends to. */
 export const SEND_BATCH_SIZE = 100;
@@ -53,6 +54,9 @@ export interface CampaignBatch {
   readonly from: typeof Sender.Type;
   readonly replyTo: string | null;
   readonly html: string;
+  readonly organizationName: string;
+  /** `null` only for a Campaign that started sending before Organizations had one. */
+  readonly postalAddress: string | null;
   readonly providerConnectionId: ProviderConnectionId | null;
   readonly recipients: readonly QueuedRecipient[];
 }
@@ -102,7 +106,9 @@ export class Campaigns extends Context.Service<
      * one query, split into batches of `batchSize`. `enqueue` is given the
      * number of batches and runs inside that transaction, so if it fails
      * nothing changes. Fails, changing nothing, if the Campaign isn't a
-     * draft, has no Provider Connection, or there's no one to send it to.
+     * draft, has no Provider Connection, its Organization has no postal
+     * address, or there's no one to send it to. An address can be changed
+     * but never removed, so it's still there when the batches go out.
      */
     readonly startSending: (
       id: CampaignId,
@@ -113,6 +119,7 @@ export class Campaigns extends Context.Service<
       | CampaignNotFound
       | CampaignNotDraft
       | ProviderConnectionNotFound
+      | PostalAddressRequired
       | NoSubscribedContacts,
       CurrentOrganization
     >;
@@ -246,6 +253,11 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
     const batch = found.value;
     const text = plainTextOf(batch.html);
 
+    const addressLine =
+      batch.postalAddress === null
+        ? null
+        : postalAddressLine(batch.organizationName, batch.postalAddress);
+
     const connection =
       batch.providerConnectionId === null
         ? Option.none()
@@ -261,12 +273,14 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           organizationId: message.organizationId,
         });
 
+        const footer = { addressLine, unsubscribeUrl: unsubscribe };
+
         const email: Types.Mutable<OutgoingEmail> = {
           from: batch.from,
           headers: unsubscribeHeaders(unsubscribe),
-          html: withUnsubscribeLink(batch.html, unsubscribe),
+          html: withFooterHtml(batch.html, footer),
           subject: batch.subject,
-          text: withUnsubscribeLine(text, unsubscribe),
+          text: withFooterText(text, footer),
           to: recipient.email,
         };
 

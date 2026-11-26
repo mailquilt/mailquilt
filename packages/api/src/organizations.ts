@@ -4,6 +4,7 @@ import {
   createOrganization,
   getOrganization,
   listOrganizations,
+  updatePostalAddress,
 } from "@repo/core";
 import { HttpApiBuilder } from "effect/http-api";
 
@@ -25,5 +26,11 @@ export const OrganizationsHandlers = HttpApiBuilder.group(
       )
       .handle("get", ({ params }) =>
         getOrganization.pipe(asMemberOf(params.organizationId), signedIn)
+      )
+      .handle("updatePostalAddress", ({ params, payload }) =>
+        updatePostalAddress(payload.postalAddress).pipe(
+          asMemberOf(params.organizationId),
+          signedIn
+        )
       )
 );

@@ -38,44 +38,56 @@ const NOT_SENT = { failed: 0, sent: 0, total: 0 };
 
 let campaigns = 0;
 
-const draftCampaign = Effect.gen(function* draftCampaign() {
-  campaigns += 1;
+const POSTAL_ADDRESS = "Unit 3 & 4, Mill Lane\nBristol BS1 4XE";
 
-  const { client, params } = yield* ownOrganization;
+const draftCampaignIn = (postalAddress: string | null) =>
+  Effect.gen(function* draftCampaign() {
+    campaigns += 1;
 
-  const list = yield* client.lists.create({
-    params,
-    payload: { name: "Weekly news" },
+    const { client, params } = yield* ownOrganization;
+
+    if (postalAddress !== null) {
+      yield* client.organizations.updatePostalAddress({
+        params,
+        payload: { postalAddress },
+      });
+    }
+
+    const list = yield* client.lists.create({
+      params,
+      payload: { name: "Weekly news" },
+    });
+
+    const connection = yield* client.providerConnections.create({
+      params,
+      payload: {
+        from: { email: "hello@acme.example" },
+        name: "Postmark",
+        smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
+      },
+    });
+
+    const campaign = yield* client.campaigns.create({
+      params,
+      payload: {
+        ...CONTENT,
+        subject: `${CONTENT.subject} #${campaigns}`,
+        listId: list.id,
+        providerConnectionId: connection.id,
+      },
+    });
+
+    return {
+      campaign,
+      client,
+      connection,
+      list,
+      params,
+      campaignParams: { ...params, campaignId: campaign.id },
+    };
   });
 
-  const connection = yield* client.providerConnections.create({
-    params,
-    payload: {
-      from: { email: "hello@acme.example" },
-      name: "Postmark",
-      smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
-    },
-  });
-
-  const campaign = yield* client.campaigns.create({
-    params,
-    payload: {
-      ...CONTENT,
-      subject: `${CONTENT.subject} #${campaigns}`,
-      listId: list.id,
-      providerConnectionId: connection.id,
-    },
-  });
-
-  return {
-    campaign,
-    client,
-    connection,
-    list,
-    params,
-    campaignParams: { ...params, campaignId: campaign.id },
-  };
-});
+const draftCampaign = draftCampaignIn(POSTAL_ADDRESS);
 
 const addContacts = (
   { client, params }: Owner,
@@ -209,6 +221,28 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "refuses to send a Campaign until its Organization has a postal address, and leaves it a draft",
+    () =>
+      Effect.gen(function* noPostalAddress() {
+        const owner = yield* draftCampaignIn(null);
+        const { campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+
+        const refused = yield* client.campaigns
+          .send({ params: campaignParams })
+          .pipe(Effect.flip);
+
+        const after = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(refused._tag, "PostalAddressRequired");
+        assert.strictEqual(after.status, "draft");
+        assert.deepStrictEqual({ ...after.recipients }, NOT_SENT);
+        assert.isEmpty(yield* (yield* QueueWorker).deliverAll);
+      })
+  );
+
+  test.effect(
     "sends a Campaign once to each Contact subscribed to its List, and to no one else",
     () =>
       Effect.gen(function* sendToSubscribed() {
@@ -289,6 +323,13 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         });
         assert.isTrue(html?.startsWith(CONTENT.html));
         assert.isTrue(text?.startsWith("THIS WEEK AT ACME\n\nHello!\n\n"));
+        assert.include(
+          html,
+          ">Acme, Unit 3 &amp; 4, Mill Lane, Bristol BS1 4XE</p>"
+        );
+        assert.isTrue(
+          text?.endsWith("\n\nAcme, Unit 3 & 4, Mill Lane, Bristol BS1 4XE")
+        );
         assert.isDefined(headers?.["List-Unsubscribe"]);
       })
   );

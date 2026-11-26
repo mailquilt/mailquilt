@@ -1,4 +1,4 @@
-import { Input, InputGroup } from "@cloudflare/kumo";
+import { Input, InputArea, InputGroup } from "@cloudflare/kumo";
 import { useStore } from "@tanstack/react-form";
 import type { AnyFieldApi } from "@tanstack/react-form";
 import { Option, Schema } from "effect";
@@ -25,7 +25,8 @@ type InputProps = Omit<
  * parts. Its first error replaces the description under it, is tied to the
  * input through `aria-describedby`, and is announced each time the form is
  * submitted, even when it says the same thing as last time. `addon` sits at
- * the end of the input, such as a button to show a password.
+ * the end of the input, such as a button to show a password. With `rows`,
+ * it's a text area of that many lines, for text that runs over several.
  */
 export const FormField = ({
   addon,
@@ -33,6 +34,7 @@ export const FormField = ({
   description,
   field,
   label,
+  rows,
   size,
   ...inputProps
 }: InputProps & {
@@ -40,6 +42,7 @@ export const FormField = ({
   description?: React.ReactNode;
   field: AnyFieldApi;
   label: string;
+  rows?: number;
 }) => {
   const submissions = useStore(
     field.form.store,
@@ -74,6 +77,27 @@ export const FormField = ({
       field.handleChange(event.target.value),
     value: String(field.state.value),
   };
+
+  if (rows !== undefined) {
+    return (
+      <InputArea
+        aria-invalid={invalid}
+        autoComplete={inputProps.autoComplete}
+        className={`${TEXT_SAFARI_WONT_ZOOM_INTO} ${className ?? ""}`}
+        description={description}
+        disabled={inputProps.disabled}
+        error={error}
+        id={inputProps.id}
+        label={label}
+        name={field.name}
+        onChange={(event) => field.handleChange(event.target.value)}
+        placeholder={inputProps.placeholder}
+        required={inputProps.required}
+        rows={rows}
+        value={String(field.state.value)}
+      />
+    );
+  }
 
   if (addon !== undefined) {
     return (

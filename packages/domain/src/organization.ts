@@ -12,6 +12,19 @@ export const OrganizationName = Schema.Trim.check(
   })
 );
 
+const MAX_POSTAL_ADDRESS_LENGTH = 300;
+
+/**
+ * Where the Organization can be reached by post, which every Campaign ends
+ * with. One or more lines; spaces around it are trimmed.
+ */
+export const PostalAddress = Schema.Trim.check(
+  Schema.isNonEmpty({ message: "Enter your organization’s postal address." }),
+  Schema.isMaxLength(MAX_POSTAL_ADDRESS_LENGTH, {
+    message: `Use at most ${MAX_POSTAL_ADDRESS_LENGTH} characters.`,
+  })
+);
+
 /** What a member may do in an Organization. The creator is its owner. */
 export const RoleSchema = Schema.Literals(["owner", "admin", "member"]);
 
@@ -21,6 +34,8 @@ export type Role = typeof RoleSchema.Type;
 export class Organization extends Schema.Class<Organization>("Organization")({
   id: OrganizationIdSchema,
   name: OrganizationName,
+  /** Where it can be reached by post, or `null` until a member adds it. Campaigns can't be sent without it. */
+  postalAddress: Schema.NullOr(PostalAddress),
   /** The role of the person asking. */
   role: RoleSchema,
 }) {}

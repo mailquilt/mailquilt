@@ -9,6 +9,7 @@ import {
   ListNotFound,
   NoSubscribedContacts,
   OrganizationNotFound,
+  PostalAddressRequired,
   ProviderConnectionNotFound,
   RateLimited,
   SendFailed,
@@ -64,6 +65,11 @@ export const CampaignNotFoundError = CampaignNotFound.pipe(
 );
 
 export const CampaignNotDraftError = CampaignNotDraft.pipe(
+  HttpApiSchema.status(409)
+);
+
+/** Every Campaign ends with the Organization's postal address, and it has none yet. */
+export const PostalAddressRequiredError = PostalAddressRequired.pipe(
   HttpApiSchema.status(409)
 );
 

@@ -33,6 +33,15 @@ const createOrganization = async (page: Page) => {
   await expect(page.getByText("Acme").first()).toBeVisible();
 };
 
+const addPostalAddress = async (page: Page) => {
+  await page.goto("/settings");
+  await page
+    .getByRole("textbox", { name: "Postal address" })
+    .fill("1 Smoke Test Lane\nTestville");
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.getByText("Saved the postal address")).toBeVisible();
+};
+
 const connectMailpit = async (page: Page) => {
   await page.goto("/providers/new");
   await page.getByLabel("Name", { exact: true }).fill("Mailpit");
@@ -106,6 +115,7 @@ test("a Campaign sent from the dashboard arrives in every subscribed Contact's i
 }) => {
   await setUpInstall(page);
   await createOrganization(page);
+  await addPostalAddress(page);
   await connectMailpit(page);
   await addContacts(page);
   await sendCampaign(page);

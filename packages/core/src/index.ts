@@ -49,6 +49,7 @@ export {
   getOrganization,
   listOrganizations,
   Organizations,
+  updatePostalAddress,
 } from "./organizations.ts";
 
 export {

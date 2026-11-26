@@ -23,6 +23,14 @@ export {
 
 export type { CampaignStatus } from "./campaign-content.ts";
 
+export {
+  postalAddressLine,
+  withFooterHtml,
+  withFooterText,
+} from "./campaign-footer.ts";
+
+export type { CampaignFooter } from "./campaign-footer.ts";
+
 export { CampaignSummary } from "./campaign-summary.ts";
 
 export { CampaignNotDraft } from "./campaign-not-draft.ts";
@@ -95,7 +103,14 @@ export { List, ListName } from "./list.ts";
 
 export { OrganizationNotFound } from "./organization-not-found.ts";
 
-export { Organization, OrganizationName, RoleSchema } from "./organization.ts";
+export {
+  Organization,
+  OrganizationName,
+  PostalAddress,
+  RoleSchema,
+} from "./organization.ts";
+
+export { PostalAddressRequired } from "./postal-address-required.ts";
 
 export type { Role } from "./organization.ts";
 

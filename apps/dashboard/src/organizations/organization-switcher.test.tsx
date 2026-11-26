@@ -67,6 +67,23 @@ describe("organization switcher", () => {
     ).resolves.toBeDefined();
   });
 
+  it("leads to the settings of the organization the tab works in", async () => {
+    api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
+
+    renderWithOrganizations(<OrganizationSwitcher />);
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Organization: Acme Newsletter, Owner",
+      })
+    );
+
+    const item = await screen.findByRole("menuitem", {
+      name: "Organization settings",
+    });
+
+    expect(item.closest("a")?.getAttribute("href")).toBe("/settings");
+  });
+
   it("keeps a tab in its organization when another tab switches", async () => {
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME, BOLT]))

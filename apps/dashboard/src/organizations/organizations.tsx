@@ -1,4 +1,8 @@
-import type { Organization, ProviderConnection } from "@repo/domain";
+import type {
+  Organization,
+  OrganizationId,
+  ProviderConnection,
+} from "@repo/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createContext,
@@ -192,6 +196,37 @@ export const useCreateOrganization = () => {
       choose(created.id);
       // WARNING: don't await the reload, or the dialog stays busy, and can't be closed, after the Organization already exists.
       void queryClient.invalidateQueries({ queryKey });
+    },
+  });
+};
+
+/**
+ * Saves the postal address every Campaign of the Organization ends with, and
+ * writes the saved Organization into the cached list, so a page that checks
+ * for it, such as a Campaign's, sees it at once.
+ */
+export const useUpdatePostalAddress = (organizationId: OrganizationId) => {
+  const queryClient = useQueryClient();
+  const queryKey = organizationsQueryKey(useAccount().id);
+
+  return useMutation({
+    mutationFn: (postalAddress: string) =>
+      callApi((client) =>
+        client.organizations.updatePostalAddress({
+          params: { organizationId },
+          payload: { postalAddress },
+        })
+      ),
+    onSuccess: async (saved) => {
+      // WARNING: a list request sent before the save would answer with the old Organization and undo this write, so it's cancelled first.
+      await queryClient.cancelQueries({ queryKey });
+      queryClient.setQueryData<readonly Organization[]>(
+        queryKey,
+        (organizations = []) =>
+          organizations.map((organization) =>
+            organization.id === saved.id ? saved : organization
+          )
+      );
     },
   });
 };

@@ -2,7 +2,12 @@ import { assert, layer } from "@effect/vitest";
 import { Organization } from "@repo/domain";
 import { Effect, Schema } from "effect";
 
-import { send, signedInClient, signedInPerson } from "./accounts.ts";
+import {
+  clientWithCookie,
+  send,
+  signedInClient,
+  signedInPerson,
+} from "./accounts.ts";
 import { ApiClient, TestApp } from "./harness.ts";
 
 const ORGANIZATION_ID = /^org_[0-7][0-9a-hjkmnp-tv-z]{25}$/u;
@@ -75,6 +80,66 @@ layer(TestApp, { timeout: "2 minutes" })("Organizations", (test) => {
         body: { name: "   " },
         headers: { cookie },
       });
+
+      assert.strictEqual(response.status, 400);
+    })
+  );
+
+  test.effect(
+    "saves the Organization's postal address, trimmed, and shows it to its members",
+    () =>
+      Effect.gen(function* savedAddress() {
+        const cookie = yield* signedInPerson;
+        const client = yield* clientWithCookie(cookie);
+
+        const created = yield* client.organizations.create({
+          payload: { name: "Acme" },
+        });
+
+        assert.isNull(created.postalAddress);
+
+        const response = yield* send(
+          "PUT",
+          `/api/organizations/${created.id}/postal-address`,
+          {
+            body: { postalAddress: "  14 Mill Lane\nBristol BS1 4XE  " },
+            headers: { cookie },
+          }
+        );
+
+        const saved = yield* Effect.promise(() => response.json()).pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(Organization))
+        );
+
+        assert.strictEqual(response.status, 200);
+        assert.strictEqual(
+          saved.postalAddress,
+          "14 Mill Lane\nBristol BS1 4XE"
+        );
+        assert.deepStrictEqual(
+          yield* client.organizations.get({
+            params: { organizationId: created.id },
+          }),
+          saved
+        );
+        assert.deepStrictEqual(yield* client.organizations.list(), [saved]);
+      })
+  );
+
+  test.effect("refuses a postal address that is only spaces", () =>
+    Effect.gen(function* blankAddress() {
+      const cookie = yield* signedInPerson;
+      const client = yield* clientWithCookie(cookie);
+
+      const created = yield* client.organizations.create({
+        payload: { name: "Acme" },
+      });
+
+      const response = yield* send(
+        "PUT",
+        `/api/organizations/${created.id}/postal-address`,
+        { body: { postalAddress: " \n " }, headers: { cookie } }
+      );
 
       assert.strictEqual(response.status, 400);
     })

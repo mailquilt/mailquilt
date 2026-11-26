@@ -10,6 +10,7 @@ import {
 import { Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { useState } from "react";
 import {
   afterAll,
   afterEach,
@@ -42,11 +43,11 @@ const organization = Schema.decodeUnknownSync(Organization)(ACME);
 
 const SEND = `${CAMPAIGN}/send`;
 
-const renderPage = () =>
+const renderPage = (inOrganization = organization) =>
   renderWithOrganizations(
     <CampaignPage
       campaignId={CampaignIdSchema.make(DRAFT.id)}
-      organization={organization}
+      organization={inOrganization}
     />
   );
 
@@ -73,6 +74,27 @@ const answering = (...answers: readonly object[]) => {
 
     return HttpResponse.json(answer);
   };
+};
+
+const AddressAddedLater = () => {
+  const [current, setCurrent] = useState(organization);
+
+  return (
+    <>
+      <button
+        onClick={() =>
+          setCurrent(Schema.decodeUnknownSync(Organization)({ ...ACME }))
+        }
+        type="button"
+      >
+        Address added elsewhere
+      </button>
+      <CampaignPage
+        campaignId={CampaignIdSchema.make(DRAFT.id)}
+        organization={current}
+      />
+    </>
+  );
 };
 
 describe("one campaign's page", () => {
@@ -171,6 +193,14 @@ describe("one campaign's page", () => {
       "Choose a provider connection before sending",
     ],
     [
+      "its organization has no postal address",
+      { _tag: "PostalAddressRequired" },
+      409,
+      DRAFT,
+      {},
+      "Add a postal address before sending",
+    ],
+    [
       "it was sent from another tab",
       { _tag: "CampaignNotDraft" },
       409,
@@ -249,6 +279,71 @@ describe("one campaign's page", () => {
     expect(
       screen.getByRole("link", { name: "Edit" }).getAttribute("href")
     ).toBe(`/campaigns/${DRAFT.id}/edit`);
+  });
+
+  it("asks for a postal address, with a link to add it, before a draft can be sent", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
+    renderPage(
+      Schema.decodeUnknownSync(Organization)({ ...ACME, postalAddress: null })
+    );
+
+    await expect(
+      screen.findByText("Add a postal address before sending")
+    ).resolves.toBeDefined();
+    expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+    expect(
+      screen
+        .getByRole("link", { name: "Add postal address" })
+        .getAttribute("href")
+    ).toBe("/settings");
+    expect(
+      screen.getByTitle("Preview of the email").getAttribute("srcdoc")
+    ).toContain(">Your postal address goes here</span></p>");
+  });
+
+  it("offers Send now again once the postal address it was refused for is added, without leaving the page", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
+      http.post(SEND, () =>
+        HttpResponse.json({ _tag: "PostalAddressRequired" }, { status: 409 })
+      )
+    );
+    renderWithOrganizations(<AddressAddedLater />);
+
+    await confirmSend();
+
+    await expect(
+      screen.findByText("Add a postal address before sending")
+    ).resolves.toBeDefined();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Address added elsewhere" })
+    );
+
+    await expect(
+      screen.findByRole("button", { name: "Send now" })
+    ).resolves.toBeDefined();
+    expect(
+      screen.queryByText("Add a postal address before sending")
+    ).toBeNull();
+  });
+
+  it("previews the email with the footer it's sent with", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
+    renderPage();
+
+    const preview = await screen.findByTitle("Preview of the email");
+
+    expect(preview.getAttribute("srcdoc")).toContain(
+      ">Acme Newsletter, 14 Mill Lane, Bristol BS1 4XE</p>"
+    );
   });
 
   it("says when the Organization has no such campaign", async () => {
