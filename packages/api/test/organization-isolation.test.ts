@@ -22,6 +22,7 @@ interface Target {
   readonly campaignId: CampaignId;
   readonly listId: ListId;
   readonly contactId: ContactId;
+  readonly contactEmail: string;
   readonly providerConnectionId: ProviderConnectionId;
 }
 
@@ -155,8 +156,12 @@ const NO_SUCH_ORGANIZATION = OrganizationIdSchema.make(
   "org_00000000000000000000000000"
 );
 
+let readers = 0;
+
 const ownedData = (owner: Client) =>
   Effect.gen(function* organizationWithData() {
+    readers += 1;
+
     const organization = yield* owner.organizations.create({
       payload: { name: "Acme" },
     });
@@ -170,7 +175,7 @@ const ownedData = (owner: Client) =>
 
     const contact = yield* owner.contacts.create({
       params,
-      payload: { email: "ada@example.com", listIds: [list.id] },
+      payload: { email: `reader-${readers}@example.com`, listIds: [list.id] },
     });
 
     const connection = yield* owner.providerConnections.create({
@@ -195,6 +200,7 @@ const ownedData = (owner: Client) =>
 
     return {
       campaignId: campaign.id,
+      contactEmail: contact.email,
       contactId: contact.id,
       listId: list.id,
       organizationId: organization.id,
@@ -228,7 +234,10 @@ const unsubscribeRequests = (token: string) =>
       ])
     );
 
-    return responses.map((response) => response.status);
+    return {
+      page: yield* Effect.promise(() => responses[0]?.text() ?? ""),
+      statuses: responses.map((response) => response.status),
+    };
   });
 
 const tenantEndpointsInContract = () => {
@@ -443,11 +452,11 @@ layer(TestApp, { timeout: "2 minutes" })(
           for (const ids of mixed) {
             const token = yield* unsubscribeToken(ids);
 
-            assert.deepStrictEqual(
-              yield* unsubscribeRequests(token),
-              [404, 404, 404],
-              ids.join(".")
-            );
+            const { page, statuses } = yield* unsubscribeRequests(token);
+
+            assert.deepStrictEqual(statuses, [404, 404, 404], ids.join("."));
+            assert.notInclude(page, target.contactEmail);
+            assert.notInclude(page, own.contactEmail);
           }
 
           const fetch = yield* AppFetch;
