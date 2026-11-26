@@ -23,7 +23,7 @@ const altTextOnly: FormatCallback = (element, _walk, builder) => {
 export const plainTextOf = (html: string) =>
   convert(html, {
     formatters: { altTextOnly },
-    limits: { maxDepth: MAX_DEPTH },
+    limits: { ellipsis: "", maxDepth: MAX_DEPTH },
     selectors: [
       { format: "altTextOnly", selector: "img" },
       { format: "skip", selector: "title" },
@@ -35,4 +35,4 @@ export const plainTextOf = (html: string) =>
       { format: "block", selector: "th" },
       { options: { hideLinkHrefIfSameAsText: true }, selector: "a" },
     ],
-  });
+  }).trim();

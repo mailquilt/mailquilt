@@ -24,7 +24,7 @@ describe("a Campaign's plain-text part", () => {
   it("still makes a text part from HTML nested too deeply to read whole, so the send doesn't fail", () => {
     const tooDeep = `${"<div>".repeat(5000)}lost${"</div>".repeat(5000)}`;
 
-    assert.isTrue(plainTextOf(`<p>Hello!</p>${tooDeep}`).startsWith("Hello!"));
+    assert.strictEqual(plainTextOf(`<p>Hello!</p>${tooDeep}`), "Hello!");
   });
 
   it("leaves out the page title, which the HTML never shows", () => {
