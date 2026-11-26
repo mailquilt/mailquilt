@@ -231,8 +231,6 @@ export const smtpProviderLayer = (options: SmtpProviderOptions = {}) =>
       const guard = yield* OutboundGuard;
 
       return {
-        parseNotifications: () => Effect.succeed([]),
-
         send: (settings, email) =>
           Effect.gen(function* send() {
             const address = yield* guard

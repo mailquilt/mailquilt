@@ -30,7 +30,6 @@ export const RecordingSmtpProviderLive = Layer.effectContext(
     const nextFailure = yield* Ref.make(Option.none<SendFailed>());
 
     return Context.make(SmtpProvider, {
-      parseNotifications: () => Effect.succeed([]),
       send: (settings, email) =>
         Effect.gen(function* send() {
           const failure = yield* Ref.getAndSet(nextFailure, Option.none());

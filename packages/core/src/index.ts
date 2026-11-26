@@ -64,8 +64,6 @@ export { HostLookupFailed } from "./host-lookup-failed.ts";
 
 export { HostNotFound } from "./host-not-found.ts";
 
-export { InvalidNotification } from "./invalid-notification.ts";
-
 export { OutboundBlocked } from "./outbound-blocked.ts";
 
 export {
@@ -76,13 +74,12 @@ export {
 
 export type { AddressClass } from "./outbound-guard.ts";
 
-export { SmtpProvider } from "./provider.ts";
+export { sendThrough, SmtpProvider } from "./provider.ts";
 
 export type {
-  DeliveryNotification,
-  NotificationRequest,
   OutgoingEmail,
   Provider,
+  ProviderConnectionWithCredentials,
   SentEmail,
   SmtpSettings,
 } from "./provider.ts";
@@ -99,7 +96,6 @@ export {
 export type {
   NewProviderConnection,
   ProviderConnectionChanges,
-  ProviderConnectionWithCredentials,
 } from "./provider-connections.ts";
 
 export { RateLimiter } from "./rate-limiter.ts";

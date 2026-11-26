@@ -71,7 +71,6 @@ export const SmtpProviderLive = smtpProviderLayer({
  * address already has an account.
  */
 export const SmtpProviderUnavailable = Layer.succeed(SmtpProvider, {
-  parseNotifications: () => Effect.succeed([]),
   send: () =>
     Effect.fail(
       new SendFailed({

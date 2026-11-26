@@ -18,7 +18,8 @@ import type { Option } from "effect";
 
 import type { CurrentOrganization } from "./current-organization.ts";
 import { CurrentUser } from "./current-user.ts";
-import { SmtpProvider } from "./provider.ts";
+import { sendThrough } from "./provider.ts";
+import type { ProviderConnectionWithCredentials } from "./provider.ts";
 import { RateLimiter } from "./rate-limiter.ts";
 
 /** What a new SMTP Provider Connection is made from. */
@@ -39,12 +40,6 @@ export interface ProviderConnectionChanges {
   readonly from: typeof Sender.Type;
   readonly smtp: typeof SmtpServer.Type;
   readonly credentials: "keep" | Option.Option<typeof SmtpCredentials.Type>;
-}
-
-/** A Provider Connection with its credentials opened, for sending only. */
-export interface ProviderConnectionWithCredentials {
-  readonly connection: ProviderConnection;
-  readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
 }
 
 /**
@@ -161,22 +156,19 @@ export const sendTestEmail = (id: ProviderConnectionId, to: string) =>
     }
 
     const connections = yield* ProviderConnections;
-    const smtp = yield* SmtpProvider;
-    const { connection, credentials } = yield* connections.withCredentials(id);
+    const opened = yield* connections.withCredentials(id);
+    const { connection } = opened;
 
-    const sent = yield* smtp.send(
-      { credentials, server: connection.smtp },
-      {
-        from: connection.from,
-        subject: TEST_EMAIL_SUBJECT,
-        text: [
-          "This is a test email from Mailquilt.",
-          "",
-          `It was sent through your provider connection "${connection.name}" (${connection.smtp.host}:${connection.smtp.port}). If you can read it, the connection works.`,
-        ].join("\n"),
-        to,
-      }
-    );
+    const sent = yield* sendThrough(opened, {
+      from: connection.from,
+      subject: TEST_EMAIL_SUBJECT,
+      text: [
+        "This is a test email from Mailquilt.",
+        "",
+        `It was sent through your provider connection "${connection.name}" (${connection.smtp.host}:${connection.smtp.port}). If you can read it, the connection works.`,
+      ].join("\n"),
+      to,
+    });
 
     return new TestEmailSent({ messageId: sent.messageId });
   });
