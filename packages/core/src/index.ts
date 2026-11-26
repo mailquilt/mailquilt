@@ -60,6 +60,12 @@ export { CredentialsUnreadable } from "./credentials-unreadable.ts";
 
 export type { SealedSecret } from "./credential-cipher.ts";
 
+export { InvalidToken } from "./invalid-token.ts";
+
+export { SignedTokens, signedTokensLayer } from "./signed-tokens.ts";
+
+export type { TokenPurpose } from "./signed-tokens.ts";
+
 export { HostLookupFailed } from "./host-lookup-failed.ts";
 
 export { HostNotFound } from "./host-not-found.ts";

@@ -3,10 +3,9 @@ import { Aead, SecureRandom } from "effect/crypto";
 import { Base64, Base64Url } from "effect/encoding";
 
 import { CredentialsUnreadable } from "./credentials-unreadable.ts";
+import { parseEncryptionKeys } from "./encryption-keys.ts";
 
 const NONCE_LENGTH = 12;
-
-const KEY_ENTRY = /^(?<version>[1-9]\d{0,8}):(?<key>[A-Za-z0-9+/]+={0,2})$/u;
 
 /** A secret as stored: the version of the key that sealed it, and the nonce and ciphertext in base64url. */
 export interface SealedSecret {
@@ -35,61 +34,25 @@ export class CredentialCipher extends Context.Service<
   }
 >()("@repo/core/CredentialCipher") {}
 
-const misconfigured = (problem: string) =>
-  Effect.die(
-    new Error(
-      `ENCRYPTION_KEYS ${problem}. Set it to one or more "version:key" entries separated by commas, each key 32 random bytes in base64, such as "1:$(openssl rand -base64 32)".`
-    )
-  );
-
-const parseKeys = (keys: string) =>
-  Effect.gen(function* parseEncryptionKeys() {
-    const entries = keys
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter((entry) => entry.length > 0);
-
-    if (entries.length === 0) {
-      return yield* misconfigured("is empty");
-    }
+const aesKeys = (keys: string) =>
+  Effect.gen(function* aesKeysByVersion() {
+    const { byVersion: bytesByVersion, newestVersion } =
+      yield* parseEncryptionKeys(keys);
 
     const byVersion = new Map<number, Aead.Key<Aead.AesGcm>>();
 
-    let newest:
-      | { readonly version: number; readonly key: Aead.Key }
-      | undefined;
-
-    for (const entry of entries) {
-      const match = KEY_ENTRY.exec(entry)?.groups;
-      const bytes = Base64.decode(match?.key ?? "");
-
-      if (match?.version === undefined || Result.isFailure(bytes)) {
-        return yield* misconfigured("has an entry that isn't version:key");
-      }
-
-      const version = Number(match.version);
-
-      if (byVersion.has(version)) {
-        return yield* misconfigured(`has key version ${version} twice`);
-      }
-
-      const key = yield* Aead.key(Aead.aes256Gcm, bytes.success).pipe(
-        Effect.catch(() => misconfigured(`key ${version} isn't 32 bytes`))
-      );
-
-      byVersion.set(version, key);
-
-      if (newest === undefined || version > newest.version) {
-        newest = { key, version };
-      }
+    for (const [version, bytes] of bytesByVersion) {
+      byVersion.set(version, yield* Aead.key(Aead.aes256Gcm, bytes));
     }
 
-    if (newest === undefined) {
-      return yield* misconfigured("is empty");
+    const newestKey = byVersion.get(newestVersion);
+
+    if (newestKey === undefined) {
+      return yield* Effect.die(new Error("ENCRYPTION_KEYS has no newest key"));
     }
 
-    return { byVersion, newest };
-  });
+    return { byVersion, newest: { key: newestKey, version: newestVersion } };
+  }).pipe(Effect.orDie);
 
 // WARNING: core's types have neither runtime's globals, so no TextEncoder; Effect's Base64 reads and writes strings as UTF-8.
 const utf8 = (text: string) =>
@@ -108,7 +71,7 @@ export const credentialCipherLayer = (keys: Redacted.Redacted<string>) =>
   Layer.effect(
     CredentialCipher,
     Effect.gen(function* credentialCipher() {
-      const { byVersion, newest } = yield* parseKeys(Redacted.value(keys));
+      const { byVersion, newest } = yield* aesKeys(Redacted.value(keys));
 
       const aead = yield* Aead.Aead;
       const random = yield* SecureRandom.SecureRandom;
