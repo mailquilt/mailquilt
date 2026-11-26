@@ -351,8 +351,8 @@ export const providerConnections = pgTable(
 );
 
 /**
- * One email (`cmp_…`) holding its own copy of its content, sent once to one
- * List through one Provider Connection. Deleting that Provider Connection
+ * One email (`cmp_…`) holding its own copy of its content, sent once to the
+ * Lists in `campaign_lists` through one Provider Connection. Deleting that Provider Connection
  * leaves the Campaign without one (`provider_connection_id` null), so a draft
  * asks for another and a send in progress stops at its next batch.
  * `recipients_*` count the Contacts it goes to, fixed when it starts sending,
@@ -370,7 +370,6 @@ export const campaigns = pgTable(
     fromName: text("from_name"),
     fromEmail: text("from_email").notNull(),
     replyTo: text("reply_to"),
-    listId: text("list_id").notNull(),
     providerConnectionId: text("provider_connection_id"),
     html: text("html").notNull(),
     status: text("status").notNull().default("draft"),
@@ -387,11 +386,6 @@ export const campaigns = pgTable(
       table.organizationId,
       table.id
     ),
-    foreignKey({
-      columns: [table.organizationId, table.listId],
-      foreignColumns: [lists.organizationId, lists.id],
-      name: "campaigns_list_fkey",
-    }),
     // WARNING: the migration narrows this to `on delete set null (provider_connection_id)`, which Drizzle can't declare; a regenerated migration would null `organization_id` too.
     foreignKey({
       columns: [table.organizationId, table.providerConnectionId],
@@ -405,6 +399,33 @@ export const campaigns = pgTable(
       "campaigns_status_check",
       sql`${table.status} in ('draft', 'sending', 'sent')`
     ),
+  ]
+);
+
+/**
+ * The Lists a Campaign goes to, and with `excluded`, the Lists whose Contacts
+ * it leaves out. A List is one or the other for a Campaign, never both.
+ */
+export const campaignLists = pgTable(
+  "campaign_lists",
+  {
+    organizationId: text("organization_id").notNull(),
+    campaignId: text("campaign_id").notNull(),
+    listId: text("list_id").notNull(),
+    excluded: boolean("excluded").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.campaignId, table.listId] }),
+    foreignKey({
+      columns: [table.organizationId, table.campaignId],
+      foreignColumns: [campaigns.organizationId, campaigns.id],
+      name: "campaign_lists_campaign_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.organizationId, table.listId],
+      foreignColumns: [lists.organizationId, lists.id],
+      name: "campaign_lists_list_fkey",
+    }),
   ]
 );
 

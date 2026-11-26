@@ -2,6 +2,7 @@ import type {
   Campaign,
   CampaignDraft,
   CampaignId,
+  ListId,
   OrganizationId,
 } from "@repo/domain";
 import {
@@ -10,7 +11,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Effect } from "effect";
+import { Array as Arr, Effect, Order } from "effect";
 
 import { callApi } from "../api.ts";
 import type { CampaignSearch } from "./campaign-search.ts";
@@ -77,6 +78,48 @@ export const useCampaign = (
     refetchInterval: (query) =>
       query.state.data?.status === "sending" ? SENDING_POLL_MS : false,
   });
+
+/** The Lists a Campaign goes to and leaves out, as the recipient count takes them. */
+export interface TargetedLists {
+  readonly listIds: readonly ListId[];
+  readonly excludedListIds: readonly ListId[];
+}
+
+/**
+ * How many Contacts a Campaign to these Lists would be sent to now. It waits
+ * until at least one List is chosen and `enabled`. After a change, the last
+ * count stays as placeholder data (`isPlaceholderData`) until the new one
+ * comes, so it can be shown as being counted again, never as current.
+ */
+export const useRecipientCount = (
+  organizationId: OrganizationId,
+  lists: TargetedLists,
+  enabled = true
+) => {
+  // WARNING: sorted, so the form and the Campaign page, which list them in different orders, share one cached count.
+  const query = {
+    excludedListIds: Arr.sort(lists.excludedListIds, Order.String),
+    listIds: Arr.sort(lists.listIds, Order.String),
+  };
+
+  return useQuery({
+    enabled: enabled && query.listIds.length > 0,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) => {
+      const count = await callApi(
+        (client) =>
+          client.campaigns.countRecipients({
+            params: { organizationId },
+            query,
+          }),
+        signal
+      );
+
+      return count.recipients;
+    },
+    queryKey: [...campaignsKey(organizationId), "recipient-count", query],
+  });
+};
 
 // WARNING: write the Campaign into the cache first; the Campaign page navigated to next would otherwise load it again, or draw the draft it was before sending.
 const useKeepCampaign = (organizationId: OrganizationId) => {

@@ -15,7 +15,7 @@ What works today, on Docker and on Cloudflare:
 - Organizations, each with its own Contacts, Lists, Provider Connections and Campaigns.
 - Adding Contacts and Lists.
 - SMTP Provider Connections, with a test email.
-- Sending a Campaign to one List, in the background.
+- Sending a Campaign to several Lists, leaving out others, in the background.
 
 Unsubscribe links, Suppressions, scheduling, templates, imports and the other P1 features are still to come, so don't send to real audiences yet.
 

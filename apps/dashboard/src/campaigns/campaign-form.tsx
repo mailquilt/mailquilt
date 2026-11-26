@@ -8,7 +8,9 @@ import {
 } from "@cloudflare/kumo";
 import {
   CampaignHtml,
+  CampaignListIds,
   CampaignSubject,
+  ExcludedListIds,
   ListIdSchema,
   MailAddress,
   campaignHtmlBytes,
@@ -20,30 +22,34 @@ import type {
   Campaign,
   CampaignDraft,
   List,
+  OrganizationId,
   ProviderConnection,
 } from "@repo/domain";
 import { useForm, useStore } from "@tanstack/react-form";
 import type { AnyFieldApi } from "@tanstack/react-form";
-import { Option, Schema } from "effect";
+import { Schema } from "effect";
 import type { Types } from "effect";
 import { useId, useState } from "react";
 import { flushSync } from "react-dom";
 
 import { formatCount } from "../audience/format.ts";
+import { useFieldError } from "../forms/field-error.tsx";
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
 import { SettingsSection } from "../layout/settings-section.tsx";
 import { EmailPreview } from "./email-preview.tsx";
+import { ListChecklists, ReachLine } from "./list-choice.tsx";
 
 const KIB = 1024;
 
 const FIELD = "w-full max-sm:h-11 pointer-coarse:h-11";
 
 const CampaignFormValues = Schema.Struct({
+  excludedListIds: Schema.Array(ListIdSchema),
   fromEmail: MailAddress,
   fromName: SenderName,
   html: CampaignHtml,
-  listId: ListIdSchema,
+  listIds: Schema.Array(ListIdSchema),
   providerConnectionId: ProviderConnectionIdSchema,
   replyTo: Schema.Trim,
   subject: CampaignSubject,
@@ -52,10 +58,6 @@ const CampaignFormValues = Schema.Struct({
 const decodeValues = Schema.decodeSync(CampaignFormValues);
 
 const mailAddress = Schema.toStandardSchemaV1(MailAddress)["~standard"];
-
-const FieldIssue = Schema.Struct({ message: Schema.String });
-
-const decodeFieldIssue = Schema.decodeUnknownOption(FieldIssue);
 
 const issue = (message: string) => ({ message });
 
@@ -71,13 +73,11 @@ const optionalAddressIssue = (value: string) => {
 
 // WARNING: every rule is a field validator; TanStack skips form-level validators while any field has an error, so their errors would arrive a round later.
 const CHECKS = {
+  excludedListIds: { onSubmit: Schema.toStandardSchemaV1(ExcludedListIds) },
   fromEmail: { onSubmit: Schema.toStandardSchemaV1(MailAddress) },
   fromName: { onSubmit: Schema.toStandardSchemaV1(SenderName) },
   html: { onSubmit: Schema.toStandardSchemaV1(CampaignHtml) },
-  listId: {
-    onSubmit: ({ value }: { value: string }) =>
-      value === "" ? issue("Choose a list.") : undefined,
-  },
+  listIds: { onSubmit: Schema.toStandardSchemaV1(CampaignListIds) },
   providerConnectionId: {
     onSubmit: ({ value }: { value: string }) =>
       value === "" ? issue("Choose a provider connection.") : undefined,
@@ -99,13 +99,15 @@ const defaultsFor = (
   campaign?: Campaign
 ) => {
   if (campaign !== undefined) {
+    const known = (ids: readonly string[]) =>
+      ids.filter((id) => lists.some((list) => list.id === id));
+
     const values: typeof CampaignFormValues.Encoded = {
+      excludedListIds: known(campaign.excludedListIds),
       fromEmail: campaign.from.email,
       fromName: campaign.from.name ?? "",
       html: campaign.html,
-      listId: lists.some((list) => list.id === campaign.listId)
-        ? campaign.listId
-        : "",
+      listIds: known(campaign.listIds),
       providerConnectionId: connections.some(
         (connection) => connection.id === campaign.providerConnectionId
       )
@@ -120,11 +122,14 @@ const defaultsFor = (
 
   const connection = only(connections);
 
+  const list = only(lists);
+
   const values: typeof CampaignFormValues.Encoded = {
+    excludedListIds: [],
     fromEmail: connection?.from.email ?? "",
     fromName: connection?.from.name ?? "",
     html: "",
-    listId: only(lists)?.id ?? "",
+    listIds: list === undefined ? [] : [list.id],
     providerConnectionId: connection?.id ?? "",
     replyTo: "",
     subject: "",
@@ -139,8 +144,9 @@ const draftFrom = (value: typeof CampaignFormValues.Type) => {
       value.fromName === ""
         ? { email: value.fromEmail }
         : { email: value.fromEmail, name: value.fromName },
+    excludedListIds: value.excludedListIds,
     html: value.html,
-    listId: value.listId,
+    listIds: value.listIds,
     providerConnectionId: value.providerConnectionId,
     subject: value.subject,
   };
@@ -150,37 +156,6 @@ const draftFrom = (value: typeof CampaignFormValues.Type) => {
   }
 
   return draft satisfies typeof CampaignDraft.Type;
-};
-
-const useFieldError = (field: AnyFieldApi) => {
-  const submissions = useStore(
-    field.form.store,
-    (state) => state.submissionAttempts
-  );
-
-  const message = Option.getOrUndefined(
-    Option.map(
-      decodeFieldIssue(field.state.meta.errors.at(0)),
-      (found) => found.message
-    )
-  );
-
-  return {
-    message,
-    submissions,
-    // WARNING: keyed by submission so a repeated error is a new alert, which screen readers announce again.
-    error:
-      message === undefined
-        ? undefined
-        : {
-            match: true as const,
-            message: (
-              <span key={submissions} role="alert">
-                {message}
-              </span>
-            ),
-          },
-  };
 };
 
 const ChoiceField = ({
@@ -219,18 +194,6 @@ const ChoiceField = ({
       {children}
     </Select>
   );
-};
-
-const subscribedNow = (list: List) => {
-  const { subscribed } = list.subscriptions;
-
-  if (subscribed === 0) {
-    return `No one is subscribed to ${list.name} yet. You can save the draft, but it can’t be sent until someone is.`;
-  }
-
-  return subscribed === 1
-    ? "1 contact is subscribed to it now."
-    : `${formatCount(subscribed)} contacts are subscribed to it now.`;
 };
 
 const ContentField = ({
@@ -343,11 +306,11 @@ const ContentField = ({
 };
 
 /**
- * A Campaign's draft: the List it goes to, the Provider Connection it goes
- * through and who it's from, its subject and its HTML, with a preview. With
- * one List or one connection, it's chosen already; choosing a connection
- * fills in who it's from. Fields are checked with the same schemas the API
- * uses.
+ * A Campaign's draft: the Lists it goes to and leaves out, with how many
+ * Contacts they reach now, the Provider Connection it goes through and who
+ * it's from, its subject and its HTML, with a preview. With one List or one
+ * connection, it's chosen already; choosing a connection fills in who it's
+ * from. Fields are checked with the same schemas the API uses.
  */
 export const CampaignForm = ({
   busy,
@@ -358,6 +321,7 @@ export const CampaignForm = ({
   failureMessage,
   lists,
   onSubmit,
+  organizationId,
   submitLabel,
 }: {
   busy: boolean;
@@ -370,6 +334,7 @@ export const CampaignForm = ({
   failureMessage: string | undefined;
   lists: readonly List[];
   onSubmit: (draft: typeof CampaignDraft.Type) => void;
+  organizationId: OrganizationId;
   submitLabel: string;
 }) => {
   const [tab, setTab] = useState<Tab>("html");
@@ -389,14 +354,17 @@ export const CampaignForm = ({
     },
   });
 
-  const listId = useStore(form.store, (state) => state.values.listId);
+  const listIds = useStore(form.store, (state) => state.values.listIds);
+
+  const excludedListIds = useStore(
+    form.store,
+    (state) => state.values.excludedListIds
+  );
 
   const connectionId = useStore(
     form.store,
     (state) => state.values.providerConnectionId
   );
-
-  const list = lists.find((candidate) => candidate.id === listId);
 
   const connection = connections.find(
     (candidate) => candidate.id === connectionId
@@ -409,36 +377,31 @@ export const CampaignForm = ({
       onSubmit={(event) => submitForm(event, form)}
     >
       <SettingsSection
-        about="Everyone subscribed to the list at the moment you send, except anyone who stopped all marketing email or whose address is suppressed. Pending and unsubscribed contacts don’t get it."
+        about="Everyone subscribed to the lists you send to at the moment you send, once each. It leaves out anyone who is or was on a list you leave out, and anyone who stopped all marketing email or whose address is suppressed."
         title="Who gets it"
       >
-        <form.Field name="listId" validators={CHECKS.listId}>
-          {(field) => (
-            <ChoiceField
-              description={list === undefined ? undefined : subscribedNow(list)}
-              field={field}
-              label="List"
-              placeholder="Choose a list"
-              valueLabel={list?.name}
+        <form.Field name="listIds" validators={CHECKS.listIds}>
+          {(sendTo) => (
+            <form.Field
+              name="excludedListIds"
+              validators={CHECKS.excludedListIds}
             >
-              {lists.map((candidate) => (
-                <Select.Option
-                  className="mq-count-option *:first:min-w-0 *:first:flex-1"
-                  key={candidate.id}
-                  value={candidate.id}
-                >
-                  <span className="flex w-full justify-between gap-6">
-                    <span className="wrap-anywhere">{candidate.name}</span>
-                    <span className="whitespace-nowrap text-kumo-subtle tabular-nums">
-                      {formatCount(candidate.subscriptions.subscribed)}{" "}
-                      subscribed
-                    </span>
-                  </span>
-                </Select.Option>
-              ))}
-            </ChoiceField>
+              {(leaveOut) => (
+                <ListChecklists
+                  leaveOut={leaveOut}
+                  lists={lists}
+                  sendTo={sendTo}
+                />
+              )}
+            </form.Field>
           )}
         </form.Field>
+        <ReachLine
+          excludedListIds={excludedListIds.map((id) => ListIdSchema.make(id))}
+          listIds={listIds.map((id) => ListIdSchema.make(id))}
+          lists={lists}
+          organizationId={organizationId}
+        />
       </SettingsSection>
       <SettingsSection
         about="The provider connection it goes out through, and who it says it’s from. Your provider must allow the from email."

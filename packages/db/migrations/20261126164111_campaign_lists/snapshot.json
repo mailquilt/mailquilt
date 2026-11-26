@@ -1,0 +1,216 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "c13902ac-3ce2-4120-8a0e-479acb7183ea",
+  "prevIds": ["583880ed-31e8-4451-88a8-4be511be1986"],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "campaign_lists"],
+      "writes": [
+        "s|tbl|public.campaign_lists",
+        "n|tbl|public.campaign_lists",
+        "e|tbl|public.campaign_lists",
+        "n|rel|public.campaign_lists",
+        "n|type|public.campaign_lists",
+        "n|rel|public.campaign_lists_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "drop_fk",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|fk|public.campaigns.campaigns_list_fkey",
+        "n|fk|public.campaigns.campaigns_list_fkey",
+        "e|fk|public.campaigns.campaigns_list_fkey",
+        "n|con|public.campaigns.campaigns_list_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "e|col|public.campaigns.organization_id",
+        "e|col|public.campaigns.list_id"
+      ]
+    },
+    {
+      "statementType": "drop_column",
+      "statementTarget": ["column", "public", "campaigns", "list_id"],
+      "writes": [
+        "s|col|public.campaigns.list_id",
+        "n|col|public.campaigns.list_id",
+        "e|col|public.campaigns.list_id"
+      ],
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "campaign_lists"],
+      "writes": [
+        "s|fk|public.campaign_lists.campaign_lists_campaign_fkey",
+        "n|fk|public.campaign_lists.campaign_lists_campaign_fkey",
+        "e|fk|public.campaign_lists.campaign_lists_campaign_fkey",
+        "n|con|public.campaign_lists.campaign_lists_campaign_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_lists",
+        "n|sch|public",
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaign_lists.organization_id",
+        "n|col|public.campaign_lists.campaign_id",
+        "n|col|public.campaigns.organization_id",
+        "n|col|public.campaigns.id",
+        "e|uniqueness|public.campaigns.id.organization_id"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "campaign_lists"],
+      "writes": [
+        "s|fk|public.campaign_lists.campaign_lists_list_fkey",
+        "n|fk|public.campaign_lists.campaign_lists_list_fkey",
+        "e|fk|public.campaign_lists.campaign_lists_list_fkey",
+        "n|con|public.campaign_lists.campaign_lists_list_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_lists",
+        "n|sch|public",
+        "n|tbl|public.lists",
+        "n|sch|public",
+        "n|col|public.campaign_lists.organization_id",
+        "n|col|public.campaign_lists.list_id",
+        "n|col|public.lists.organization_id",
+        "n|col|public.lists.id",
+        "e|uniqueness|public.lists.id.organization_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "campaign_lists",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "campaign_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "list_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "excluded",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "campaign_lists_campaign_fkey",
+        "nameExplicit": true,
+        "columns": ["organization_id", "campaign_id"],
+        "schemaTo": "public",
+        "tableTo": "campaigns",
+        "columnsTo": ["organization_id", "id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "campaign_lists_list_fkey",
+        "nameExplicit": true,
+        "columns": ["organization_id", "list_id"],
+        "schemaTo": "public",
+        "tableTo": "lists",
+        "columnsTo": ["organization_id", "id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "NO ACTION",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_lists",
+        "name": "campaign_lists_pkey",
+        "columns": ["campaign_id", "list_id"],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "drop",
+      "key": "columns\u0000[\"public\",\"campaigns\",\"list_id\"]"
+    },
+    {
+      "op": "drop",
+      "key": "fks\u0000[\"public\",\"campaigns\",\"campaigns_list_fkey\"]"
+    }
+  ]
+}

@@ -3,6 +3,8 @@ import { QueueInbox, SmtpOutbox } from "@repo/core/testing";
 import {
   CampaignIdSchema,
   ListIdSchema,
+  MAX_CAMPAIGN_HTML_BYTES,
+  MAX_CAMPAIGN_LISTS,
   ProviderConnectionIdSchema,
   SendFailed,
 } from "@repo/domain";
@@ -10,7 +12,12 @@ import type { ContactId, ListId } from "@repo/domain";
 import { Effect, pipe } from "effect";
 import { SqlClient } from "effect/sql";
 
-import { ownOrganization } from "./accounts.ts";
+import {
+  clientWithCookie,
+  ownOrganization,
+  send as request,
+  signedInPerson,
+} from "./accounts.ts";
 import { QueueWorker, TestApp } from "./harness.ts";
 
 type Owner = Effect.Success<typeof ownOrganization>;
@@ -72,7 +79,8 @@ const draftCampaignIn = (postalAddress: string | null) =>
       payload: {
         ...CONTENT,
         subject: `${CONTENT.subject} #${campaigns}`,
-        listId: list.id,
+        excludedListIds: [],
+        listIds: [list.id],
         providerConnectionId: connection.id,
       },
     });
@@ -135,7 +143,8 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         assert.strictEqual(campaign.html, CONTENT.html);
         assert.strictEqual(campaign.replyTo, CONTENT.replyTo);
         assert.deepStrictEqual({ ...campaign.from }, CONTENT.from);
-        assert.strictEqual(campaign.listId, list.id);
+        assert.deepStrictEqual(campaign.listIds, [list.id]);
+        assert.deepStrictEqual(campaign.excludedListIds, []);
         assert.strictEqual(campaign.providerConnectionId, connection.id);
         assert.deepStrictEqual({ ...campaign.recipients }, NOT_SENT);
         assert.isNull(campaign.sendingStartedAt);
@@ -146,7 +155,8 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           payload: {
             from: { email: "news@acme.example" },
             html: "<p>Changed</p>",
-            listId: list.id,
+            excludedListIds: [],
+            listIds: [list.id],
             providerConnectionId: connection.id,
             subject: "Changed",
           },
@@ -169,7 +179,8 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           params,
           payload: {
             ...CONTENT,
-            listId: list.id,
+            excludedListIds: [],
+            listIds: [list.id],
             providerConnectionId: connection.id,
           },
         });
@@ -195,12 +206,13 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
 
         const payload = {
           ...CONTENT,
-          listId: list.id,
+          excludedListIds: [],
+          listIds: [list.id],
           providerConnectionId: connection.id,
         };
 
         const noList = yield* client.campaigns
-          .create({ params, payload: { ...payload, listId: NO_SUCH_LIST } })
+          .create({ params, payload: { ...payload, listIds: [NO_SUCH_LIST] } })
           .pipe(Effect.flip);
 
         const noConnection = yield* client.campaigns
@@ -210,11 +222,19 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           })
           .pipe(Effect.flip);
 
+        const noExcludedList = yield* client.campaigns
+          .update({
+            params: campaignParams,
+            payload: { ...payload, excludedListIds: [NO_SUCH_LIST] },
+          })
+          .pipe(Effect.flip);
+
         const noCampaign = yield* client.campaigns
           .send({ params: { ...params, campaignId: NO_SUCH_CAMPAIGN } })
           .pipe(Effect.flip);
 
         assert.strictEqual(noList._tag, "ListNotFound");
+        assert.strictEqual(noExcludedList._tag, "ListNotFound");
         assert.strictEqual(noConnection._tag, "ProviderConnectionNotFound");
         assert.strictEqual(noCampaign._tag, "CampaignNotFound");
       })
@@ -336,6 +356,225 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           text?.endsWith("\n\nAcme, Unit 3 & 4, Mill Lane, Bristol BS1 4XE")
         );
         assert.isDefined(headers?.["List-Unsubscribe"]);
+      })
+  );
+
+  test.effect(
+    "sends a Campaign once to each Contact subscribed to any of its Lists, leaving out anyone with a Subscription to an excluded List",
+    () =>
+      Effect.gen(function* sendToSeveralLists() {
+        const owner = yield* draftCampaign;
+
+        const { campaign, campaignParams, client, connection, list, params } =
+          owner;
+
+        const offers = yield* client.lists.create({
+          params,
+          payload: { name: "Offers" },
+        });
+
+        const customers = yield* client.lists.create({
+          params,
+          payload: { name: "Customers" },
+        });
+
+        yield* addContacts(owner, ["both@example.com"], [list.id, offers.id]);
+        yield* addContacts(owner, ["offers@example.com"], [offers.id]);
+        yield* addContacts(
+          owner,
+          ["customer@example.com"],
+          [list.id, customers.id]
+        );
+
+        const [pendingCustomer, formerCustomer] = yield* addContacts(
+          owner,
+          ["pending-customer@example.com", "former-customer@example.com"],
+          [list.id, customers.id]
+        );
+
+        const sql = yield* SqlClient.SqlClient;
+        const pendingId = pendingCustomer?.id ?? assert.fail();
+        const formerId = formerCustomer?.id ?? assert.fail();
+
+        yield* sql`
+          update subscriptions
+          set status = case contact_id when ${pendingId} then 'pending' else 'unsubscribed' end
+          where list_id = ${customers.id} and contact_id in (${pendingId}, ${formerId})`;
+
+        yield* client.campaigns.update({
+          params: campaignParams,
+          payload: {
+            ...CONTENT,
+            excludedListIds: [customers.id],
+            listIds: [list.id, offers.id],
+            providerConnectionId: connection.id,
+            subject: campaign.subject,
+          },
+        });
+
+        const sending = yield* client.campaigns.send({
+          params: campaignParams,
+        });
+
+        yield* (yield* QueueWorker).deliverAll;
+
+        assert.deepStrictEqual(
+          sending.listIds,
+          [list.id, offers.id].toSorted()
+        );
+        assert.deepStrictEqual(sending.excludedListIds, [customers.id]);
+        assert.strictEqual(sending.recipients.total, 2);
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "both@example.com",
+          "offers@example.com",
+        ]);
+      })
+  );
+
+  test.effect(
+    "counts the Contacts a Campaign to some Lists would reach now, leaving out the same Contacts a send does",
+    () =>
+      Effect.gen(function* countRecipients() {
+        const owner = yield* draftCampaign;
+        const { client, list, params } = owner;
+
+        const offers = yield* client.lists.create({
+          params,
+          payload: { name: "Offers" },
+        });
+
+        const customers = yield* client.lists.create({
+          params,
+          payload: { name: "Customers" },
+        });
+
+        yield* addContacts(owner, ["both@example.com"], [list.id, offers.id]);
+        yield* addContacts(owner, ["offers@example.com"], [offers.id]);
+        yield* addContacts(
+          owner,
+          ["customer@example.com"],
+          [list.id, customers.id]
+        );
+        yield* addContacts(owner, ["suppressed@example.com"], [list.id]);
+
+        const [optedOut] = yield* addContacts(
+          owner,
+          ["opted-out@example.com"],
+          [list.id]
+        );
+
+        const sql = yield* SqlClient.SqlClient;
+
+        yield* sql`update contacts set opted_out_at = now() where id = ${optedOut?.id ?? assert.fail()}`;
+        yield* client.suppressions.add({
+          params,
+          payload: { emails: ["suppressed@example.com"] },
+        });
+
+        const count = yield* client.campaigns.countRecipients({
+          params,
+          query: {
+            excludedListIds: [customers.id],
+            listIds: [list.id, offers.id],
+          },
+        });
+
+        const unknownList = yield* client.campaigns
+          .countRecipients({
+            params,
+            query: { excludedListIds: [NO_SUCH_LIST], listIds: [list.id] },
+          })
+          .pipe(Effect.flip);
+
+        assert.deepStrictEqual({ ...count }, { recipients: 2 });
+        assert.strictEqual(unknownList._tag, "ListNotFound");
+      })
+  );
+
+  test.effect(
+    "accepts a draft with every field at its longest, within the API's request size",
+    () =>
+      Effect.gen(function* longestDraft() {
+        const { campaignParams, client, connection, params } =
+          yield* draftCampaign;
+
+        const lists = yield* pipe(
+          Array.from(
+            { length: MAX_CAMPAIGN_LISTS * 2 },
+            (_, index) => `List ${index}`
+          ),
+          Effect.forEach((name) =>
+            client.lists.create({ params, payload: { name } })
+          )
+        );
+
+        const ids = lists.map((list) => list.id);
+        const address = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(57)}.com`;
+        const escaped = "\u0001";
+
+        const longest = yield* client.campaigns.update({
+          params: campaignParams,
+          payload: {
+            excludedListIds: ids.slice(MAX_CAMPAIGN_LISTS),
+            from: { email: address, name: escaped.repeat(100) },
+            html: "a".repeat(MAX_CAMPAIGN_HTML_BYTES - 2),
+            listIds: ids.slice(0, MAX_CAMPAIGN_LISTS),
+            providerConnectionId: connection.id,
+            replyTo: address,
+            subject: escaped.repeat(200),
+          },
+        });
+
+        assert.lengthOf(longest.listIds, MAX_CAMPAIGN_LISTS);
+        assert.lengthOf(longest.excludedListIds, MAX_CAMPAIGN_LISTS);
+      })
+  );
+
+  test.effect(
+    "refuses a draft that names no List, or names one List both to send to and to leave out",
+    () =>
+      Effect.gen(function* listChoiceRefused() {
+        const cookie = yield* signedInPerson;
+        const client = yield* clientWithCookie(cookie);
+
+        const organization = yield* client.organizations.create({
+          payload: { name: "Acme" },
+        });
+
+        const params = { organizationId: organization.id };
+
+        const list = yield* client.lists.create({
+          params,
+          payload: { name: "Weekly news" },
+        });
+
+        const connection = yield* client.providerConnections.create({
+          params,
+          payload: {
+            from: { email: "hello@acme.example" },
+            name: "Postmark",
+            smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
+          },
+        });
+
+        const path = `/api/organizations/${organization.id}/campaigns`;
+        const draft = { ...CONTENT, providerConnectionId: connection.id };
+
+        const noList = yield* request("POST", path, {
+          body: { ...draft, listIds: [] },
+          headers: { cookie },
+        });
+
+        const both = yield* request("POST", path, {
+          body: { ...draft, excludedListIds: [list.id], listIds: [list.id] },
+          headers: { cookie },
+        });
+
+        const page = yield* client.campaigns.list({ params, query: {} });
+
+        assert.strictEqual(noList.status, 400);
+        assert.strictEqual(both.status, 400);
+        assert.strictEqual(page.total, 0);
       })
   );
 
@@ -580,7 +819,8 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
             params: campaignParams,
             payload: {
               ...CONTENT,
-              listId: list.id,
+              excludedListIds: [],
+              listIds: [list.id],
               providerConnectionId: connection.id,
             },
           })

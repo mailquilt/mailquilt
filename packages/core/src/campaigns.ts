@@ -1,6 +1,7 @@
 import type {
   Campaign,
   CampaignDraft,
+  CampaignLists,
   CampaignId,
   CampaignNotDraft,
   CampaignNotFound,
@@ -74,7 +75,15 @@ export type RecipientOutcome =
 export class Campaigns extends Context.Service<
   Campaigns,
   {
-    /** Creates a draft. Fails if the Organization doesn't have its List or Provider Connection. */
+    /**
+     * How many Contacts a Campaign to `lists` would be sent to now, worked
+     * out the same way `startSending` fixes them. Fails if the Organization
+     * doesn't have one of the Lists.
+     */
+    readonly countRecipients: (
+      lists: typeof CampaignLists.Type
+    ) => Effect.Effect<number, ListNotFound, CurrentOrganization>;
+    /** Creates a draft. Fails if the Organization doesn't have its Lists or Provider Connection. */
     readonly create: (
       draft: typeof CampaignDraft.Type
     ) => Effect.Effect<
@@ -103,9 +112,10 @@ export class Campaigns extends Context.Service<
     ) => Effect.Effect<CampaignPage, never, CurrentOrganization>;
     /**
      * Moves a draft to `sending` and, in the same transaction, fixes who it
-     * goes to: every Contact with a subscribed Subscription to its List, no
-     * Opt-out and an address that isn't Suppressed, in one query, split into
-     * batches of `batchSize`. `enqueue` is given the
+     * goes to: every Contact with a subscribed Subscription to any of its
+     * Lists, none to a List it leaves out, no Opt-out and an address that
+     * isn't Suppressed, once each, in one query, split into batches of
+     * `batchSize`. `enqueue` is given the
      * number of batches and runs inside that transaction, so if it fails
      * nothing changes. Fails, changing nothing, if the Campaign isn't a
      * draft, has no Provider Connection, its Organization has no postal
@@ -134,7 +144,7 @@ export class Campaigns extends Context.Service<
       never,
       CurrentOrganization
     >;
-    /** Whether the Contact is still subscribed to the Campaign's List, has no Opt-out, and their address isn't Suppressed. */
+    /** Whether the Contact is still subscribed to one of the Lists the Campaign goes to, has no Opt-out, and their address isn't Suppressed. The Lists it leaves out were applied when it started sending. */
     readonly stillConsents: (
       id: CampaignId,
       contactId: ContactId
@@ -152,6 +162,14 @@ export class Campaigns extends Context.Service<
     ) => Effect.Effect<void, never, CurrentOrganization>;
   }
 >()("@repo/core/Campaigns") {}
+
+/** How many Contacts a Campaign to `lists` would be sent to now. */
+export const countRecipients = (lists: typeof CampaignLists.Type) =>
+  Effect.gen(function* countCampaignRecipients() {
+    const campaigns = yield* Campaigns;
+
+    return { recipients: yield* campaigns.countRecipients(lists) };
+  });
 
 /** Creates a draft Campaign in the Organization this request acts in. */
 export const createCampaign = (draft: typeof CampaignDraft.Type) =>

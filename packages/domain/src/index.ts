@@ -15,10 +15,14 @@ export { Campaign } from "./campaign.ts";
 export {
   CampaignDraft,
   CampaignHtml,
+  CampaignListIds,
+  CampaignLists,
   CampaignStatusSchema,
   campaignHtmlBytes,
   CampaignSubject,
+  ExcludedListIds,
   MAX_CAMPAIGN_HTML_BYTES,
+  MAX_CAMPAIGN_LISTS,
 } from "./campaign-content.ts";
 
 export type { CampaignStatus } from "./campaign-content.ts";
@@ -48,6 +52,8 @@ export { ContactNotFound } from "./contact-not-found.ts";
 export { ContactPage, PAGE_SIZE } from "./contact-page.ts";
 
 export { Contact, ContactEmail } from "./contact.ts";
+
+export { Count } from "./count.ts";
 
 export { CredentialsRequired } from "./credentials-required.ts";
 

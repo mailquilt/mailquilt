@@ -20,8 +20,10 @@ import {
   CAMPAIGN,
   CAMPAIGNS,
   DRAFT,
+  OFFERS,
   POSTMARK,
   ready,
+  RECIPIENT_COUNT,
   ROAST,
 } from "./test-campaigns.ts";
 
@@ -58,6 +60,25 @@ const answerWith = (campaign: typeof DRAFT, status: number) => {
 const notifications = () =>
   within(screen.getByRole("region", { name: "Notifications" }));
 
+const CUSTOMERS = {
+  ...OFFERS,
+  id: "lst_01h455vb4pex5vsknk084sn02s",
+  name: "Customers",
+};
+
+const reachLine = () => document.querySelector(".mq-reach")?.textContent ?? "";
+
+const group = (name: string) => within(screen.getByRole("group", { name }));
+
+// WARNING: a person clicks a List's name; happy-dom also follows the row's label after the checkbox's own click, so clicking the box there ticks it twice.
+const tick = (groupName: string, list: { readonly name: string }) =>
+  fireEvent.click(group(groupName).getByText(list.name));
+
+const writeTheEmail = () => {
+  type("Subject", DRAFT.subject);
+  type("Content", DRAFT.html);
+};
+
 describe("writing and editing a campaign", () => {
   beforeAll(() => api.listen({ onUnhandledFrame: "error" }));
   afterEach(() => {
@@ -77,17 +98,14 @@ describe("writing and editing a campaign", () => {
     );
 
     await screen.findByLabelText("Subject");
-    expect(
-      screen.getByText("3 contacts are subscribed to it now.")
-    ).toBeDefined();
-    type("Subject", DRAFT.subject);
-    type("Content", DRAFT.html);
+    writeTheEmail();
     submit("Save draft");
 
     await expect(create.received).resolves.toStrictEqual({
+      excludedListIds: [],
       from: POSTMARK.from,
       html: DRAFT.html,
-      listId: ROAST.id,
+      listIds: [ROAST.id],
       providerConnectionId: POSTMARK.id,
       subject: DRAFT.subject,
     });
@@ -112,11 +130,13 @@ describe("writing and editing a campaign", () => {
     await screen.findByLabelText("Subject");
     submit("Save draft");
 
-    await expect(screen.findByText("Choose a list.")).resolves.toBeDefined();
+    await expect(
+      screen.findByText("Choose at least one list.")
+    ).resolves.toBeDefined();
     expect(
       screen.getAllByRole("alert").map((alert) => alert.textContent)
     ).toStrictEqual([
-      "Choose a list.",
+      "Choose at least one list.",
       "Choose a provider connection.",
       "Enter an email address.",
       "Enter a subject.",
@@ -124,7 +144,7 @@ describe("writing and editing a campaign", () => {
     ]);
     expect(screen.getByText("Fix 5 fields to save draft.")).toBeDefined();
     expect(document.activeElement).toBe(
-      screen.getByRole("combobox", { name: "List" })
+      group("Send to").getAllByRole("checkbox")[0]
     );
   });
 
@@ -160,9 +180,10 @@ describe("writing and editing a campaign", () => {
     submit("Save changes");
 
     await expect(update.received).resolves.toStrictEqual({
+      excludedListIds: [],
       from: DRAFT.from,
       html: DRAFT.html,
-      listId: ROAST.id,
+      listIds: [ROAST.id],
       providerConnectionId: POSTMARK.id,
       replyTo: "hello@acme.example",
       subject: "December roast, second try",
@@ -173,5 +194,144 @@ describe("writing and editing a campaign", () => {
     await expect(
       notifications().findByText("Changes saved")
     ).resolves.toBeDefined();
+  });
+
+  it("sends to the lists ticked and leaves out the lists ticked under Leave out", async () => {
+    const create = answerWith(DRAFT, 201);
+
+    api.use(
+      ...ready({ lists: [ROAST, OFFERS, CUSTOMERS] }),
+      http.post(CAMPAIGNS, create.handler)
+    );
+    renderWithOrganizations(<NewCampaignPage organization={organization} />);
+
+    await screen.findByLabelText("Subject");
+    tick("Send to", OFFERS);
+    tick("Send to", ROAST);
+    fireEvent.click(screen.getByRole("button", { name: "Leave out a list" }));
+    tick("Leave out", CUSTOMERS);
+    writeTheEmail();
+    submit("Save draft");
+
+    await expect(create.received).resolves.toMatchObject({
+      excludedListIds: [CUSTOMERS.id],
+      listIds: [ROAST.id, OFFERS.id],
+    });
+  });
+
+  it("moves a left-out list back to the lists it's sent to when it's ticked there", async () => {
+    const create = answerWith(DRAFT, 201);
+
+    api.use(
+      ...ready({ lists: [ROAST, CUSTOMERS] }),
+      http.post(CAMPAIGNS, create.handler)
+    );
+    renderWithOrganizations(<NewCampaignPage organization={organization} />);
+
+    await screen.findByLabelText("Subject");
+    tick("Send to", ROAST);
+    fireEvent.click(screen.getByRole("button", { name: "Leave out a list" }));
+    tick("Leave out", CUSTOMERS);
+
+    expect(
+      group("Send to").getByRole("checkbox", {
+        name: "Customers Left out below",
+      })
+    ).toBeDefined();
+
+    tick("Send to", CUSTOMERS);
+
+    expect(group("Leave out").queryByRole("checkbox")).toBeNull();
+    expect(
+      group("Leave out").getByText("Every list is chosen above.")
+    ).toBeDefined();
+
+    writeTheEmail();
+    submit("Save draft");
+
+    await expect(create.received).resolves.toMatchObject({
+      excludedListIds: [],
+      listIds: [ROAST.id, CUSTOMERS.id],
+    });
+  });
+
+  it("says how many contacts the lists chosen would reach now, from the API's count", async () => {
+    const asked: URLSearchParams[] = [];
+
+    api.use(
+      http.get(RECIPIENT_COUNT, ({ request }) => {
+        asked.push(new URL(request.url).searchParams);
+
+        return HttpResponse.json({ recipients: 1204 });
+      }),
+      ...ready({ lists: [ROAST, OFFERS, CUSTOMERS] })
+    );
+    renderWithOrganizations(<NewCampaignPage organization={organization} />);
+
+    await screen.findByLabelText("Subject");
+    expect(document.querySelector(".mq-reach")).toBeNull();
+
+    tick("Send to", OFFERS);
+    fireEvent.click(screen.getByRole("button", { name: "Leave out a list" }));
+    tick("Leave out", CUSTOMERS);
+
+    await expect
+      .poll(reachLine)
+      .toBe(
+        "1,204 contacts would get it nowCounted again at the moment you send."
+      );
+    expect(
+      asked.map((query) => [
+        query.getAll("listIds"),
+        query.getAll("excludedListIds"),
+      ])
+    ).toContainEqual([[OFFERS.id], [CUSTOMERS.id]]);
+  });
+
+  it.each([
+    [
+      "no one is subscribed to them",
+      { ...ROAST, subscriptions: { ...ROAST.subscriptions, subscribed: 0 } },
+      "No one is subscribed to these lists yet.",
+    ],
+    [
+      "everyone subscribed is left out",
+      ROAST,
+      "Everyone subscribed to these lists is or was on a list you leave out, stopped all marketing email, or has a suppressed address.",
+    ],
+  ])(
+    "says no one would get it now, and that the draft can still be saved, when %s",
+    async (_, list, why) => {
+      api.use(...ready({ lists: [list], recipients: 0 }));
+      renderWithOrganizations(<NewCampaignPage organization={organization} />);
+
+      await expect.poll(reachLine).toContain("No one would get it now");
+      expect(reachLine()).toContain(why);
+      expect(reachLine()).toContain("You can save the draft");
+    }
+  );
+
+  it("says when it couldn't count who it goes to, and counts again with Try again", async () => {
+    let asked = 0;
+
+    api.use(
+      http.get(RECIPIENT_COUNT, () => {
+        asked += 1;
+
+        return asked === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({ recipients: 3 });
+      }),
+      ...ready()
+    );
+    renderWithOrganizations(<NewCampaignPage organization={organization} />);
+
+    await expect
+      .poll(reachLine)
+      .toContain("Mailquilt couldn’t count who it goes to.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await expect.poll(reachLine).toContain("3 contacts would get it now");
   });
 });

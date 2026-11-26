@@ -25,13 +25,14 @@ import { TablePage } from "../layout/table-page.tsx";
 import { TableRegion } from "../layout/table-region.tsx";
 import { useProviderConnections } from "../providers/providers-api.ts";
 import { formatSince } from "./campaign-dates.ts";
+import { listSummary, namesOf } from "./campaign-lists.tsx";
 import type { CampaignSearch } from "./campaign-search.ts";
 import { CampaignSetupNeeded, isReadyToWrite } from "./campaign-setup.tsx";
 import { CampaignStatusLabel } from "./campaign-status.tsx";
 import { useCampaignPage } from "./campaigns-api.ts";
 
 const DESCRIPTION =
-  "Email you send once to everyone subscribed to a list, through your own provider.";
+  "Email you send once to the lists you choose, through your own provider.";
 
 const NewCampaignButton = () => (
   <LinkButton href="/campaigns/new" icon={PlusIcon} variant="primary">
@@ -41,8 +42,32 @@ const NewCampaignButton = () => (
 
 interface CampaignRow {
   readonly campaign: CampaignSummary;
-  readonly listName: string;
+  readonly listNames: readonly string[];
 }
+
+const ListsCell = ({ names }: { names: readonly string[] }) => {
+  const [first, ...rest] = names;
+
+  return (
+    <span
+      className="flex min-w-0 items-baseline gap-1.5"
+      title={names.join(", ")}
+    >
+      <span className="min-w-0 truncate">{first}</span>
+      {rest.length === 0 ? null : (
+        <>
+          <span
+            aria-hidden="true"
+            className="shrink-0 text-sm text-kumo-subtle tabular-nums"
+          >
+            +{rest.length}
+          </span>
+          <span className="sr-only">, {rest.join(", ")}</span>
+        </>
+      )}
+    </span>
+  );
+};
 
 const dateOf = (campaign: CampaignSummary) => {
   if (campaign.status === "sent" && campaign.sentAt !== null) {
@@ -87,9 +112,9 @@ const COLUMNS = helper.columns([
     header: "Status",
     id: "status",
   }),
-  helper.accessor((row) => row.listName, {
-    cell: ({ getValue }) => <span title={getValue()}>{getValue()}</span>,
-    header: "List",
+  helper.accessor((row) => row.listNames, {
+    cell: ({ getValue }) => <ListsCell names={getValue()} />,
+    header: "Lists",
     id: "list",
   }),
   helper.accessor((row) => row.campaign, {
@@ -117,7 +142,8 @@ const COLUMNS = helper.columns([
   helper.display({
     cell: ({ row }) => (
       <span className="line-clamp-2 text-sm text-kumo-subtle">
-        {row.original.listName}, {dateOf(row.original.campaign).line}
+        {listSummary(row.original.listNames)},{" "}
+        {dateOf(row.original.campaign).line}
       </span>
     ),
     header: () => <span className="sr-only">Summary</span>,
@@ -127,7 +153,7 @@ const COLUMNS = helper.columns([
 
 const COLUMN_CLASSES = {
   date: "w-36 whitespace-nowrap max-md:hidden",
-  list: "max-w-64 truncate whitespace-nowrap text-kumo-default max-lg:hidden",
+  list: "w-64 max-w-64 whitespace-nowrap text-kumo-default max-lg:hidden",
   sentTo: "text-right whitespace-nowrap tabular-nums max-xl:hidden",
   status: "w-32 whitespace-nowrap max-sm:w-auto",
   subject:
@@ -246,7 +272,6 @@ export const CampaignsPage = ({
       );
     }
 
-    const names = new Map(lists.data.map((list) => [list.id, list.name]));
     const shown = page.data;
 
     return (
@@ -270,7 +295,7 @@ export const CampaignsPage = ({
         <CampaignsTable
           rows={shown.campaigns.map((campaign) => ({
             campaign,
-            listName: names.get(campaign.listId) ?? "A deleted list",
+            listNames: namesOf(campaign.listIds, lists.data),
           }))}
         />
       </TableRegion>

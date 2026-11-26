@@ -2,7 +2,9 @@ import {
   Campaign,
   CampaignDraft,
   CampaignIdSchema,
+  CampaignLists,
   CampaignPage,
+  Count,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
@@ -32,15 +34,22 @@ export const CampaignQuery = Schema.Struct({
   )
 );
 
+/** How many Contacts a Campaign to those Lists would be sent to now. */
+export const RecipientCount = Schema.Struct({ recipients: Count });
+
 /**
  * An Organization's Campaigns. A Campaign is a draft until `send`, which
- * fixes who it goes to (every Contact with a subscribed Subscription to its
- * List) and sends it in the background: it answers with the Campaign
+ * fixes who it goes to (every Contact with a subscribed Subscription to any
+ * of its Lists, once, except anyone on a List it leaves out, with an Opt-out
+ * or a Suppressed address) and sends it in the background: it answers with
+ * the Campaign
  * `sending`, which becomes `sent` once every one of them was sent it or the
  * Provider refused it. A draft can be changed; a Campaign that started
  * sending can't be changed or sent again (`CampaignNotDraft`). `send` fails
  * with `NoSubscribedContacts` when there's no one to send it to, and with
  * `ProviderConnectionNotFound` when its Provider Connection was deleted.
+ * `countRecipients` counts who a Campaign to some Lists would go to now,
+ * the same way `send` fixes them.
  */
 export class CampaignsApi extends HttpApiGroup.make("campaigns")
   .add(
@@ -63,6 +72,22 @@ export class CampaignsApi extends HttpApiGroup.make("campaigns")
       payload: CampaignDraft,
       success: Campaign.pipe(HttpApiSchema.status(201)),
     })
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "countRecipients",
+      "/organizations/:organizationId/campaigns/recipient-count",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          ListNotFoundError,
+        ],
+        params: organizationParams,
+        query: CampaignLists,
+        success: RecipientCount,
+      }
+    )
   )
   .add(
     HttpApiEndpoint.get(
