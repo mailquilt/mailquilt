@@ -1,4 +1,4 @@
-# Mail Quilt logo kit
+# Mailquilt logo kit
 
 ## Files
 
@@ -57,7 +57,7 @@ Keep clear space around the logo of at least the height of one block in the symb
       srcset="./docs/brand/svg/mailquilt-logo.svg"
     />
     <img
-      alt="Mail Quilt"
+      alt="Mailquilt"
       src="./docs/brand/svg/mailquilt-logo.svg"
       width="360"
     />
