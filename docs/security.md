@@ -54,7 +54,7 @@ A control marked **planned** isn't built yet and names the issue that builds it.
 ### Authorization and tenant isolation
 
 - Every endpoint declares the role it needs (planned, #34). Until then, every member of an Organization can do everything in it.
-- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)).
+- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). The exception is unsubscribe, which a recipient uses without a session: its signed token is the only credential, and it changes only the named Contact's Subscriptions to that Campaign's Lists and their Opt-out (ADR 0016).
 - Every repository method for tenant data requires the Organization from the request context.
 - A CI test suite attempts cross-Organization reads and writes, and fails when an endpoint for one Organization's data has no case in it.
 - A write that uses the session cookie is refused when its `Origin` is another site.

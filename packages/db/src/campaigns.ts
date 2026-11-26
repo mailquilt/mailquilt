@@ -257,6 +257,7 @@ export const CampaignsLive = Layer.effect(
               fromEmail: campaigns.fromEmail,
               fromName: campaigns.fromName,
               html: campaigns.html,
+              listId: campaigns.listId,
               providerConnectionId: campaigns.providerConnectionId,
               replyTo: campaigns.replyTo,
               subject: campaigns.subject,
@@ -270,6 +271,15 @@ export const CampaignsLive = Layer.effect(
 
           const recipients = yield* db
             .select({
+              consents: sql<boolean>`exists (
+                select 1 from contacts c
+                join subscriptions s on s.organization_id = c.organization_id and s.contact_id = c.id
+                where c.organization_id = campaign_recipients.organization_id
+                  and c.id = campaign_recipients.contact_id
+                  and c.opted_out_at is null
+                  and s.list_id = ${campaign.listId}
+                  and s.status = 'subscribed'
+              )`,
               contactId: campaignRecipients.contactId,
               email: campaignRecipients.email,
             })
@@ -297,6 +307,7 @@ export const CampaignsLive = Layer.effect(
                     campaign.providerConnectionId
                   ),
             recipients: recipients.map((recipient) => ({
+              consents: recipient.consents,
               contactId: ContactIdSchema.make(recipient.contactId),
               email: recipient.email,
             })),

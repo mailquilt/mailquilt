@@ -10,17 +10,19 @@ type Owner = Effect.Success<typeof ownOrganization>;
 
 const ONE_CLICK = "List-Unsubscribe=One-Click";
 
+const FROM_PAGE = "from=page";
+
 let campaigns = 0;
 
 const newList = ({ client, params }: Owner, name: string) =>
   client.lists.create({ params, payload: { name } });
 
-const sendCampaign = (
+const startCampaign = (
   owner: Owner,
   listId: ListId,
   emails: readonly string[]
 ) =>
-  Effect.gen(function* sendToList() {
+  Effect.gen(function* startSendingToList() {
     campaigns += 1;
 
     const { client, params } = owner;
@@ -60,13 +62,30 @@ const sendCampaign = (
     yield* client.campaigns.send({
       params: { ...params, campaignId: campaign.id },
     });
-    yield* (yield* QueueWorker).deliverAll;
 
+    return { campaignId: campaign.id, subject };
+  });
+
+const sentWith = (subject: string) =>
+  Effect.gen(function* sentEmails() {
     const outbox = yield* SmtpOutbox;
 
     return (yield* outbox.sent)
       .filter((sent) => sent.email.subject === subject)
       .map((sent) => sent.email);
+  });
+
+const sendCampaign = (
+  owner: Owner,
+  listId: ListId,
+  emails: readonly string[]
+) =>
+  Effect.gen(function* sendToList() {
+    const { subject } = yield* startCampaign(owner, listId, emails);
+
+    yield* (yield* QueueWorker).deliverAll;
+
+    return yield* sentWith(subject);
   });
 
 const unsubscribePath = (email: {
@@ -101,6 +120,24 @@ const post = (path: string, body: string) =>
         fetch(`${APP_URL}${path}`, {
           body,
           headers: { "content-type": "application/x-www-form-urlencoded" },
+          method: "POST",
+          redirect: "manual",
+        })
+      )
+    );
+  });
+
+const postMultipart = (path: string) =>
+  Effect.gen(function* postMultipartForm() {
+    const fetch = yield* AppFetch;
+    const body = new FormData();
+
+    body.set("List-Unsubscribe", "One-Click");
+
+    return yield* responseOf(
+      yield* Effect.promise(() =>
+        fetch(`${APP_URL}${path}`, {
+          body,
           method: "POST",
           redirect: "manual",
         })
@@ -156,14 +193,25 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
       Effect.gen(function* oneClick() {
         const owner = yield* ownOrganization;
         const list = yield* newList(owner, "Weekly picks");
-        const [ada] = yield* sendCampaign(owner, list.id, ["ada@example.com"]);
 
-        const response = yield* post(unsubscribePath(ada ?? {}), ONE_CLICK);
+        const [ada, grace] = yield* sendCampaign(owner, list.id, [
+          "ada@example.com",
+          "grace@example.com",
+        ]);
 
-        assert.strictEqual(response.status, 200);
-        assert.strictEqual(
-          yield* statusOn(owner, list.id, "ada@example.com"),
-          "unsubscribed"
+        const urlEncoded = yield* post(unsubscribePath(ada ?? {}), ONE_CLICK);
+        const multipart = yield* postMultipart(unsubscribePath(grace ?? {}));
+
+        assert.deepStrictEqual(
+          [urlEncoded.status, multipart.status],
+          [200, 200]
+        );
+        assert.deepStrictEqual(
+          [
+            yield* statusOn(owner, list.id, "ada@example.com"),
+            yield* statusOn(owner, list.id, "grace@example.com"),
+          ],
+          ["unsubscribed", "unsubscribed"]
         );
       })
   );
@@ -187,7 +235,7 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
           "subscribed"
         );
 
-        const confirmed = yield* post(path, "");
+        const confirmed = yield* post(path, FROM_PAGE);
 
         assert.strictEqual(confirmed.status, 303);
         assert.strictEqual(confirmed.location, path);
@@ -257,7 +305,7 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
 
         const stopped = yield* post(
           path.replace("/unsubscribe?", "/unsubscribe/all?"),
-          ""
+          FROM_PAGE
         );
 
         assert.strictEqual(stopped.status, 303);
@@ -272,6 +320,45 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
         assert.deepStrictEqual(
           next.map((email) => email.to),
           ["grace@example.com"]
+        );
+      })
+  );
+
+  test.effect(
+    "leaves out a Contact who stops marketing email while a Campaign is still sending to them",
+    () =>
+      Effect.gen(function* optOutMidSend() {
+        const owner = yield* ownOrganization;
+        const list = yield* newList(owner, "Weekly picks");
+
+        const [ada] = yield* sendCampaign(owner, list.id, ["ada@example.com"]);
+
+        const next = yield* startCampaign(owner, list.id, [
+          "grace@example.com",
+        ]);
+
+        yield* post(
+          unsubscribePath(ada ?? {}).replace(
+            "/unsubscribe?",
+            "/unsubscribe/all?"
+          ),
+          FROM_PAGE
+        );
+
+        yield* (yield* QueueWorker).deliverAll;
+
+        const sent = yield* owner.client.campaigns.get({
+          params: { ...owner.params, campaignId: next.campaignId },
+        });
+
+        assert.deepStrictEqual(
+          (yield* sentWith(next.subject)).map((email) => email.to),
+          ["grace@example.com"]
+        );
+        assert.strictEqual(sent.status, "sent");
+        assert.deepStrictEqual(
+          { ...sent.recipients },
+          { failed: 1, sent: 1, total: 2 }
         );
       })
   );

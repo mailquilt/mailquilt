@@ -1,5 +1,6 @@
 import { assert, layer } from "@effect/vitest";
 import { MailquiltApi } from "@repo/contract";
+import { SignedTokens, signedTokensLayer } from "@repo/core";
 import { OrganizationIdSchema } from "@repo/domain";
 import type {
   CampaignId,
@@ -10,9 +11,10 @@ import type {
 } from "@repo/domain";
 import { Effect, Redacted } from "effect";
 import { HttpApi } from "effect/http-api";
+import { SqlClient } from "effect/sql";
 
 import { signedInClient } from "./accounts.ts";
-import { TestApp } from "./harness.ts";
+import { APP_URL, AppFetch, TEST_ENCRYPTION_KEYS, TestApp } from "./harness.ts";
 
 type Client = Effect.Success<typeof signedInClient>;
 
@@ -199,6 +201,35 @@ const ownedData = (owner: Client) =>
       organizationId: organization.id,
       providerConnectionId: connection.id,
     } satisfies Target;
+  });
+
+const unsubscribeToken = (ids: readonly string[]) =>
+  Effect.gen(function* signUnsubscribeToken() {
+    const tokens = yield* SignedTokens;
+
+    return yield* tokens.sign("unsubscribe", ids.join("."));
+  }).pipe(Effect.provide(signedTokensLayer(TEST_ENCRYPTION_KEYS)));
+
+const unsubscribeRequests = (token: string) =>
+  Effect.gen(function* everyUnsubscribeRequest() {
+    const fetch = yield* AppFetch;
+    const query = `?token=${encodeURIComponent(token)}`;
+
+    const oneClick = {
+      body: "List-Unsubscribe=One-Click",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      method: "POST",
+    };
+
+    const responses = yield* Effect.promise(() =>
+      Promise.all([
+        fetch(`${APP_URL}/unsubscribe${query}`),
+        fetch(`${APP_URL}/unsubscribe${query}`, oneClick),
+        fetch(`${APP_URL}/unsubscribe/all${query}`, oneClick),
+      ])
+    );
+
+    return responses.map((response) => response.status);
   });
 
 const tenantEndpointsInContract = () => {
@@ -390,6 +421,53 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.deepStrictEqual(
             lists.map((list) => [list.id, list.subscriptions.subscribed]),
             [[own.listId, 1]]
+          );
+        })
+    );
+
+    test.effect(
+      "never unsubscribes or opts out a Contact through a link that mixes in another Organization's IDs",
+      () =>
+        Effect.gen(function* foreignUnsubscribe() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+
+          const mixed = [
+            [own.organizationId, target.campaignId, target.contactId],
+            [own.organizationId, own.campaignId, target.contactId],
+            [own.organizationId, target.campaignId, own.contactId],
+            [target.organizationId, own.campaignId, target.contactId],
+          ];
+
+          for (const ids of mixed) {
+            const token = yield* unsubscribeToken(ids);
+
+            assert.deepStrictEqual(
+              yield* unsubscribeRequests(token),
+              [404, 404, 404],
+              ids.join(".")
+            );
+          }
+
+          const sql = yield* SqlClient.SqlClient;
+
+          const consent = yield* sql<{
+            readonly status: string;
+            readonly opted_out: boolean;
+          }>`
+            select s.status, c.opted_out_at is not null as opted_out
+            from contacts c join subscriptions s on s.contact_id = c.id
+            where c.id in (${target.contactId}, ${own.contactId})
+          `;
+
+          assert.deepStrictEqual(
+            consent.map((row) => ({ ...row })),
+            [
+              { opted_out: false, status: "subscribed" },
+              { opted_out: false, status: "subscribed" },
+            ]
           );
         })
     );

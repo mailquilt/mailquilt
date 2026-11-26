@@ -42,6 +42,14 @@ const escape = (text: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
+/**
+ * The field every form on these pages posts. A post without it is a mail
+ * app's one-click unsubscribe (RFC 8058), which gets no redirect.
+ */
+export const PAGE_FIELD = { name: "from", value: "page" } as const;
+
+const FROM_PAGE = `<input type="hidden" name="${PAGE_FIELD.name}" value="${PAGE_FIELD.value}">`;
+
 type BlockKind = "full" | "empty" | "all";
 
 const BLOCKS: Readonly<Record<BlockKind, string>> = {
@@ -101,7 +109,7 @@ const email = (address: string) =>
   `<span class="email">${escape(address)}</span>`;
 
 const button = (action: string, label: string) =>
-  `<form action="${escape(action)}" method="post"><button type="submit">${escape(label)}</button></form>`;
+  `<form action="${escape(action)}" method="post">${FROM_PAGE}<button type="submit">${escape(label)}</button></form>`;
 
 /** Asks whether to unsubscribe. Nothing changes until the button is pressed. */
 export const confirmPage = (unsubscription: Unsubscription, action: string) => {
@@ -122,7 +130,7 @@ export const unsubscribedPage = (
 ) =>
   page({
     block: "empty",
-    body: `<p>${escape(unsubscription.organizationName)} won’t send ${escape(listsOf(unsubscription.listNames))} to ${email(unsubscription.email)} again.</p><form action="${escape(stopAllAction)}" method="post" class="more"><p>Don’t want any marketing email from ${escape(unsubscription.organizationName)}?</p><button type="submit">Stop all marketing email</button></form>`,
+    body: `<p>${escape(unsubscription.organizationName)} won’t send ${escape(listsOf(unsubscription.listNames))} to ${email(unsubscription.email)} again.</p><form action="${escape(stopAllAction)}" method="post" class="more">${FROM_PAGE}<p>Don’t want any marketing email from ${escape(unsubscription.organizationName)}?</p><button type="submit">Stop all marketing email</button></form>`,
     sender: unsubscription.organizationName,
     title: "You’re unsubscribed",
   });

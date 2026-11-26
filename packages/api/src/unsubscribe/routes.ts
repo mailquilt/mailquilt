@@ -15,12 +15,11 @@ import {
   failedPage,
   stoppedAllPage,
   unsubscribedPage,
+  PAGE_FIELD,
 } from "./pages.ts";
 import type { FailedStep } from "./pages.ts";
 
 const MAX_FORM_BODY_SIZE = ByteSize.kibibytes(4);
-
-const ONE_CLICK = "One-Click";
 
 // WARNING: the token is in the address, so no page may send a Referer, be cached or be indexed; nothing on it loads from elsewhere.
 const PAGE_HEADERS = {
@@ -56,10 +55,14 @@ const logFailure = (cause: Cause.Cause<unknown>) =>
 
 const isOneClick = HttpServerRequest.HttpServerRequest.pipe(
   Effect.flatMap((request) => request.urlParamsBody),
-  Effect.map((params) =>
-    Option.contains(UrlParams.getFirst(params, "List-Unsubscribe"), ONE_CLICK)
+  Effect.map(
+    (params) =>
+      !Option.contains(
+        UrlParams.getFirst(params, PAGE_FIELD.name),
+        PAGE_FIELD.value
+      )
   ),
-  Effect.orElseSucceed(() => false),
+  Effect.orElseSucceed(() => true),
   Effect.provideService(HttpIncomingMessage.MaxBodySize, MAX_FORM_BODY_SIZE)
 );
 

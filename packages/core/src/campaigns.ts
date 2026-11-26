@@ -39,10 +39,15 @@ export interface CampaignFilter {
   readonly before?: CampaignId;
 }
 
-/** A Contact a Campaign is still to be sent to, at the address they had when it started sending. */
+/**
+ * A Contact a Campaign is still to be sent to, at the address they had when
+ * it started sending. `consents` is false when, since then, they unsubscribed
+ * from the Campaign's List or recorded an Opt-out.
+ */
 export interface QueuedRecipient {
   readonly contactId: ContactId;
   readonly email: string;
+  readonly consents: boolean;
 }
 
 /** What one queue message sends: the Campaign's content, and its recipients in that batch still queued. */
@@ -207,6 +212,12 @@ const SERVER_FAILURES = new Set<SendFailureReason>([
   "unreachable",
 ]);
 
+const NO_LONGER_CONSENTS = new SendFailed({
+  detail:
+    "They unsubscribed or stopped marketing email before it was sent to them.",
+  reason: "failed",
+});
+
 const NO_CONNECTION = new SendFailed({
   detail: "The Campaign's provider connection was deleted.",
   reason: "failed",
@@ -270,7 +281,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
 
     const serverFailure = yield* Ref.make(Option.none<SendFailed>());
 
-    const sendOrSkip = (recipient: QueuedRecipient) =>
+    const sendUnlessServerFailed = (recipient: QueuedRecipient) =>
       Effect.flatMap(Ref.get(serverFailure), (earlier) =>
         Option.match(earlier, {
           onNone: () =>
@@ -284,6 +295,11 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           onSome: Effect.fail,
         })
       );
+
+    const sendOrSkip = (recipient: QueuedRecipient) =>
+      recipient.consents
+        ? sendUnlessServerFailed(recipient)
+        : Effect.fail(NO_LONGER_CONSENTS);
 
     const outcomes = yield* pipe(
       batch.recipients,
