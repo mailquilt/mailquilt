@@ -106,9 +106,13 @@ export { RateLimiter } from "./rate-limiter.ts";
 
 export type { RateLimitDecision, RateLimitRule } from "./rate-limiter.ts";
 
-export { CurrentMembership } from "./current-membership.ts";
+export type { CurrentMembership } from "./current-membership.ts";
 
-export { CurrentOrganization } from "./current-organization.ts";
+export { currentRole } from "./current-membership.ts";
+
+export type { CurrentOrganization } from "./current-organization.ts";
+
+export { currentOrganizationId } from "./current-organization.ts";
 
 export { CurrentUser } from "./current-user.ts";
 
@@ -136,7 +140,7 @@ export {
   updateSystemMailer,
 } from "./instance.ts";
 
-export { InstanceAdmin } from "./instance-admin.ts";
+export type { InstanceAdmin } from "./instance-admin.ts";
 
 export type {
   NewInstanceAdmin,

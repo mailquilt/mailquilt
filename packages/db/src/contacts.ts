@@ -1,5 +1,5 @@
 import type { ContactFilter } from "@repo/core";
-import { Contacts, CurrentOrganization } from "@repo/core";
+import { Contacts, currentOrganizationId } from "@repo/core";
 import type { ListId, OrganizationId } from "@repo/domain";
 import {
   Contact,
@@ -159,7 +159,7 @@ export const ContactsLive = Layer.effect(
     return {
       create: (email, listIds) =>
         Effect.gen(function* createContact() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
           const lists = [...new Set<ListId>(listIds)];
 
           yield* requireLists(db, organization, lists);
@@ -222,7 +222,7 @@ export const ContactsLive = Layer.effect(
           .transaction(
             () =>
               Effect.gen(function* contactPage() {
-                const organization = (yield* CurrentOrganization).id;
+                const organization = yield* currentOrganizationId;
 
                 if (filter.list !== undefined) {
                   yield* requireLists(db, organization, [filter.list]);

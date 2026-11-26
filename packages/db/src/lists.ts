@@ -1,4 +1,4 @@
-import { CurrentOrganization, Lists } from "@repo/core";
+import { currentOrganizationId, Lists } from "@repo/core";
 import type { ListId, OrganizationId } from "@repo/domain";
 import {
   AddedToList,
@@ -91,7 +91,7 @@ export const ListsLive = Layer.effect(
     return {
       addContacts: (listId, contactIds) =>
         Effect.gen(function* addContacts() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
           const unique = [...new Set(contactIds)];
 
           yield* requireLists(db, organization, [listId]);
@@ -166,7 +166,7 @@ export const ListsLive = Layer.effect(
         }),
 
       all: Effect.gen(function* allLists() {
-        const organization = (yield* CurrentOrganization).id;
+        const organization = yield* currentOrganizationId;
         const rows = yield* listsWithCounts(organization);
 
         return yield* decodeLists(rows.map(toList));
@@ -174,7 +174,7 @@ export const ListsLive = Layer.effect(
 
       create: (name) =>
         Effect.gen(function* createList() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
           const id = yield* withRandom(newListId);
 
           const [created] = yield* db
@@ -196,7 +196,7 @@ export const ListsLive = Layer.effect(
 
       get: (id) =>
         Effect.gen(function* getList() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
           const [row] = yield* listsWithCounts(organization, id);
 
           if (row === undefined) {
