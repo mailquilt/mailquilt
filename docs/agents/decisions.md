@@ -8,7 +8,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 
 - A Campaign goes only to Contacts with a subscribed Subscription to a targeted List. It leaves out anyone on an excluded List, with an Opt-out, or with a Suppressed address. Each Contact gets it once.
 - "Unsubscribe", both the link and the one-click header, unsubscribes the Contact from every List the Campaign targeted, not just one.
-- "Stop all marketing email", on the unsubscribe page, records an Opt-out. Only the Contact can lift it, through a form or the preference center. An import or the API never can.
+- "Stop all marketing email", on the unsubscribe page, records an Opt-out. Only the Contact can lift it, through a form or the preference center (#13, #30); until those exist, nothing lifts it. An import or the API never can.
 - An import never subscribes again a Contact who unsubscribed or has an Opt-out.
 - A Transactional Message ignores Subscriptions and Opt-outs but respects Suppressions from bounces and complaints.
 - A hard bounce or a complaint suppresses the address at once. Soft bounces suppress it after 3 within 7 days.
@@ -71,7 +71,7 @@ The larger decisions are ADRs in `docs/adr/`: Postgres only (0001), customers br
 - Response schemas reuse input rules, so a stored value that fails a rule can't be returned. A change that tightens an input rule also migrates the stored values that would fail it, in the same pull request (#43).
 - In the API, a field holding an ID is named for it (`listId`, `listIds`), in query parameters too, and a response gives a missing value as `null`, never as an absent key. The Contacts filter `list` and a sender's absent `name` are the exceptions left to fix before the first release (#158) (#43).
 - Delivery events are partitioned by month through a hand-written migration, and dropped after 13 months by default once retention is built (#22). Campaign totals and Contact engagement summaries outlive them.
-- Imports, recipient snapshots and event writes are set-based. There's never a query per Contact.
+- Imports, recipient snapshots and event writes are set-based. There's never a query per Contact, except the consent check just before each Campaign email: a batch can run for minutes, and someone who unsubscribes or opts out partway through must not get it (#12).
 - A rule over many rows at once, such as who receives a Campaign or which Contacts a List adds, is one SQL statement in the repository. `core` holds a use case's steps, not set logic (#43).
 - Migrations are expand-then-contract. They run on boot behind an advisory lock in Docker, and in the deploy step on Cloudflare.
 - Migrations run in one transaction, so `CREATE INDEX CONCURRENTLY` isn't available: an index on a large table, such as delivery events, holds up writes to it while it builds, at boot on Docker and in the deploy step on Cloudflare. That's accepted while tables are small; such a migration gets its own plan. Migrations don't set a `lock_timeout` yet (#158) (#43).
