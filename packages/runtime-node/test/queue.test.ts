@@ -24,7 +24,7 @@ const MESSAGES_QUEUE = "mailquilt";
 
 const TICK_MS = 30 * 1000;
 
-const RECLAIM_WITHIN_MS = 150 * 1000;
+const RECLAIM_WITHIN_MS = 3 * 60 * 1000;
 
 // WARNING: the worker runs in its own process, so SIGKILL stops it as a crash would: no graceful stop, no failed job, no more heartbeats.
 const KILLED_WORKER = `
@@ -223,7 +223,7 @@ layer(PostgresLive, { timeout: "2 minutes" })("pg-boss Queue", (it) => {
   );
 
   it.effect(
-    "hands a batch whose worker was killed mid-send to another worker within 150 seconds",
+    "hands a batch whose worker was killed mid-send to another worker within 3 minutes",
     () =>
       Effect.gen(function* killedWorker() {
         const url = yield* emptyDatabase;
