@@ -300,6 +300,38 @@ describe("one campaign's page", () => {
     expect(document.activeElement).toBe(fact);
   });
 
+  it("stops going by a count of no one once counting again fails, and offers Send now", async () => {
+    let asked = 0;
+
+    api.use(
+      http.get(RECIPIENT_COUNT, () => {
+        asked += 1;
+
+        return asked === 1
+          ? HttpResponse.json({ recipients: 0 })
+          : HttpResponse.error();
+      }),
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
+    renderPage();
+
+    await expect(
+      screen.findByText("No one to send to yet")
+    ).resolves.toBeDefined();
+
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    await expect(
+      screen.findByText("Couldn’t count them")
+    ).resolves.toBeDefined();
+    expect(screen.queryByText("No one to send to yet")).toBeNull();
+    expect(screen.getByRole("button", { name: "Send now" })).toBeDefined();
+  });
+
   it("names how many it goes to, and the lists it goes to and leaves out, before sending", async () => {
     api.use(
       ...ready({ lists: [ROAST, OFFERS], recipients: 1204 }),

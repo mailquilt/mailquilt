@@ -3,6 +3,8 @@ import { QueueInbox, SmtpOutbox } from "@repo/core/testing";
 import {
   CampaignIdSchema,
   ListIdSchema,
+  MAX_CAMPAIGN_HTML_BYTES,
+  MAX_CAMPAIGN_LISTS,
   ProviderConnectionIdSchema,
   SendFailed,
 } from "@repo/domain";
@@ -448,7 +450,11 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
 
         yield* addContacts(owner, ["both@example.com"], [list.id, offers.id]);
         yield* addContacts(owner, ["offers@example.com"], [offers.id]);
-        yield* addContacts(owner, ["customer@example.com"], [customers.id]);
+        yield* addContacts(
+          owner,
+          ["customer@example.com"],
+          [list.id, customers.id]
+        );
         yield* addContacts(owner, ["suppressed@example.com"], [list.id]);
 
         const [optedOut] = yield* addContacts(
@@ -482,6 +488,45 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
 
         assert.deepStrictEqual({ ...count }, { recipients: 2 });
         assert.strictEqual(unknownList._tag, "ListNotFound");
+      })
+  );
+
+  test.effect(
+    "accepts a draft with every field at its longest, within the API's request size",
+    () =>
+      Effect.gen(function* longestDraft() {
+        const { campaignParams, client, connection, params } =
+          yield* draftCampaign;
+
+        const lists = yield* pipe(
+          Array.from(
+            { length: MAX_CAMPAIGN_LISTS * 2 },
+            (_, index) => `List ${index}`
+          ),
+          Effect.forEach((name) =>
+            client.lists.create({ params, payload: { name } })
+          )
+        );
+
+        const ids = lists.map((list) => list.id);
+        const address = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(57)}.com`;
+        const escaped = "\u0001";
+
+        const longest = yield* client.campaigns.update({
+          params: campaignParams,
+          payload: {
+            excludedListIds: ids.slice(MAX_CAMPAIGN_LISTS),
+            from: { email: address, name: escaped.repeat(100) },
+            html: "a".repeat(MAX_CAMPAIGN_HTML_BYTES - 2),
+            listIds: ids.slice(0, MAX_CAMPAIGN_LISTS),
+            providerConnectionId: connection.id,
+            replyTo: address,
+            subject: escaped.repeat(200),
+          },
+        });
+
+        assert.lengthOf(longest.listIds, MAX_CAMPAIGN_LISTS);
+        assert.lengthOf(longest.excludedListIds, MAX_CAMPAIGN_LISTS);
       })
   );
 

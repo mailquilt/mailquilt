@@ -72,10 +72,11 @@ export const CampaignStatusSchema = Schema.Literals([
 export type CampaignStatus = typeof CampaignStatusSchema.Type;
 
 /**
- * The most Lists a Campaign can go to, and the most it can leave out. Both
- * full fit in a request beside 60 KiB of HTML.
+ * The most Lists a Campaign can go to, and the most it can leave out. With
+ * both full and every other field at its longest, a draft still fits in the
+ * API's 64 KiB request body beside 60 KiB of HTML; 25 each wouldn't.
  */
-export const MAX_CAMPAIGN_LISTS = 25;
+export const MAX_CAMPAIGN_LISTS = 20;
 
 const atMostCampaignLists = Schema.isMaxLength(MAX_CAMPAIGN_LISTS, {
   message: `Choose at most ${MAX_CAMPAIGN_LISTS} lists.`,

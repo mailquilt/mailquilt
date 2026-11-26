@@ -496,7 +496,9 @@ const CampaignView = ({
     organization,
   };
 
-  const counted = count.isPlaceholderData ? undefined : count.data;
+  // WARNING: a count that failed to refresh, or one kept from other Lists, is no count; going by it would block or confirm a send on a number that isn't current.
+  const counted =
+    failedToCount(count) || count.isPlaceholderData ? undefined : count.data;
 
   const refusal = stillRefused(refused, loaded);
 

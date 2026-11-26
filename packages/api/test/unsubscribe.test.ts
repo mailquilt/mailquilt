@@ -116,10 +116,11 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
         const owner = yield* ownOrganization;
         const list = yield* newList(owner, "Weekly picks");
         const vip = yield* newList(owner, "Lapsed VIPs");
+        const club = yield* newList(owner, "Roasting club");
 
         yield* owner.client.contacts.create({
           params: owner.params,
-          payload: { email: "grace@example.com", listIds: [vip.id] },
+          payload: { email: "grace@example.com", listIds: [vip.id, club.id] },
         });
 
         const sent = yield* sendCampaign(
@@ -141,9 +142,13 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
         assert.notInclude(adaPage.html, "Lapsed VIPs");
         assert.include(gracePage.html, "Unsubscribe from Lapsed VIPs?");
         assert.notInclude(gracePage.html, "Weekly picks");
-        assert.strictEqual(
-          yield* statusOn(owner, vip.id, "grace@example.com"),
-          "unsubscribed"
+        assert.notInclude(gracePage.html, "Roasting club");
+        assert.deepStrictEqual(
+          [
+            yield* statusOn(owner, vip.id, "grace@example.com"),
+            yield* statusOn(owner, club.id, "grace@example.com"),
+          ],
+          ["unsubscribed", "subscribed"]
         );
         assert.strictEqual(
           yield* statusOn(owner, list.id, "ada@example.com"),
