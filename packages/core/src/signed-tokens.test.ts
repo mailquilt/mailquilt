@@ -3,11 +3,16 @@ import { DateTime, Effect, Exit, Redacted } from "effect";
 import { Base64 } from "effect/encoding";
 import { TestClock } from "effect/testing";
 
+import { InvalidToken } from "./invalid-token.ts";
 import { SignedTokens, signedTokensLayer } from "./signed-tokens.ts";
 
 const KEY_1 = `1:${Base64.encode(new Uint8Array(32).fill(1))}`;
 
 const KEY_2 = `2:${Base64.encode(new Uint8Array(32).fill(2))}`;
+
+const ANOTHER_INSTALLS_KEY_1 = `1:${Base64.encode(new Uint8Array(32).fill(9))}`;
+
+const REFUSED = Exit.fail(new InvalidToken());
 
 const PAYLOAD = "org_01h455vb4pex5vsknk084sn02q.cnt_01h455vb4pex5vsknk084sn02q";
 
@@ -56,20 +61,22 @@ describe("signed tokens", () => {
       for (const candidate of changed) {
         const result = yield* verify(candidate);
 
-        assert.isTrue(Exit.isFailure(result), candidate);
+        assert.deepStrictEqual(result, REFUSED, candidate);
       }
     }).pipe(Effect.provide(tokensWith(`${KEY_1},${KEY_2}`)))
   );
 
   it.effect("refuses a token signed by another install's keys", () =>
     Effect.gen(function* otherKeys() {
-      const token = yield* sign().pipe(Effect.provide(tokensWith(KEY_2)));
+      const token = yield* sign().pipe(
+        Effect.provide(tokensWith(ANOTHER_INSTALLS_KEY_1))
+      );
 
-      const result = yield* verify(token.replace(/^2\./u, "1.")).pipe(
+      const result = yield* verify(token).pipe(
         Effect.provide(tokensWith(KEY_1))
       );
 
-      assert.isTrue(Exit.isFailure(result));
+      assert.deepStrictEqual(result, REFUSED);
     })
   );
 
@@ -82,7 +89,7 @@ describe("signed tokens", () => {
       assert.deepStrictEqual(yield* verify(token), Exit.succeed(PAYLOAD));
 
       yield* TestClock.adjust("1 minute");
-      assert.isTrue(Exit.isFailure(yield* verify(token)));
+      assert.deepStrictEqual(yield* verify(token), REFUSED);
     }).pipe(Effect.provide(tokensWith(KEY_1)))
   );
 
@@ -104,7 +111,7 @@ describe("signed tokens", () => {
           Effect.provide(tokensWith(KEY_2))
         );
 
-        assert.isTrue(Exit.isFailure(removed));
+        assert.deepStrictEqual(removed, REFUSED);
       })
   );
 });
