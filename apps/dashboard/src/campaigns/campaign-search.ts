@@ -1,9 +1,7 @@
 import { CampaignIdSchema } from "@repo/domain";
-import { Effect, flow, Schema } from "effect";
-import type { Types } from "effect";
+import { flow, Schema } from "effect";
 
-const droppedIfInvalid = <S extends Schema.Top>(schema: S) =>
-  schema.pipe(Schema.catchDecoding(() => Effect.succeedNone));
+import { droppedIfInvalid, oneCursor } from "../search-in-url.ts";
 
 const CampaignSearchInUrl = Schema.Struct({
   after: Schema.optionalKey(droppedIfInvalid(CampaignIdSchema)),
@@ -15,18 +13,6 @@ const CampaignSearchInUrl = Schema.Struct({
  * A part that doesn't parse, such as an edited ID, is dropped.
  */
 export type CampaignSearch = typeof CampaignSearchInUrl.Type;
-
-const oneCursor = ({ after, before }: CampaignSearch) => {
-  const search: Types.Mutable<CampaignSearch> = {};
-
-  if (after !== undefined) {
-    search.after = after;
-  } else if (before !== undefined) {
-    search.before = before;
-  }
-
-  return search satisfies CampaignSearch;
-};
 
 /**
  * Reads the Campaigns table's search from the URL, keeping one cursor, the

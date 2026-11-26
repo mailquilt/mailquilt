@@ -1,8 +1,7 @@
 import { ProviderConnectionIdSchema } from "@repo/domain";
-import { Effect, Schema } from "effect";
+import { Schema } from "effect";
 
-const droppedIfInvalid = <S extends Schema.Top>(schema: S) =>
-  schema.pipe(Schema.catchDecoding(() => Effect.succeedNone));
+import { droppedIfInvalid } from "../search-in-url.ts";
 
 const ProvidersSearchInUrl = Schema.Struct({
   connected: Schema.optionalKey(droppedIfInvalid(ProviderConnectionIdSchema)),
