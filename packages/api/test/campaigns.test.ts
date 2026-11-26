@@ -243,7 +243,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
-    "sends a Campaign once to each Contact subscribed to its List, and to no one else",
+    "sends a Campaign once to each Contact subscribed to its List whose address isn't Suppressed, and to no one else",
     () =>
       Effect.gen(function* sendToSubscribed() {
         const owner = yield* draftCampaign;
@@ -270,6 +270,11 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         yield* setStatus(unsubscribed?.id ?? assert.fail(), "unsubscribed");
         yield* addContacts(owner, ["offers-only@example.com"], [otherList.id]);
         yield* addContacts(owner, ["no-lists@example.com"], []);
+        yield* addContacts(owner, ["suppressed@example.com"], [list.id]);
+        yield* client.suppressions.add({
+          params,
+          payload: { emails: ["Suppressed@Example.com"] },
+        });
 
         const sending = yield* client.campaigns.send({
           params: campaignParams,
@@ -588,6 +593,38 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         assert.deepStrictEqual(yield* sentTo(campaign.subject), [
           "ada@example.com",
         ]);
+      })
+  );
+
+  test.effect(
+    "leaves out a Contact whose address is Suppressed while the Campaign is still sending to them",
+    () =>
+      Effect.gen(function* suppressedMidSend() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list, params } = owner;
+
+        yield* addContacts(
+          owner,
+          ["ada@example.com", "grace@example.com"],
+          [list.id]
+        );
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* client.suppressions.add({
+          params,
+          payload: { emails: ["grace@example.com"] },
+        });
+        yield* (yield* QueueWorker).deliverAll;
+
+        const sent = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "ada@example.com",
+        ]);
+        assert.strictEqual(sent.status, "sent");
+        assert.deepStrictEqual(
+          { ...sent.recipients },
+          { failed: 1, sent: 1, total: 2 }
+        );
       })
   );
 

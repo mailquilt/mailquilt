@@ -127,6 +127,18 @@ export const newCampaignId = newId("cmp").pipe(
   Effect.map((id) => CampaignIdSchema.make(id))
 );
 
+/** A Suppression's ID, `sup_…`. */
+export const SuppressionIdSchema = Schema.String.check(hasPrefix("sup")).pipe(
+  Schema.brand("SuppressionId")
+);
+
+export type SuppressionId = typeof SuppressionIdSchema.Type;
+
+/** A new Suppression ID. IDs made later sort after earlier ones. */
+export const newSuppressionId = newId("sup").pipe(
+  Effect.map((id) => SuppressionIdSchema.make(id))
+);
+
 /** A signed-in person. Better Auth makes these IDs, so they have no prefix. */
 export const UserIdSchema = Schema.String.pipe(Schema.brand("UserId"));
 

@@ -47,7 +47,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Sending pipeline (outline)
 
-Today a Campaign is sent now to the subscribed Contacts of one List without an Opt-out, in batches through its Provider Connection. Targeting several Lists and exclusions (#15), Suppressions (#14), scheduling (#16), throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
+Today a Campaign is sent now to the subscribed Contacts of one List without an Opt-out or a Suppressed address, in batches through its Provider Connection. Members add and remove Suppressions by hand; bounces and complaints will add them (#19, #21). Targeting several Lists and exclusions (#15), scheduling (#16), throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
 
 1. **Start:** a Campaign starts (now or when the scheduler finds it due).
 2. **Resolve recipients in one set-based query:**

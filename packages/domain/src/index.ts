@@ -67,10 +67,12 @@ export {
   newMemberId,
   newOrganizationId,
   newSubscriptionId,
+  newSuppressionId,
   newProviderConnectionId,
   OrganizationIdSchema,
   ProviderConnectionIdSchema,
   SubscriptionIdSchema,
+  SuppressionIdSchema,
   UserIdSchema,
 } from "./ids.ts";
 
@@ -82,6 +84,7 @@ export type {
   OrganizationId,
   ProviderConnectionId,
   SubscriptionId,
+  SuppressionId,
   UserId,
 } from "./ids.ts";
 
@@ -143,6 +146,21 @@ export { TestEmailSent } from "./test-email-sent.ts";
 export { Subscription, SubscriptionStatusSchema } from "./subscription.ts";
 
 export type { SubscriptionStatus } from "./subscription.ts";
+
+export { SuppressionNotFound } from "./suppression-not-found.ts";
+
+export { SuppressionNotRemovable } from "./suppression-not-removable.ts";
+
+export { SuppressionPage } from "./suppression-page.ts";
+
+export { Suppression, SuppressionReasonSchema } from "./suppression.ts";
+
+export type { SuppressionReason } from "./suppression.ts";
+
+export {
+  MAX_SUPPRESSIONS_ADDED_AT_ONCE,
+  SuppressionsAdded,
+} from "./suppressions-added.ts";
 
 export { SetupClosed } from "./setup-closed.ts";
 

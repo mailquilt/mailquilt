@@ -15,6 +15,8 @@ import {
   SendFailed,
   SetupClosed,
   SignInRequired,
+  SuppressionNotFound,
+  SuppressionNotRemovable,
   SystemMailerFromEnvironment,
 } from "@repo/domain";
 import { HttpApiSchema } from "effect/http-api";
@@ -79,4 +81,13 @@ export const NoSubscribedContactsError = NoSubscribedContacts.pipe(
 
 export const DatabaseUnreachableError = DatabaseUnreachable.pipe(
   HttpApiSchema.status(503)
+);
+
+export const SuppressionNotFoundError = SuppressionNotFound.pipe(
+  HttpApiSchema.status(404)
+);
+
+/** Only a Suppression a member added can be removed, not one from a bounce or complaint. */
+export const SuppressionNotRemovableError = SuppressionNotRemovable.pipe(
+  HttpApiSchema.status(409)
 );

@@ -103,8 +103,9 @@ export class Campaigns extends Context.Service<
     ) => Effect.Effect<CampaignPage, never, CurrentOrganization>;
     /**
      * Moves a draft to `sending` and, in the same transaction, fixes who it
-     * goes to: every Contact with a subscribed Subscription to its List, in
-     * one query, split into batches of `batchSize`. `enqueue` is given the
+     * goes to: every Contact with a subscribed Subscription to its List, no
+     * Opt-out and an address that isn't Suppressed, in one query, split into
+     * batches of `batchSize`. `enqueue` is given the
      * number of batches and runs inside that transaction, so if it fails
      * nothing changes. Fails, changing nothing, if the Campaign isn't a
      * draft, has no Provider Connection, its Organization has no postal
@@ -133,7 +134,7 @@ export class Campaigns extends Context.Service<
       never,
       CurrentOrganization
     >;
-    /** Whether the Contact is still subscribed to the Campaign's List and has no Opt-out. */
+    /** Whether the Contact is still subscribed to the Campaign's List, has no Opt-out, and their address isn't Suppressed. */
     readonly stillConsents: (
       id: CampaignId,
       contactId: ContactId
@@ -224,7 +225,7 @@ const SERVER_FAILURES = new Set<SendFailureReason>([
 
 const NO_LONGER_CONSENTS = new SendFailed({
   detail:
-    "They unsubscribed or stopped marketing email before it was sent to them.",
+    "They unsubscribed, stopped marketing email or were suppressed before it was sent to them.",
   reason: "failed",
 });
 
@@ -324,7 +325,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         })
       );
 
-    // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes or opts out partway through still gets it.
+    // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes, opts out or is Suppressed partway through still gets it.
     const sendOrSkip = (recipient: QueuedRecipient) =>
       Effect.flatMap(
         campaigns.stillConsents(message.campaignId, recipient.contactId),
