@@ -1,6 +1,6 @@
 import {
   CredentialCipher,
-  CurrentOrganization,
+  currentOrganizationId,
   ProviderConnections,
 } from "@repo/core";
 import type { OrganizationId } from "@repo/domain";
@@ -122,7 +122,7 @@ export const ProviderConnectionsLive = Layer.effect(
 
     return {
       all: Effect.gen(function* allConnections() {
-        const organization = (yield* CurrentOrganization).id;
+        const organization = yield* currentOrganizationId;
 
         const rows = yield* db
           .select(connectionColumns)
@@ -138,7 +138,7 @@ export const ProviderConnectionsLive = Layer.effect(
 
       create: (connection) =>
         Effect.gen(function* createConnection() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           const id = yield* newProviderConnectionId.pipe(
             Effect.provideService(SecureRandom.SecureRandom, random)
@@ -175,7 +175,7 @@ export const ProviderConnectionsLive = Layer.effect(
 
       remove: (id) =>
         Effect.gen(function* removeConnection() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           const removed = yield* db
             .delete(providerConnections)
@@ -190,7 +190,7 @@ export const ProviderConnectionsLive = Layer.effect(
 
       update: (id, changes) =>
         Effect.gen(function* updateConnection() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           const settings = yield* encodeServer(changes.smtp).pipe(Effect.orDie);
 
@@ -242,7 +242,7 @@ export const ProviderConnectionsLive = Layer.effect(
 
       withCredentials: (id) =>
         Effect.gen(function* connectionWithCredentials() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           const [row] = yield* db
             .select({

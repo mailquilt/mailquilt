@@ -1,8 +1,4 @@
-import {
-  CurrentMembership,
-  CurrentOrganization,
-  Organizations,
-} from "@repo/core";
+import { currentOrganizationId, currentRole, Organizations } from "@repo/core";
 import {
   newMemberId,
   newOrganizationId,
@@ -54,13 +50,13 @@ export const OrganizationsLive = Layer.effect(
           .pipe(Effect.orDie),
 
       current: Effect.gen(function* currentOrganization() {
-        const current = yield* CurrentOrganization;
-        const { role } = yield* CurrentMembership;
+        const organizationId = yield* currentOrganizationId;
+        const role = yield* currentRole;
 
         const [row] = yield* db
           .select({ id: organizations.id, name: organizations.name })
           .from(organizations)
-          .where(eq(organizations.id, current.id));
+          .where(eq(organizations.id, organizationId));
 
         return yield* decodeOrganization({ ...row, role });
       }).pipe(Effect.orDie),

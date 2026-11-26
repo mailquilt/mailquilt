@@ -1,5 +1,5 @@
 import type { CampaignFilter, RecipientOutcome } from "@repo/core";
-import { Campaigns, CurrentOrganization } from "@repo/core";
+import { Campaigns, currentOrganizationId } from "@repo/core";
 import type {
   CampaignDraft,
   CampaignId,
@@ -221,7 +221,7 @@ export const CampaignsLive = Layer.effect(
     return {
       create: (draft) =>
         Effect.gen(function* createCampaign() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           yield* requireLists(db, organization, [draft.listId]);
           yield* requireConnection(
@@ -248,7 +248,7 @@ export const CampaignsLive = Layer.effect(
 
       get: (id) =>
         Effect.gen(function* getCampaign() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           return yield* one(organization, id);
         }),
@@ -258,7 +258,7 @@ export const CampaignsLive = Layer.effect(
           .transaction(
             () =>
               Effect.gen(function* campaignPage() {
-                const organization = (yield* CurrentOrganization).id;
+                const organization = yield* currentOrganizationId;
 
                 const inWindow = yield* newestFirstPageAroundCursor(
                   organization,
@@ -304,7 +304,7 @@ export const CampaignsLive = Layer.effect(
 
       queuedBatch: (id, batch) =>
         Effect.gen(function* queuedBatch() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           const [campaign] = yield* db
             .select({
@@ -362,7 +362,7 @@ export const CampaignsLive = Layer.effect(
       // WARNING: the Campaign is marked sent in a statement after the outcomes commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
       recordOutcomes: (id, outcomes) =>
         Effect.gen(function* recordOutcomes() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           if (outcomes.length > 0) {
             yield* db.execute(sql`
@@ -413,7 +413,7 @@ export const CampaignsLive = Layer.effect(
         db
           .transaction(() =>
             Effect.gen(function* startSending() {
-              const organization = (yield* CurrentOrganization).id;
+              const organization = yield* currentOrganizationId;
 
               const [started] = yield* db
                 .update(campaigns)
@@ -480,7 +480,7 @@ export const CampaignsLive = Layer.effect(
 
       update: (id, draft) =>
         Effect.gen(function* updateCampaign() {
-          const organization = (yield* CurrentOrganization).id;
+          const organization = yield* currentOrganizationId;
 
           yield* requireLists(db, organization, [draft.listId]);
           yield* requireConnection(
