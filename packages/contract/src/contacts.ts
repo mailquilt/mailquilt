@@ -1,22 +1,23 @@
 import {
   Contact,
-  ContactAlreadyExists,
   ContactEmail,
   ContactIdSchema,
   ContactPage,
   ListIdSchema,
-  ListNotFound,
-  OrganizationIdSchema,
   SubscriptionStatusSchema,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
+import {
+  ContactAlreadyExistsError,
+  ListNotFoundError,
+  OrganizationNotFoundError,
+  SignInRequiredError,
+} from "./errors.ts";
+import { organizationParams } from "./params.ts";
 
 const MAX_LISTS_FOR_NEW_CONTACT = 100;
-
-const params = { organizationId: OrganizationIdSchema };
 
 /**
  * Which Contacts to list. `after` and `before` are the `next` and `previous`
@@ -47,9 +48,9 @@ export class ContactsApi extends HttpApiGroup.make("contacts")
       error: [
         SignInRequiredError,
         OrganizationNotFoundError,
-        ListNotFound.pipe(HttpApiSchema.status(404)),
+        ListNotFoundError,
       ],
-      params,
+      params: organizationParams,
       query: ContactQuery,
       success: ContactPage,
     })
@@ -59,10 +60,10 @@ export class ContactsApi extends HttpApiGroup.make("contacts")
       error: [
         SignInRequiredError,
         OrganizationNotFoundError,
-        ContactAlreadyExists.pipe(HttpApiSchema.status(409)),
-        ListNotFound.pipe(HttpApiSchema.status(404)),
+        ContactAlreadyExistsError,
+        ListNotFoundError,
       ],
-      params,
+      params: organizationParams,
       payload: Schema.Struct({
         email: ContactEmail,
         listIds: Schema.optionalKey(

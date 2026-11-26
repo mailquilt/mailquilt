@@ -1,26 +1,24 @@
 import {
-  CredentialsRequired,
   EmailAddress,
-  InstanceAdminRequired,
   InstanceSettings,
   InstanceStatus,
   NewPassword,
   PersonName,
   Sender,
-  SetupClosed,
   SignUpPolicySchema,
   SmtpCredentials,
   SmtpServer,
-  SystemMailerFromEnvironment,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
-import { SignInRequiredError } from "./errors.ts";
-
-const InstanceAdminRequiredError = InstanceAdminRequired.pipe(
-  HttpApiSchema.status(403)
-);
+import {
+  CredentialsRequiredError,
+  InstanceAdminRequiredError,
+  SetupClosedError,
+  SignInRequiredError,
+  SystemMailerFromEnvironmentError,
+} from "./errors.ts";
 
 /**
  * The install itself. `status` is public, so the dashboard knows whether to
@@ -40,7 +38,7 @@ export class InstanceApi extends HttpApiGroup.make("instance")
   )
   .add(
     HttpApiEndpoint.post("setUp", "/instance/setup", {
-      error: SetupClosed.pipe(HttpApiSchema.status(409)),
+      error: SetupClosedError,
       payload: Schema.Struct({
         name: PersonName,
         email: EmailAddress,
@@ -70,8 +68,8 @@ export class InstanceApi extends HttpApiGroup.make("instance")
         error: [
           SignInRequiredError,
           InstanceAdminRequiredError,
-          CredentialsRequired.pipe(HttpApiSchema.status(422)),
-          SystemMailerFromEnvironment.pipe(HttpApiSchema.status(409)),
+          CredentialsRequiredError,
+          SystemMailerFromEnvironmentError,
         ],
         payload: Schema.Struct({
           from: Sender,

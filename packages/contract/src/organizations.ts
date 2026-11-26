@@ -1,12 +1,9 @@
-import {
-  Organization,
-  OrganizationIdSchema,
-  OrganizationName,
-} from "@repo/domain";
+import { Organization, OrganizationName } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
 import { OrganizationNotFoundError, SignInRequiredError } from "./errors.ts";
+import { organizationParams } from "./params.ts";
 
 /**
  * The Organizations the signed-in person belongs to. Endpoints for one
@@ -30,7 +27,7 @@ export class OrganizationsApi extends HttpApiGroup.make("organizations")
   .add(
     HttpApiEndpoint.get("get", "/organizations/:organizationId", {
       error: [SignInRequiredError, OrganizationNotFoundError],
-      params: { organizationId: OrganizationIdSchema },
+      params: organizationParams,
       success: Organization,
     })
   ) {}
