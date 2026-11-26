@@ -1,5 +1,5 @@
 import { MailquiltApi } from "@repo/contract";
-import { Effect } from "effect";
+import { Effect, Predicate } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
@@ -19,3 +19,23 @@ export const callApi = <A, E>(
   call: (client: ApiClient) => Effect.Effect<A, E>,
   signal?: AbortSignal
 ) => Effect.runPromise(apiClient.pipe(Effect.flatMap(call)), { signal });
+
+const RETRIES = 3;
+
+/**
+ * Whether a failed query is asked again: up to 3 times, but never after the
+ * API refused it with `SignInRequired`, which another try can't change. The
+ * query client's default; a query adds its own exceptions to it.
+ */
+export const retryUnlessSignedOut = (failures: number, error: Error) =>
+  !Predicate.isTagged(error, "SignInRequired") && failures < RETRIES;
+
+/**
+ * Whether a query is loading for the first time: waiting, and never failed.
+ * A page shows its loader only then. A retry after a failure keeps the
+ * failure in place, so focus stays on its Try again.
+ */
+export const loadingFirstTime = (query: {
+  readonly isPending: boolean;
+  readonly errorUpdatedAt: number;
+}) => query.isPending && query.errorUpdatedAt === 0;

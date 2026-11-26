@@ -2,8 +2,6 @@ import type {
   Campaign,
   CampaignDraft,
   CampaignId,
-  List,
-  ListId,
   OrganizationId,
 } from "@repo/domain";
 import {
@@ -12,12 +10,10 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Effect, Predicate } from "effect";
+import { Effect } from "effect";
 
 import { callApi } from "../api.ts";
 import type { CampaignSearch } from "./campaign-search.ts";
-
-const DEFAULT_RETRIES = 3;
 
 /** How often a Campaign that is sending is asked for again, until it's sent. */
 export const SENDING_POLL_MS = 2000;
@@ -30,13 +26,6 @@ const pagesKey = (organizationId: OrganizationId) =>
 
 const campaignKey = (organizationId: OrganizationId, campaignId: CampaignId) =>
   [...campaignsKey(organizationId), "one", campaignId] as const;
-
-// WARNING: the same keys as `useLists` in audience-api.ts, so a List already loaded there draws at once here, and adding Contacts refreshes both.
-const listsKey = (organizationId: OrganizationId) =>
-  ["organizations", organizationId, "audience", "lists"] as const;
-
-const retryUnlessSignedOut = (failures: number, error: Error) =>
-  !Predicate.isTagged(error, "SignInRequired") && failures < DEFAULT_RETRIES;
 
 /**
  * One page of the Organization's Campaigns, newest first. While another page
@@ -62,7 +51,6 @@ export const useCampaignPage = (
       ) === true
         ? SENDING_POLL_MS
         : false,
-    retry: retryUnlessSignedOut,
   });
 
 /**
@@ -88,44 +76,7 @@ export const useCampaign = (
     queryKey: campaignKey(organizationId, campaignId),
     refetchInterval: (query) =>
       query.state.data?.status === "sending" ? SENDING_POLL_MS : false,
-    retry: retryUnlessSignedOut,
   });
-
-/**
- * One List with its counts, or `null` when the Organization no longer has it.
- * It waits until `listId` is known. A List already in the cached list of
- * Lists draws at once, and is checked.
- */
-export const useList = (
-  organizationId: OrganizationId,
-  listId: ListId | undefined
-) => {
-  const queryClient = useQueryClient();
-
-  return useQuery({
-    enabled: listId !== undefined,
-    initialData: () =>
-      queryClient
-        .getQueryData<readonly List[]>(listsKey(organizationId))
-        ?.find((list) => list.id === listId),
-    initialDataUpdatedAt: () =>
-      queryClient.getQueryState(listsKey(organizationId))?.dataUpdatedAt,
-    queryFn: ({ signal }) =>
-      listId === undefined
-        ? Promise.resolve(null)
-        : callApi(
-            (client) =>
-              client.lists
-                .get({ params: { listId, organizationId } })
-                .pipe(
-                  Effect.catchTag("ListNotFound", () => Effect.succeed(null))
-                ),
-            signal
-          ),
-    queryKey: [...listsKey(organizationId), listId ?? "unknown"],
-    retry: retryUnlessSignedOut,
-  });
-};
 
 // WARNING: write the Campaign into the cache first; the Campaign page navigated to next would otherwise load it again, or draw the draft it was before sending.
 const useKeepCampaign = (organizationId: OrganizationId) => {

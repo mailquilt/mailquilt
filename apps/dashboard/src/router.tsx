@@ -7,11 +7,10 @@ import {
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 import { Predicate } from "effect";
 
+import { retryUnlessSignedOut } from "./api.ts";
 import { authClient } from "./auth/auth-client.ts";
 import { Crash } from "./layout/crash.tsx";
 import { routeTree } from "./routeTree.gen";
-
-const RETRIES = 3;
 
 const sessionEnded = (error: Error) =>
   Predicate.isTagged(error, "SignInRequired");
@@ -32,7 +31,7 @@ export const createQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        retry: (failures, error) => !sessionEnded(error) && failures < RETRIES,
+        retry: retryUnlessSignedOut,
       },
     },
     mutationCache: new MutationCache({ onError: checkSessionIfEnded }),

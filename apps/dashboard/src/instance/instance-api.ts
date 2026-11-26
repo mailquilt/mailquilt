@@ -11,10 +11,8 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Predicate, Redacted } from "effect";
 
-import { callApi } from "../api.ts";
+import { callApi, retryUnlessSignedOut } from "../api.ts";
 import { authClient } from "../auth/auth-client.ts";
-
-const SETTINGS_RETRIES = 3;
 
 const STATUS_KEY = ["instance"] as const;
 
@@ -100,8 +98,7 @@ export const useInstanceSettings = () =>
     queryKey: SETTINGS_KEY,
     retry: (failures, error) =>
       !Predicate.isTagged(error, "InstanceAdminRequired") &&
-      !Predicate.isTagged(error, "SignInRequired") &&
-      failures < SETTINGS_RETRIES,
+      retryUnlessSignedOut(failures, error),
   });
 
 const useSaveSettings = () => {

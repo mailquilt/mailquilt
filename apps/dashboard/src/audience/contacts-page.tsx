@@ -19,6 +19,7 @@ import { Array as Arr } from "effect";
 import type { DateTime } from "effect";
 import { useMemo, useRef, useState } from "react";
 
+import { loadingFirstTime } from "../api.ts";
 import { PlusIcon } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { CursorPager } from "../layout/cursor-pager.tsx";
@@ -662,10 +663,7 @@ export const ContactsPage = ({
     (candidate) => candidate.id === shownSearch.list
   );
 
-  if (
-    (lists.isPending && lists.errorUpdatedAt === 0) ||
-    (page.isPending && page.errorUpdatedAt === 0)
-  ) {
+  if (loadingFirstTime(lists) || loadingFirstTime(page)) {
     return <PageAreaLoading label="Loading contacts" />;
   }
 

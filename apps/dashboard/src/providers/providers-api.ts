@@ -7,11 +7,9 @@ import type {
   SmtpServer,
 } from "@repo/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Effect, Predicate } from "effect";
+import { Effect } from "effect";
 
-import { callApi } from "../api.ts";
-
-const DEFAULT_RETRIES = 3;
+import { callApi, retryUnlessSignedOut } from "../api.ts";
 
 /** Where the Organization's Provider Connections are kept in the query cache. Creating an Organization seeds its key with an empty list. */
 export const connectionsKey = (organizationId: OrganizationId) =>
@@ -24,7 +22,10 @@ export interface ConnectionSettings {
   readonly smtp: typeof SmtpServer.Type;
 }
 
-/** Every Provider Connection in the Organization, oldest first. */
+/**
+ * Every Provider Connection in the Organization, oldest first. With
+ * `retryWhenFailed: false`, a failure isn't retried.
+ */
 export const useProviderConnections = (
   organizationId: OrganizationId,
   {
@@ -34,10 +35,7 @@ export const useProviderConnections = (
 ) =>
   useQuery({
     enabled,
-    retry: (failures, error) =>
-      retryWhenFailed &&
-      !Predicate.isTagged(error, "SignInRequired") &&
-      failures < DEFAULT_RETRIES,
+    retry: retryWhenFailed ? retryUnlessSignedOut : false,
     queryFn: ({ signal }) =>
       callApi(
         (client) =>
