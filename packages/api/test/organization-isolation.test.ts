@@ -8,6 +8,7 @@ import type {
   ListId,
   OrganizationId,
   ProviderConnectionId,
+  SuppressionId,
 } from "@repo/domain";
 import { Effect, Redacted } from "effect";
 import { HttpApi } from "effect/http-api";
@@ -24,6 +25,7 @@ interface Target {
   readonly contactId: ContactId;
   readonly contactEmail: string;
   readonly providerConnectionId: ProviderConnectionId;
+  readonly suppressionId: SuppressionId;
 }
 
 type TenantCall = (
@@ -158,6 +160,23 @@ const TENANT_ENDPOINTS = {
         params: { organizationId, providerConnectionId },
         payload: { to: "intruder@example.com" },
       }),
+  "GET /api/organizations/:organizationId/suppressions": (
+    client: Client,
+    { organizationId }: Target
+  ) => client.suppressions.list({ params: { organizationId }, query: {} }),
+  "POST /api/organizations/:organizationId/suppressions": (
+    client: Client,
+    { organizationId }: Target
+  ) =>
+    client.suppressions.add({
+      params: { organizationId },
+      payload: { emails: ["intruder@example.com"] },
+    }),
+  "DELETE /api/organizations/:organizationId/suppressions/:suppressionId": (
+    client: Client,
+    { organizationId, suppressionId }: Target
+  ) =>
+    client.suppressions.remove({ params: { organizationId, suppressionId } }),
 } satisfies Record<string, TenantCall>;
 
 const NO_SUCH_ORGANIZATION = OrganizationIdSchema.make(
@@ -206,6 +225,13 @@ const ownedData = (owner: Client) =>
       },
     });
 
+    yield* owner.suppressions.add({
+      params,
+      payload: { emails: [`suppressed-${readers}@example.com`] },
+    });
+
+    const suppressions = yield* owner.suppressions.list({ params, query: {} });
+
     return {
       campaignId: campaign.id,
       contactEmail: contact.email,
@@ -213,6 +239,7 @@ const ownedData = (owner: Client) =>
       listId: list.id,
       organizationId: organization.id,
       providerConnectionId: connection.id,
+      suppressionId: suppressions.suppressions[0]?.id ?? assert.fail(),
     } satisfies Target;
   });
 
@@ -471,6 +498,44 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.deepStrictEqual(
             lists.map((list) => [list.id, list.subscriptions.subscribed]),
             [[own.listId, 1]]
+          );
+        })
+    );
+
+    test.effect(
+      "never reaches another Organization's Suppressions from its own",
+      () =>
+        Effect.gen(function* foreignSuppression() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+          const params = { organizationId: own.organizationId };
+
+          const removal = yield* outsider.suppressions
+            .remove({
+              params: { ...params, suppressionId: target.suppressionId },
+            })
+            .pipe(Effect.flip);
+
+          const ownList = yield* outsider.suppressions.list({
+            params,
+            query: {},
+          });
+
+          const targetList = yield* owner.suppressions.list({
+            params: { organizationId: target.organizationId },
+            query: {},
+          });
+
+          assert.strictEqual(removal._tag, "SuppressionNotFound");
+          assert.deepStrictEqual(
+            ownList.suppressions.map((suppression) => suppression.id),
+            [own.suppressionId]
+          );
+          assert.deepStrictEqual(
+            targetList.suppressions.map((suppression) => suppression.id),
+            [target.suppressionId]
           );
         })
     );

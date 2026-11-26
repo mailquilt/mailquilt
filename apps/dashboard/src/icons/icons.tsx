@@ -12,13 +12,16 @@ import {
   Cancel01Icon,
   ComputerIcon,
   Copy01Icon,
+  Csv01Icon,
   Delete02Icon,
+  FileImportIcon,
   Globe02Icon,
   Home03Icon,
   InformationCircleIcon,
   LeftToRightListBulletIcon,
   LinkSquare02Icon,
   Logout03Icon,
+  MailBlock01Icon,
   Mail01Icon,
   Megaphone01Icon,
   Menu01Icon,
@@ -161,7 +164,10 @@ export const Info = InfoIcon;
 export const X = XIcon;
 
 export const DotsThreeIcon = hugeicon(MoreHorizontalIcon, "DotsThreeIcon");
+export const EnvelopeBlockIcon = hugeicon(MailBlock01Icon, "EnvelopeBlockIcon");
 export const EnvelopeSimpleIcon = hugeicon(Mail01Icon, "EnvelopeSimpleIcon");
+export const FileArrowUpIcon = hugeicon(FileImportIcon, "FileArrowUpIcon");
+export const FileCsvIcon = hugeicon(Csv01Icon, "FileCsvIcon");
 export const GearSixIcon = hugeicon(Settings02Icon, "GearSixIcon");
 export const HardDrivesIcon = hugeicon(ServerStack01Icon, "HardDrivesIcon");
 export const HouseIcon = hugeicon(Home03Icon, "HouseIcon");

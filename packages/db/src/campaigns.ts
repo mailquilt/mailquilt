@@ -333,6 +333,11 @@ export const CampaignsLive = Layer.effect(
                 and c.id = ${contactId}
                 and c.opted_out_at is null
                 and s.status = 'subscribed'
+                and not exists (
+                  select 1 from suppressions x
+                  where x.organization_id = c.organization_id
+                    and lower(x.email) = lower(c.email)
+                )
             ) as consents
           `);
 
@@ -444,6 +449,11 @@ export const CampaignsLive = Layer.effect(
                       and s.list_id = ${started.listId}
                       and s.status = 'subscribed'
                       and c.opted_out_at is null
+                      and not exists (
+                        select 1 from suppressions x
+                        where x.organization_id = c.organization_id
+                          and lower(x.email) = lower(c.email)
+                      )
                     returning 1
                   )
                   select count(*)::int as recipients from snapshot

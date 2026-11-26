@@ -26,10 +26,12 @@ type InputProps = Omit<
  * input through `aria-describedby`, and is announced each time the form is
  * submitted, even when it says the same thing as last time. `addon` sits at
  * the end of the input, such as a button to show a password. With `rows`,
- * it's a text area of that many lines, for text that runs over several.
+ * it's a text area of that many lines, for text that runs over several,
+ * and `areaRef` reaches it.
  */
 export const FormField = ({
   addon,
+  areaRef,
   className,
   description,
   field,
@@ -39,6 +41,7 @@ export const FormField = ({
   ...inputProps
 }: InputProps & {
   addon?: React.ReactNode;
+  areaRef?: React.Ref<HTMLTextAreaElement>;
   description?: React.ReactNode;
   field: AnyFieldApi;
   label: string;
@@ -92,6 +95,7 @@ export const FormField = ({
         name={field.name}
         onChange={(event) => field.handleChange(event.target.value)}
         placeholder={inputProps.placeholder}
+        ref={areaRef}
         required={inputProps.required}
         rows={rows}
         value={String(field.state.value)}

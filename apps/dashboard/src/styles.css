@@ -75,6 +75,11 @@
   --mq-logo-ink: #111113;
   --mq-logo-grey: #71717a;
   --mq-logo-slot: #a1a1aa;
+  /* The dashed slot's line: a piece not there yet. */
+  --mq-slot-dash: 1.5px;
+  /* An import's progress segments: the seam between them and their corners. */
+  --mq-batch-gap: 3px;
+  --mq-batch-radius: 2.5px;
   --mq-block-ink: #111113;
   --mq-body: #52525b;
   --mq-seam: #d4d4d8;
@@ -851,6 +856,13 @@ aside.mq-frame {
   z-index: 61;
 }
 
+/* A popup opened from inside a dialog, such as a Select's list, sits above the dialog's window (61); none of them has a z-index of its own. */
+[data-theme="mailquilt"]:has([role="dialog"] [data-popup-open])
+  [data-base-ui-portal]
+  > [data-side][data-align] {
+  z-index: 62;
+}
+
 /*
  * LayerDialog pads its body below the description even when there is
  * nothing in it, as in a delete confirmation, which left a lopsided gap. Such
@@ -896,7 +908,7 @@ aside.mq-frame {
 }
 
 .mq-done-block::before {
-  border: 1.5px dashed var(--mq-logo-slot);
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
 }
 
 .mq-done-block::after {
@@ -1054,6 +1066,53 @@ aside.mq-frame {
   50% {
     opacity: 0.45;
   }
+}
+
+/* Where a CSV file is dropped: the logo's dashed slot, a piece not there yet. */
+.mq-dropzone {
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
+  border-radius: var(--radius-xl);
+  background: var(--color-kumo-elevated);
+}
+
+.mq-dropzone[data-dragging] {
+  border-color: var(--mq-block-ink);
+}
+
+.mq-dropzone[data-invalid] {
+  border-color: var(--color-kumo-danger);
+}
+
+/* An import's progress in at most 20 segments, each a share of its requests: ink once sent, the dashed slot until then. */
+.mq-batches {
+  display: flex;
+  height: 0.75rem;
+  gap: var(--mq-batch-gap);
+}
+
+.mq-batches > i {
+  flex: 1;
+  border-radius: var(--mq-batch-radius);
+}
+
+.mq-batches > [data-state="done"],
+.mq-batches > [data-state="sending"] {
+  background: var(--mq-block-ink);
+}
+
+.mq-batches > [data-state="sending"] {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mq-batches > [data-state="sending"] {
+    animation: mq-pulse 1600ms ease-in-out infinite;
+    opacity: 1;
+  }
+}
+
+.mq-batches > [data-state="waiting"] {
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
 }
 
 /* What arrives after its place is drawn, such as a count, fades in rather than popping. */
@@ -1345,7 +1404,7 @@ aside.mq-frame {
 }
 
 .mq-makeup > [data-status="pending"] {
-  border: 1.5px dashed var(--mq-logo-slot);
+  border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
 }
 
 .mq-makeup > [data-status="unsubscribed"] {

@@ -39,6 +39,15 @@ export { Contacts, createContact, listContacts } from "./contacts.ts";
 
 export type { ContactFilter } from "./contacts.ts";
 
+export {
+  addSuppressions,
+  listSuppressions,
+  removeSuppression,
+  Suppressions,
+} from "./suppressions.ts";
+
+export type { SuppressionFilter } from "./suppressions.ts";
+
 export { checkHealth, DatabaseHealth } from "./health.ts";
 
 export { addToList, createList, getList, Lists, listLists } from "./lists.ts";

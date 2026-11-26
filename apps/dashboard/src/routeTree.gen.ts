@@ -16,6 +16,7 @@ import { Route as AppContactsRouteImport } from './routes/_app/contacts'
 import { Route as AppInstanceRouteImport } from './routes/_app/instance'
 import { Route as AppListsRouteImport } from './routes/_app/lists'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSuppressionsRouteImport } from './routes/_app/suppressions'
 import { Route as AuthCheckYourInboxRouteImport } from './routes/_auth/check-your-inbox'
 import { Route as AuthEmailVerifiedRouteImport } from './routes/_auth/email-verified'
 import { Route as AuthSetupRouteImport } from './routes/_auth/setup'
@@ -60,6 +61,11 @@ const AppListsRoute = AppListsRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSuppressionsRoute = AppSuppressionsRouteImport.update({
+  id: '/suppressions',
+  path: '/suppressions',
   getParentRoute: () => AppRoute,
 } as any)
 const AuthCheckYourInboxRoute = AuthCheckYourInboxRouteImport.update({
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/instance': typeof AppInstanceRoute
   '/lists': typeof AppListsRoute
   '/settings': typeof AppSettingsRoute
+  '/suppressions': typeof AppSuppressionsRoute
   '/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/email-verified': typeof AuthEmailVerifiedRoute
   '/setup': typeof AuthSetupRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/instance': typeof AppInstanceRoute
   '/lists': typeof AppListsRoute
   '/settings': typeof AppSettingsRoute
+  '/suppressions': typeof AppSuppressionsRoute
   '/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/email-verified': typeof AuthEmailVerifiedRoute
   '/setup': typeof AuthSetupRoute
@@ -172,6 +180,7 @@ export interface FileRoutesById {
   '/_app/instance': typeof AppInstanceRoute
   '/_app/lists': typeof AppListsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/suppressions': typeof AppSuppressionsRoute
   '/_auth/check-your-inbox': typeof AuthCheckYourInboxRoute
   '/_auth/email-verified': typeof AuthEmailVerifiedRoute
   '/_auth/setup': typeof AuthSetupRoute
@@ -194,6 +203,7 @@ export interface FileRouteTypes {
     | '/instance'
     | '/lists'
     | '/settings'
+    | '/suppressions'
     | '/check-your-inbox'
     | '/email-verified'
     | '/setup'
@@ -213,6 +223,7 @@ export interface FileRouteTypes {
     | '/instance'
     | '/lists'
     | '/settings'
+    | '/suppressions'
     | '/check-your-inbox'
     | '/email-verified'
     | '/setup'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/_app/instance'
     | '/_app/lists'
     | '/_app/settings'
+    | '/_app/suppressions'
     | '/_auth/check-your-inbox'
     | '/_auth/email-verified'
     | '/_auth/setup'
@@ -302,6 +314,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/suppressions': {
+      id: '/_app/suppressions'
+      path: '/suppressions'
+      fullPath: '/suppressions'
+      preLoaderRoute: typeof AppSuppressionsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_auth/check-your-inbox': {
@@ -396,6 +415,7 @@ interface AppRouteChildren {
   AppInstanceRoute: typeof AppInstanceRoute
   AppListsRoute: typeof AppListsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppSuppressionsRoute: typeof AppSuppressionsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCampaignsNewRoute: typeof AppCampaignsNewRoute
   AppProvidersNewRoute: typeof AppProvidersNewRoute
@@ -411,6 +431,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppInstanceRoute: AppInstanceRoute,
   AppListsRoute: AppListsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppSuppressionsRoute: AppSuppressionsRoute,
   AppIndexRoute: AppIndexRoute,
   AppCampaignsNewRoute: AppCampaignsNewRoute,
   AppProvidersNewRoute: AppProvidersNewRoute,

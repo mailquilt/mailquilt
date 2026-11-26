@@ -105,13 +105,13 @@ export const SendCampaignDialog = ({
     <ActionDialog
       actionLabel="Send now"
       busy={send.isPending}
-      description={`Everyone subscribed to ${listName} gets it now, through ${connectionName}. Once it starts, it can’t be stopped.`}
+      description={`It goes now, through ${connectionName}, to the ${formatCount(subscribed)} ${subscribed === 1 ? "contact" : "contacts"} subscribed to ${listName}, except anyone who stopped all marketing email or whose address is suppressed. Once it starts, it can’t be stopped.`}
       finalFocus={finalFocus}
       formId={formId}
       onExited={onExited}
       onOpenChange={onOpenChange}
       open={open}
-      title={`Send to ${formatCount(subscribed)} ${subscribed === 1 ? "contact" : "contacts"}?`}
+      title="Send this campaign now?"
     >
       <form
         className="flex flex-col gap-4"

@@ -409,7 +409,7 @@ export const CampaignForm = ({
       onSubmit={(event) => submitForm(event, form)}
     >
       <SettingsSection
-        about="Everyone subscribed to the list at the moment you send. Pending and unsubscribed contacts don’t get it."
+        about="Everyone subscribed to the list at the moment you send, except anyone who stopped all marketing email or whose address is suppressed. Pending and unsubscribed contacts don’t get it."
         title="Who gets it"
       >
         <form.Field name="listId" validators={CHECKS.listId}>

@@ -277,6 +277,40 @@ export const subscriptions = pgTable(
 );
 
 /**
+ * An Organization-wide block on one email address (`sup_…`): no Campaign
+ * goes to it, whatever its Subscriptions. The address is kept as entered and
+ * unique per Organization regardless of case, and needn't belong to a
+ * Contact. `reason` says where it came from: a hard bounce, a complaint, or a
+ * member (`manual`); only a manual one can be removed.
+ */
+export const suppressions = pgTable(
+  "suppressions",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    reason: text("reason").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("suppressions_organization_id_id_idx").on(
+      table.organizationId,
+      table.id
+    ),
+    uniqueIndex("suppressions_organization_id_email_key").on(
+      table.organizationId,
+      sql`lower(${table.email})`
+    ),
+    check(
+      "suppressions_reason_check",
+      sql`${table.reason} in ('hard-bounce', 'complaint', 'manual')`
+    ),
+  ]
+);
+
+/**
  * An Organization's configured sending service (`pcn_…`). `settings` holds
  * where it sends, such as an SMTP server's host, port and encryption, and
  * never a secret. `credentials` is sealed with AES-256-GCM under the key
