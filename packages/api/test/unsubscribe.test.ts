@@ -364,14 +364,14 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
   );
 
   test.effect(
-    "stops sending to a Contact who stops marketing email partway through the batch that would reach them",
+    "skips a Contact who stops marketing email after the email before theirs in the same batch was sent",
     () =>
       Effect.gen(function* optOutMidBatch() {
         const owner = yield* ownOrganization;
         const list = yield* newList(owner, "Weekly picks");
 
         const addresses = Array.from(
-          { length: 11 },
+          { length: 3 },
           (_, index) => `reader-${index}@example.com`
         );
 
@@ -382,11 +382,11 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
           query: { list: list.id },
         });
 
-        const lastInBatch = (contacts?.contacts ?? [])
-          .toSorted((a, b) => (a.id < b.id ? -1 : 1))
-          .at(-1);
+        const [, secondInBatch] = (contacts?.contacts ?? []).toSorted((a, b) =>
+          a.id < b.id ? -1 : 1
+        );
 
-        const link = first.find((email) => email.to === lastInBatch?.email);
+        const link = first.find((email) => email.to === secondInBatch?.email);
 
         const next = yield* startCampaign(owner, list.id, []);
 
@@ -407,8 +407,8 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
 
         const sentTo = (yield* sentWith(next.subject)).map((email) => email.to);
 
-        assert.strictEqual(sentTo.length, 10);
-        assert.notInclude(sentTo, lastInBatch?.email);
+        assert.strictEqual(sentTo.length, 2);
+        assert.notInclude(sentTo, secondInBatch?.email);
       })
   );
 });

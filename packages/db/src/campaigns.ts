@@ -3,7 +3,6 @@ import { Campaigns, currentOrganizationId } from "@repo/core";
 import type {
   CampaignDraft,
   CampaignId,
-  ContactId,
   OrganizationId,
   ProviderConnectionId,
 } from "@repo/domain";
@@ -306,31 +305,28 @@ export const CampaignsLive = Layer.effect(
           });
         }).pipe(Effect.orDie),
 
-      stillConsenting: (id, contactIds) =>
-        Effect.gen(function* stillConsenting() {
+      stillConsents: (id, contactId) =>
+        Effect.gen(function* stillConsents() {
           const organization = yield* currentOrganizationId;
 
-          if (contactIds.length === 0) {
-            return new Set<ContactId>();
-          }
-
-          const { rows } = yield* db.execute<{ readonly id: string }>(sql`
-            select c.id
-            from contacts c
-            join campaigns cmp on cmp.organization_id = c.organization_id and cmp.id = ${id}
-            join subscriptions s on s.organization_id = c.organization_id
-              and s.contact_id = c.id
-              and s.list_id = cmp.list_id
-            where c.organization_id = ${organization}
-              and c.id in (${sql.join(
-                contactIds.map((contactId) => sql`${contactId}`),
-                sql`, `
-              )})
-              and c.opted_out_at is null
-              and s.status = 'subscribed'
+          const { rows } = yield* db.execute<{
+            readonly consents: boolean;
+          }>(sql`
+            select exists (
+              select 1
+              from contacts c
+              join campaigns cmp on cmp.organization_id = c.organization_id and cmp.id = ${id}
+              join subscriptions s on s.organization_id = c.organization_id
+                and s.contact_id = c.id
+                and s.list_id = cmp.list_id
+              where c.organization_id = ${organization}
+                and c.id = ${contactId}
+                and c.opted_out_at is null
+                and s.status = 'subscribed'
+            ) as consents
           `);
 
-          return new Set(rows.map((row) => ContactIdSchema.make(row.id)));
+          return rows[0]?.consents === true;
         }).pipe(Effect.orDie),
 
       // WARNING: the Campaign is marked sent in a statement after the outcomes commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.

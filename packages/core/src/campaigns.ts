@@ -123,14 +123,11 @@ export class Campaigns extends Context.Service<
       never,
       CurrentOrganization
     >;
-    /**
-     * Of `contactIds`, the ones still subscribed to the Campaign's List with
-     * no Opt-out, in one query.
-     */
-    readonly stillConsenting: (
+    /** Whether the Contact is still subscribed to the Campaign's List and has no Opt-out. */
+    readonly stillConsents: (
       id: CampaignId,
-      contactIds: readonly ContactId[]
-    ) => Effect.Effect<ReadonlySet<ContactId>, never, CurrentOrganization>;
+      contactId: ContactId
+    ) => Effect.Effect<boolean, never, CurrentOrganization>;
     /**
      * Records what the Provider did for each recipient still queued, adds
      * them to the Campaign's counts and writes a `sent` delivery event for
@@ -214,9 +211,6 @@ const SERVER_FAILURES = new Set<SendFailureReason>([
   "unavailable",
   "unreachable",
 ]);
-
-// WARNING: a batch can take minutes to send, so consent is read again for every group of this many, not once; an unsubscribe or Opt-out takes effect within that many sends.
-const CONSENT_CHECKED_EVERY = 10;
 
 const NO_LONGER_CONSENTS = new SendFailed({
   detail:
@@ -302,19 +296,18 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         })
       );
 
-    const sendOrSkip = (
-      recipient: QueuedRecipient,
-      consenting: ReadonlySet<ContactId>
-    ) =>
-      consenting.has(recipient.contactId)
-        ? sendUnlessServerFailed(recipient)
-        : Effect.fail(NO_LONGER_CONSENTS);
+    // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes or opts out partway through still gets it.
+    const sendOrSkip = (recipient: QueuedRecipient) =>
+      Effect.flatMap(
+        campaigns.stillConsents(message.campaignId, recipient.contactId),
+        (consents) =>
+          consents
+            ? sendUnlessServerFailed(recipient)
+            : Effect.fail(NO_LONGER_CONSENTS)
+      );
 
-    const outcomeFor = (
-      recipient: QueuedRecipient,
-      consenting: ReadonlySet<ContactId>
-    ) =>
-      sendOrSkip(recipient, consenting).pipe(
+    const outcomeFor = (recipient: QueuedRecipient) =>
+      sendOrSkip(recipient).pipe(
         Effect.match({
           onFailure: (failed) =>
             ({
@@ -329,23 +322,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         })
       );
 
-    const outcomes = yield* pipe(
-      Arr.chunksOf(batch.recipients, CONSENT_CHECKED_EVERY),
-      Effect.forEach((group) =>
-        Effect.gen(function* sendGroup() {
-          const consenting = yield* campaigns.stillConsenting(
-            message.campaignId,
-            group.map((recipient) => recipient.contactId)
-          );
-
-          return yield* pipe(
-            group,
-            Effect.forEach((recipient) => outcomeFor(recipient, consenting))
-          );
-        })
-      ),
-      Effect.map(Arr.flatten)
-    );
+    const outcomes = yield* pipe(batch.recipients, Effect.forEach(outcomeFor));
 
     yield* campaigns.recordOutcomes(message.campaignId, outcomes);
   }).pipe(asQueuedFor(message));
