@@ -11,7 +11,6 @@ import type {
 } from "@repo/domain";
 import { Effect, Redacted } from "effect";
 import { HttpApi } from "effect/http-api";
-import { SqlClient } from "effect/sql";
 
 import { signedInClient } from "./accounts.ts";
 import { APP_URL, AppFetch, TEST_ENCRYPTION_KEYS, TestApp } from "./harness.ts";
@@ -451,24 +450,23 @@ layer(TestApp, { timeout: "2 minutes" })(
             );
           }
 
-          const sql = yield* SqlClient.SqlClient;
+          const fetch = yield* AppFetch;
 
-          const consent = yield* sql<{
-            readonly status: string;
-            readonly opted_out: boolean;
-          }>`
-            select s.status, c.opted_out_at is not null as opted_out
-            from contacts c join subscriptions s on s.contact_id = c.id
-            where c.id in (${target.contactId}, ${own.contactId})
-          `;
+          for (const data of [target, own]) {
+            const token = yield* unsubscribeToken([
+              data.organizationId,
+              data.campaignId,
+              data.contactId,
+            ]);
 
-          assert.deepStrictEqual(
-            consent.map((row) => ({ ...row })),
-            [
-              { opted_out: false, status: "subscribed" },
-              { opted_out: false, status: "subscribed" },
-            ]
-          );
+            const response = yield* Effect.promise(() =>
+              fetch(`${APP_URL}/unsubscribe?token=${encodeURIComponent(token)}`)
+            );
+
+            const page = yield* Effect.promise(() => response.text());
+
+            assert.include(page, "Unsubscribe from Weekly news?");
+          }
         })
     );
 

@@ -362,4 +362,53 @@ layer(TestApp, { timeout: "2 minutes" })("Unsubscribe", (test) => {
         );
       })
   );
+
+  test.effect(
+    "stops sending to a Contact who stops marketing email partway through the batch that would reach them",
+    () =>
+      Effect.gen(function* optOutMidBatch() {
+        const owner = yield* ownOrganization;
+        const list = yield* newList(owner, "Weekly picks");
+
+        const addresses = Array.from(
+          { length: 11 },
+          (_, index) => `reader-${index}@example.com`
+        );
+
+        const first = yield* sendCampaign(owner, list.id, addresses);
+
+        const contacts = yield* owner.client.contacts.list({
+          params: owner.params,
+          query: { list: list.id },
+        });
+
+        const lastInBatch = (contacts?.contacts ?? [])
+          .toSorted((a, b) => (a.id < b.id ? -1 : 1))
+          .at(-1);
+
+        const link = first.find((email) => email.to === lastInBatch?.email);
+
+        const next = yield* startCampaign(owner, list.id, []);
+
+        const optOut = post(
+          unsubscribePath(link ?? {}).replace(
+            "/unsubscribe?",
+            "/unsubscribe/all?"
+          ),
+          FROM_PAGE
+        ).pipe(
+          Effect.asVoid,
+          Effect.provideService(AppFetch, yield* AppFetch),
+          Effect.orDie
+        );
+
+        yield* (yield* SmtpOutbox).afterNextSend(optOut);
+        yield* (yield* QueueWorker).deliverAll;
+
+        const sentTo = (yield* sentWith(next.subject)).map((email) => email.to);
+
+        assert.strictEqual(sentTo.length, 10);
+        assert.notInclude(sentTo, lastInBatch?.email);
+      })
+  );
 });
