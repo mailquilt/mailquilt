@@ -9,6 +9,7 @@ import { Context, Effect, Option, Schema } from "effect";
 import { CurrentOrganization } from "./current-organization.ts";
 import type { CurrentOrganization as CurrentOrganizationTag } from "./current-organization.ts";
 import { InvalidToken } from "./invalid-token.ts";
+import { preferencesPath } from "./preferences-link.ts";
 import { PublicUrl } from "./public-url.ts";
 import { SignedTokens } from "./signed-tokens.ts";
 
@@ -123,10 +124,21 @@ const foundFor = (target: UnsubscribeTarget) =>
     return unsubscription.value;
   });
 
+/** What the unsubscribe page shows, with the path of the Contact's preferences page. */
+export interface UnsubscribePage extends Unsubscription {
+  readonly preferencesPath: string;
+}
+
 /** What the unsubscribe page shows for a link. Changes nothing. */
 export const unsubscribePage = (token: string) =>
   Effect.gen(function* readUnsubscribePage() {
-    return yield* foundFor(yield* targetOf(token));
+    const target = yield* targetOf(token);
+    const unsubscription = yield* foundFor(target);
+
+    return {
+      ...unsubscription,
+      preferencesPath: yield* preferencesPath(target),
+    } satisfies UnsubscribePage;
   });
 
 /** Unsubscribes the link's Contact from every List its Campaign targeted. */

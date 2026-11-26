@@ -1,10 +1,11 @@
 /**
- * What every Campaign email ends with: the Contact's own unsubscribe link and
- * the Organization's postal address on one line. Sending and the dashboard's
+ * What every Campaign email ends with: the Contact's own unsubscribe and
+ * preferences links, and the Organization's postal address on one line. Sending and the dashboard's
  * preview both use these, so the preview shows the footer as it's sent.
  */
 export interface CampaignFooter {
   readonly unsubscribeUrl: string;
+  readonly preferencesUrl: string;
   /** From `postalAddressLine`, or `null` for a Campaign that started sending before Organizations had one. */
   readonly addressLine: string | null;
 }
@@ -69,7 +70,7 @@ const lastClosingBodyOutsideComments = (html: string) => {
  */
 export const withFooterHtml = (html: string, footer: CampaignFooter) => {
   const below = footer.addressLine === null ? "32px" : "0";
-  const unsubscribe = `<p style="margin:32px 0 ${below};${FOOTER_STYLE}">Don’t want these emails? <a href="${escapeHtml(footer.unsubscribeUrl)}" style="color:#52525b">Unsubscribe</a></p>`;
+  const unsubscribe = `<p style="margin:32px 0 ${below};${FOOTER_STYLE}">Don’t want these emails? <a href="${escapeHtml(footer.unsubscribeUrl)}" style="color:#52525b">Unsubscribe</a> or <a href="${escapeHtml(footer.preferencesUrl)}" style="color:#52525b">manage your preferences</a></p>`;
 
   const address =
     footer.addressLine === null
@@ -85,7 +86,7 @@ export const withFooterHtml = (html: string, footer: CampaignFooter) => {
 
 /** The Campaign's plain-text part with the same footer as `withFooterHtml`. */
 export const withFooterText = (text: string, footer: CampaignFooter) => {
-  const unsubscribe = `${text}\n\nDon’t want these emails? Unsubscribe:\n${footer.unsubscribeUrl}`;
+  const unsubscribe = `${text}\n\nDon’t want these emails? Unsubscribe:\n${footer.unsubscribeUrl}\nManage your preferences:\n${footer.preferencesUrl}`;
 
   return footer.addressLine === null
     ? unsubscribe

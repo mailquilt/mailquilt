@@ -13,7 +13,7 @@ const PUBLIC_PAGES_STYLESHEET = "public-pages.css";
 
 const APP_STYLESHEET = /^assets\/styles-[\w-]+\.css$/u;
 
-// WARNING: pages the server renders, such as unsubscribe, link the dashboard's stylesheet under this fixed name (packages/api/src/unsubscribe/pages.ts); rename both together.
+// WARNING: pages the server renders, such as unsubscribe, link the dashboard's stylesheet under this fixed name (packages/api/src/public-pages/shell.ts); rename both together.
 const publicPagesStylesheet = () =>
   ({
     configureServer: (server) => {
@@ -66,6 +66,7 @@ const config = defineConfig({
     proxy: {
       "^/api/": DEV_API_URL,
       "^/health$": DEV_API_URL,
+      "^/preferences": DEV_API_URL,
       "^/unsubscribe": DEV_API_URL,
     },
     strictPort: true,

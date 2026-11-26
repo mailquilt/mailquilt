@@ -248,6 +248,40 @@ const unsubscribeRequests = (token: string) =>
     };
   });
 
+const preferencesToken = (ids: readonly string[]) =>
+  Effect.gen(function* signPreferencesToken() {
+    const tokens = yield* SignedTokens;
+
+    return yield* tokens.sign("preferences", ids.join("."));
+  }).pipe(Effect.provide(signedTokensLayer(TEST_ENCRYPTION_KEYS)));
+
+const preferencesRequests = (token: string, listId: string) =>
+  Effect.gen(function* everyPreferencesRequest() {
+    const fetch = yield* AppFetch;
+    const query = `?token=${encodeURIComponent(token)}`;
+
+    const form = {
+      body: `list=${encodeURIComponent(listId)}`,
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      method: "POST",
+      redirect: "manual",
+    } as const;
+
+    const responses = yield* Effect.promise(() =>
+      Promise.all([
+        fetch(`${APP_URL}/preferences${query}`),
+        fetch(`${APP_URL}/preferences/unsubscribe${query}`, form),
+        fetch(`${APP_URL}/preferences/subscribe${query}`, form),
+        fetch(`${APP_URL}/preferences/all${query}`, form),
+      ])
+    );
+
+    return {
+      page: yield* Effect.promise(() => responses[0]?.text() ?? ""),
+      statuses: responses.map((response) => response.status),
+    };
+  });
+
 const tenantEndpointsInContract = () => {
   const endpoints: string[] = [];
 
@@ -484,6 +518,58 @@ layer(TestApp, { timeout: "2 minutes" })(
 
             assert.include(page, "Unsubscribe from Weekly news?");
           }
+        })
+    );
+
+    test.effect(
+      "never shows or changes a Contact's preferences through a link that mixes in another Organization's IDs",
+      () =>
+        Effect.gen(function* foreignPreferences() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+
+          for (const ids of [
+            [own.organizationId, target.contactId],
+            [target.organizationId, own.contactId],
+          ]) {
+            const token = yield* preferencesToken(ids);
+
+            const { page, statuses } = yield* preferencesRequests(
+              token,
+              target.listId
+            );
+
+            assert.deepStrictEqual(
+              statuses,
+              [404, 404, 404, 404],
+              ids.join(".")
+            );
+            assert.notInclude(page, target.contactEmail);
+            assert.notInclude(page, own.contactEmail);
+          }
+
+          const fetch = yield* AppFetch;
+
+          const targetToken = yield* preferencesToken([
+            target.organizationId,
+            target.contactId,
+          ]);
+
+          const response = yield* Effect.promise(() =>
+            fetch(
+              `${APP_URL}/preferences?token=${encodeURIComponent(targetToken)}`
+            )
+          );
+
+          const page = (yield* Effect.promise(() =>
+            response.text()
+          )).replaceAll("<wbr/>", "");
+
+          assert.include(page, target.contactEmail);
+          assert.include(page, "Weekly news");
+          assert.include(page, "You get these");
         })
     );
 

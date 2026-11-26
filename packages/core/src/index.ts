@@ -72,7 +72,21 @@ export {
   Unsubscribes,
 } from "./unsubscribe.ts";
 
-export type { Unsubscription } from "./unsubscribe.ts";
+export type { UnsubscribePage, Unsubscription } from "./unsubscribe.ts";
+
+export {
+  preferencesPage,
+  Preferences,
+  stopAllFromPreferences,
+  subscribeToList,
+  unsubscribeFromList,
+} from "./preferences.ts";
+
+export type { ContactPreferences, PreferenceList } from "./preferences.ts";
+
+export { preferencesPath, preferencesUrl } from "./preferences-link.ts";
+
+export type { PreferencesTarget } from "./preferences-link.ts";
 
 export { SignedTokens, signedTokensLayer } from "./signed-tokens.ts";
 

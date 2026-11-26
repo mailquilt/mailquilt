@@ -54,7 +54,7 @@ A control marked **planned** isn't built yet and names the issue that builds it.
 ### Authorization and tenant isolation
 
 - Every endpoint declares the role it needs (planned, #34). Until then, every member of an Organization can do everything in it.
-- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). The exception is unsubscribe, which a recipient uses without a session: its signed token is the only credential, and it changes only the named Contact's Subscriptions to that Campaign's Lists and their Opt-out (ADR 0016).
+- Every endpoint for one Organization's data names it in the path and checks the caller's membership on every request. A non-member gets the same 404 as for an Organization that doesn't exist ([ADR 0007](adr/0007-tenant-endpoints-name-the-organization-in-the-path.md)). The exceptions are unsubscribe and preferences, which a recipient uses without a session: the signed token is the only credential. An unsubscribe link changes only the named Contact's Subscriptions to that Campaign's Lists and their Opt-out; a preferences link changes only that Contact's existing Subscriptions and their Opt-out, and can lift it (ADR 0016).
 - Every repository method for tenant data requires the Organization from the request context.
 - A CI test suite attempts cross-Organization reads and writes, and fails when an endpoint for one Organization's data has no case in it.
 - A write that uses the session cookie is refused when its `Origin` is another site.
@@ -83,8 +83,8 @@ Backends are listed in [architecture.md](architecture.md#deployment-targets).
 
 ### Public endpoints
 
-- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe links use it now (#12); preference, tracking and bounce (VERP) tokens will (#13, #21, #23).
-- **Unsubscribe pages** send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and a Content Security Policy that loads nothing from elsewhere, because the token is in the address. They escape every value they show.
+- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe and preferences links use it now (#12, #13); tracking and bounce (VERP) tokens will (#21, #23).
+- **Unsubscribe and preferences pages** send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and a Content Security Policy that loads nothing from elsewhere, because the token is in the address. They escape every value they show.
 
 Planned, with the features they protect.
 

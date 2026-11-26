@@ -1,20 +1,13 @@
-import { createHash } from "node:crypto";
-
 import { assert, describe, it } from "@effect/vitest";
 
-import {
-  confirmPage,
-  stoppedAllPage,
-  THEME_SCRIPT,
-  THEME_SCRIPT_HASH,
-  unsubscribedPage,
-} from "./pages.ts";
+import { confirmPage, stoppedAllPage, unsubscribedPage } from "./pages.ts";
 
 const HOSTILE = {
   email: `"><img src=x onerror=alert(1)>@example.com`,
   listNames: ["<script>alert(1)</script>", "Tom & Jerry's"],
   optedOut: false,
   organizationName: `Acme </title><script>alert(1)</script>`,
+  preferencesPath: "/preferences?token=t",
   subscribed: true,
 };
 
@@ -52,13 +45,6 @@ describe("unsubscribe pages", () => {
     assert.include(
       confirmPage(HOSTILE, "/unsubscribe?token=t"),
       "&lt;script&gt;alert(1)&lt;/script&gt; and Tom &amp; Jerry&#x27;s"
-    );
-  });
-
-  it("allows its theme script by the script's own hash, so the policy blocks any other", () => {
-    assert.strictEqual(
-      THEME_SCRIPT_HASH,
-      `sha256-${createHash("sha256").update(THEME_SCRIPT).digest("base64")}`
     );
   });
 });

@@ -8,6 +8,8 @@ import {
 
 const URL = "https://mail.acme.example/unsubscribe?token=1.abc.def";
 
+const PREFERENCES = "https://mail.acme.example/preferences?token=1.ghi.jkl";
+
 describe("a Campaign email's footer", () => {
   it("puts the name and each line of the postal address on one line, leaving out blank lines", () => {
     assert.strictEqual(
@@ -30,6 +32,7 @@ describe("a Campaign email's footer", () => {
     (character, escaped) => {
       const html = withFooterHtml("<p>Hi</p>", {
         addressLine: `Acme${character}`,
+        preferencesUrl: PREFERENCES,
         unsubscribeUrl: URL,
       });
 
@@ -37,32 +40,34 @@ describe("a Campaign email's footer", () => {
     }
   );
 
-  it("ends the HTML inside its body, with the unsubscribe link and then the address", () => {
+  it("ends the HTML inside its body, with the unsubscribe and preferences links and then the address", () => {
     const html = withFooterHtml("<html><body><p>Hi</p></body></html>", {
       addressLine: "Acme, 14 Mill Lane",
+      preferencesUrl: PREFERENCES,
       unsubscribeUrl: URL,
     });
 
     assert.match(
       html,
-      /<p>Hi<\/p><p [^>]+>Don’t want these emails\? <a href="https:\/\/mail\.acme\.example\/unsubscribe\?token=1\.abc\.def" [^>]+>Unsubscribe<\/a><\/p><p [^>]+>Acme, 14 Mill Lane<\/p><\/body><\/html>$/u
+      /<p>Hi<\/p><p [^>]+>Don’t want these emails\? <a href="https:\/\/mail\.acme\.example\/unsubscribe\?token=1\.abc\.def" [^>]+>Unsubscribe<\/a> or <a href="https:\/\/mail\.acme\.example\/preferences\?token=1\.ghi\.jkl" [^>]+>manage your preferences<\/a><\/p><p [^>]+>Acme, 14 Mill Lane<\/p><\/body><\/html>$/u
     );
   });
 
-  it("ends the plain text with the unsubscribe link and then the address", () => {
+  it("ends the plain text with the unsubscribe and preferences links and then the address", () => {
     assert.strictEqual(
       withFooterText("Hi", {
         addressLine: "Acme, 14 Mill Lane",
+        preferencesUrl: PREFERENCES,
         unsubscribeUrl: URL,
       }),
-      `Hi\n\nDon’t want these emails? Unsubscribe:\n${URL}\n\nAcme, 14 Mill Lane`
+      `Hi\n\nDon’t want these emails? Unsubscribe:\n${URL}\nManage your preferences:\n${PREFERENCES}\n\nAcme, 14 Mill Lane`
     );
   });
 
   it("ends the HTML inside its real body, never inside a comment that mentions one", () => {
     const html = withFooterHtml(
       "<html><body><p>Hi</p></body></html><!-- old template </body> -->",
-      { addressLine: "Acme", unsubscribeUrl: URL }
+      { addressLine: "Acme", preferencesUrl: PREFERENCES, unsubscribeUrl: URL }
     );
 
     assert.match(

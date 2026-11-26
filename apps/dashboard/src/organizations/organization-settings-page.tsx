@@ -28,7 +28,8 @@ const FooterAsTyped = ({
     </figcaption>
     <div className="flex flex-col items-center gap-1.5 rounded-xl bg-kumo-recessed px-4 py-5 text-center text-sm text-pretty break-words text-kumo-subtle">
       <p>
-        Don’t want these emails? <span className="underline">Unsubscribe</span>
+        Don’t want these emails? <span className="underline">Unsubscribe</span>{" "}
+        or <span className="underline">manage your preferences</span>
       </p>
       {postalAddress.trim() === "" ? (
         <p className="rounded-md border border-dashed border-(--mq-logo-slot) px-2.5 py-0.5">

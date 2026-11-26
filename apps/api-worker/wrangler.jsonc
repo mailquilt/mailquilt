@@ -10,7 +10,14 @@
   "assets": {
     "directory": "../dashboard/dist/client",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/health", "/api/*", "/unsubscribe", "/unsubscribe/*"],
+    "run_worker_first": [
+      "/health",
+      "/api/*",
+      "/preferences",
+      "/preferences/*",
+      "/unsubscribe",
+      "/unsubscribe/*",
+    ],
   },
   // A Campaign's batches. Create the queue once with `wrangler queues create
   // mailquilt`. Each delivery is one batch of up to 100 emails, so it has a
