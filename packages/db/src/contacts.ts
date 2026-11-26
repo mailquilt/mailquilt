@@ -7,13 +7,13 @@ import {
   ContactPage,
   newContactId,
   newSubscriptionId,
-  PAGE_SIZE,
 } from "@repo/domain";
-import { and, asc, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
 
 import { Database } from "./database.ts";
+import { newestFirstPage } from "./newest-first-page.ts";
 import { requireLists } from "./require-lists.ts";
 import { contacts, subscriptions } from "./schema.ts";
 
@@ -121,41 +121,6 @@ export const ContactsLive = Layer.effect(
               })
             );
 
-    const newestFirstPageAroundCursor = (
-      organization: OrganizationId,
-      filter: ContactFilter
-    ) => {
-      const where = contactsMatching(organization, filter);
-
-      if (filter.before !== undefined) {
-        return db
-          .select(contactColumns)
-          .from(contacts)
-          .where(and(where, gt(contacts.id, filter.before)))
-          .orderBy(asc(contacts.id))
-          .limit(PAGE_SIZE)
-          .pipe(
-            Effect.orDie,
-            Effect.map((rows) => rows.toReversed())
-          );
-      }
-
-      return db
-        .select(contactColumns)
-        .from(contacts)
-        .where(
-          and(
-            where,
-            filter.after === undefined
-              ? undefined
-              : lt(contacts.id, filter.after)
-          )
-        )
-        .orderBy(desc(contacts.id))
-        .limit(PAGE_SIZE)
-        .pipe(Effect.orDie);
-    };
-
     return {
       create: (email, listIds) =>
         Effect.gen(function* createContact() {
@@ -228,34 +193,20 @@ export const ContactsLive = Layer.effect(
                   yield* requireLists(db, organization, [filter.list]);
                 }
 
-                const inWindow = yield* newestFirstPageAroundCursor(
-                  organization,
-                  filter
-                );
-
-                const { after, before, ...matching } = filter;
-
-                const cursorPassedEveryMatch =
-                  inWindow.length === 0 &&
-                  (after !== undefined || before !== undefined);
-
-                const items = cursorPassedEveryMatch
-                  ? yield* newestFirstPageAroundCursor(organization, matching)
-                  : inWindow;
-
-                const first = items[0]?.id ?? "";
-
-                const [counted] = yield* db
-                  .select({
-                    start: sql<number>`(count(*) filter (where ${contacts.id} > ${first}))::int`,
-                    total: sql<number>`count(*)::int`,
-                  })
-                  .from(contacts)
-                  .where(contactsMatching(organization, filter))
-                  .pipe(Effect.orDie);
-
-                const start = counted?.start ?? 0;
-                const total = counted?.total ?? 0;
+                const { items, next, previous, start, total } =
+                  yield* newestFirstPage(db, {
+                    cursor: filter,
+                    id: contacts.id,
+                    matching: contactsMatching(organization, filter),
+                    rows: (where, order, limit) =>
+                      db
+                        .select(contactColumns)
+                        .from(contacts)
+                        .where(where)
+                        .orderBy(order)
+                        .limit(limit),
+                    table: contacts,
+                  });
 
                 const subscriptionsByContact = yield* subscriptionsOf(
                   organization,
@@ -266,11 +217,8 @@ export const ContactsLive = Layer.effect(
                   contacts: items.map((item) =>
                     toContact(item, subscriptionsByContact.get(item.id) ?? [])
                   ),
-                  next:
-                    start + items.length < total
-                      ? (items.at(-1)?.id ?? null)
-                      : null,
-                  previous: start > 0 ? (items[0]?.id ?? null) : null,
+                  next,
+                  previous,
                   start,
                   total,
                 }).pipe(Effect.orDie);

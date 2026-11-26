@@ -1,4 +1,4 @@
-import type { CampaignFilter, RecipientOutcome } from "@repo/core";
+import type { RecipientOutcome } from "@repo/core";
 import { Campaigns, currentOrganizationId } from "@repo/core";
 import type {
   CampaignDraft,
@@ -14,16 +14,16 @@ import {
   ContactIdSchema,
   newCampaignId,
   NoSubscribedContacts,
-  PAGE_SIZE,
   ProviderConnectionIdSchema,
   ProviderConnectionNotFound,
 } from "@repo/domain";
-import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { SecureRandom } from "effect/crypto";
 
 import { Database } from "./database.ts";
+import { newestFirstPage } from "./newest-first-page.ts";
 import { requireLists } from "./require-lists.ts";
 import {
   campaignRecipients,
@@ -183,41 +183,6 @@ export const CampaignsLive = Layer.effect(
           )
         );
 
-    const newestFirstPageAroundCursor = (
-      organization: OrganizationId,
-      filter: CampaignFilter
-    ) => {
-      const where = eq(campaigns.organizationId, organization);
-
-      if (filter.before !== undefined) {
-        return db
-          .select(summaryColumns)
-          .from(campaigns)
-          .where(and(where, gt(campaigns.id, filter.before)))
-          .orderBy(asc(campaigns.id))
-          .limit(PAGE_SIZE)
-          .pipe(
-            Effect.orDie,
-            Effect.map((rows) => rows.toReversed())
-          );
-      }
-
-      return db
-        .select(summaryColumns)
-        .from(campaigns)
-        .where(
-          and(
-            where,
-            filter.after === undefined
-              ? undefined
-              : lt(campaigns.id, filter.after)
-          )
-        )
-        .orderBy(desc(campaigns.id))
-        .limit(PAGE_SIZE)
-        .pipe(Effect.orDie);
-    };
-
     return {
       create: (draft) =>
         Effect.gen(function* createCampaign() {
@@ -260,42 +225,23 @@ export const CampaignsLive = Layer.effect(
               Effect.gen(function* campaignPage() {
                 const organization = yield* currentOrganizationId;
 
-                const inWindow = yield* newestFirstPageAroundCursor(
-                  organization,
-                  filter
-                );
-
-                const cursorPassedEveryCampaign =
-                  inWindow.length === 0 &&
-                  (filter.after !== undefined || filter.before !== undefined);
-
-                const items = cursorPassedEveryCampaign
-                  ? yield* newestFirstPageAroundCursor(organization, {})
-                  : inWindow;
-
-                const first = items[0]?.id ?? "";
-
-                const [counted] = yield* db
-                  .select({
-                    start: sql<number>`(count(*) filter (where ${campaigns.id} > ${first}))::int`,
-                    total: sql<number>`count(*)::int`,
-                  })
-                  .from(campaigns)
-                  .where(eq(campaigns.organizationId, organization))
-                  .pipe(Effect.orDie);
-
-                const start = counted?.start ?? 0;
-                const total = counted?.total ?? 0;
+                const { items, ...page } = yield* newestFirstPage(db, {
+                  cursor: filter,
+                  id: campaigns.id,
+                  matching: eq(campaigns.organizationId, organization),
+                  rows: (where, order, limit) =>
+                    db
+                      .select(summaryColumns)
+                      .from(campaigns)
+                      .where(where)
+                      .orderBy(order)
+                      .limit(limit),
+                  table: campaigns,
+                });
 
                 return yield* decodePage({
+                  ...page,
                   campaigns: items.map(toSummary),
-                  next:
-                    start + items.length < total
-                      ? (items.at(-1)?.id ?? null)
-                      : null,
-                  previous: start > 0 ? (items[0]?.id ?? null) : null,
-                  start,
-                  total,
                 }).pipe(Effect.orDie);
               }),
             { accessMode: "read only", isolationLevel: "repeatable read" }
