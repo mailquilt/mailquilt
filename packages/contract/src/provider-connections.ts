@@ -33,8 +33,10 @@ const connectionParams = {
  * credentials when it leaves them out, and removes them when they are
  * `null`; a change of host, port or encryption needs them entered again
  * (`CredentialsRequired`), so saved credentials only ever go to the server
- * they were entered for. `emailsPerMinute` is the most emails a minute a
- * connection sends, across every Campaign sending through it; `create`
+ * they were entered for. `emailsPerMinute` is the rate a connection sends
+ * at, across every Campaign sending through it: each email waits one
+ * interval after the last, except that after a stall a few can leave close
+ * together (ADR 0018); `create`
  * without it, or with `null`, sets none, and `update` without it keeps the
  * one saved. `sendTestEmail` sends a short email through a
  * connection, at most 10 every 10 minutes per person; when the Provider
