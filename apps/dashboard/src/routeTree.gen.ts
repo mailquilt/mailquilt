@@ -24,6 +24,9 @@ import { Route as AuthSignInRouteImport } from './routes/_auth/sign-in'
 import { Route as AuthSignUpRouteImport } from './routes/_auth/sign-up'
 import { Route as AppCampaignsIndexRouteImport } from './routes/_app/campaigns/index'
 import { Route as AppCampaignsNewRouteImport } from './routes/_app/campaigns/new'
+import { Route as AppDomainsIndexRouteImport } from './routes/_app/domains/index'
+import { Route as AppDomainsSendingDomainIdRouteImport } from './routes/_app/domains/$sendingDomainId'
+import { Route as AppDomainsNewRouteImport } from './routes/_app/domains/new'
 import { Route as AppProvidersIndexRouteImport } from './routes/_app/providers/index'
 import { Route as AppProvidersNewRouteImport } from './routes/_app/providers/new'
 import { Route as AppCampaignsCampaignIdIndexRouteImport } from './routes/_app/campaigns/$campaignId/index'
@@ -104,6 +107,22 @@ const AppCampaignsNewRoute = AppCampaignsNewRouteImport.update({
   path: '/campaigns/new',
   getParentRoute: () => AppRoute,
 } as any)
+const AppDomainsIndexRoute = AppDomainsIndexRouteImport.update({
+  id: '/domains/',
+  path: '/domains/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDomainsSendingDomainIdRoute =
+  AppDomainsSendingDomainIdRouteImport.update({
+    id: '/domains/$sendingDomainId',
+    path: '/domains/$sendingDomainId',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppDomainsNewRoute = AppDomainsNewRouteImport.update({
+  id: '/domains/new',
+  path: '/domains/new',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProvidersIndexRoute = AppProvidersIndexRouteImport.update({
   id: '/providers/',
   path: '/providers/',
@@ -152,8 +171,11 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/campaigns/new': typeof AppCampaignsNewRoute
+  '/domains/$sendingDomainId': typeof AppDomainsSendingDomainIdRoute
+  '/domains/new': typeof AppDomainsNewRoute
   '/providers/new': typeof AppProvidersNewRoute
   '/campaigns/': typeof AppCampaignsIndexRoute
+  '/domains/': typeof AppDomainsIndexRoute
   '/providers/': typeof AppProvidersIndexRoute
   '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/providers/$providerConnectionId/bounces': typeof AppProvidersProviderConnectionIdBouncesRoute
@@ -173,8 +195,11 @@ export interface FileRoutesByTo {
   '/sign-in': typeof AuthSignInRoute
   '/sign-up': typeof AuthSignUpRoute
   '/campaigns/new': typeof AppCampaignsNewRoute
+  '/domains/$sendingDomainId': typeof AppDomainsSendingDomainIdRoute
+  '/domains/new': typeof AppDomainsNewRoute
   '/providers/new': typeof AppProvidersNewRoute
   '/campaigns': typeof AppCampaignsIndexRoute
+  '/domains': typeof AppDomainsIndexRoute
   '/providers': typeof AppProvidersIndexRoute
   '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/providers/$providerConnectionId/bounces': typeof AppProvidersProviderConnectionIdBouncesRoute
@@ -197,8 +222,11 @@ export interface FileRoutesById {
   '/_auth/sign-up': typeof AuthSignUpRoute
   '/_app/': typeof AppIndexRoute
   '/_app/campaigns/new': typeof AppCampaignsNewRoute
+  '/_app/domains/$sendingDomainId': typeof AppDomainsSendingDomainIdRoute
+  '/_app/domains/new': typeof AppDomainsNewRoute
   '/_app/providers/new': typeof AppProvidersNewRoute
   '/_app/campaigns/': typeof AppCampaignsIndexRoute
+  '/_app/domains/': typeof AppDomainsIndexRoute
   '/_app/providers/': typeof AppProvidersIndexRoute
   '/_app/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
   '/_app/providers/$providerConnectionId/bounces': typeof AppProvidersProviderConnectionIdBouncesRoute
@@ -220,8 +248,11 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/campaigns/new'
+    | '/domains/$sendingDomainId'
+    | '/domains/new'
     | '/providers/new'
     | '/campaigns/'
+    | '/domains/'
     | '/providers/'
     | '/campaigns/$campaignId/edit'
     | '/providers/$providerConnectionId/bounces'
@@ -241,8 +272,11 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/sign-up'
     | '/campaigns/new'
+    | '/domains/$sendingDomainId'
+    | '/domains/new'
     | '/providers/new'
     | '/campaigns'
+    | '/domains'
     | '/providers'
     | '/campaigns/$campaignId/edit'
     | '/providers/$providerConnectionId/bounces'
@@ -264,8 +298,11 @@ export interface FileRouteTypes {
     | '/_auth/sign-up'
     | '/_app/'
     | '/_app/campaigns/new'
+    | '/_app/domains/$sendingDomainId'
+    | '/_app/domains/new'
     | '/_app/providers/new'
     | '/_app/campaigns/'
+    | '/_app/domains/'
     | '/_app/providers/'
     | '/_app/campaigns/$campaignId/edit'
     | '/_app/providers/$providerConnectionId/bounces'
@@ -385,6 +422,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCampaignsNewRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/domains/': {
+      id: '/_app/domains/'
+      path: '/domains'
+      fullPath: '/domains/'
+      preLoaderRoute: typeof AppDomainsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/domains/$sendingDomainId': {
+      id: '/_app/domains/$sendingDomainId'
+      path: '/domains/$sendingDomainId'
+      fullPath: '/domains/$sendingDomainId'
+      preLoaderRoute: typeof AppDomainsSendingDomainIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/domains/new': {
+      id: '/_app/domains/new'
+      path: '/domains/new'
+      fullPath: '/domains/new'
+      preLoaderRoute: typeof AppDomainsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/providers/': {
       id: '/_app/providers/'
       path: '/providers'
@@ -438,8 +496,11 @@ interface AppRouteChildren {
   AppSuppressionsRoute: typeof AppSuppressionsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCampaignsNewRoute: typeof AppCampaignsNewRoute
+  AppDomainsSendingDomainIdRoute: typeof AppDomainsSendingDomainIdRoute
+  AppDomainsNewRoute: typeof AppDomainsNewRoute
   AppProvidersNewRoute: typeof AppProvidersNewRoute
   AppCampaignsIndexRoute: typeof AppCampaignsIndexRoute
+  AppDomainsIndexRoute: typeof AppDomainsIndexRoute
   AppProvidersIndexRoute: typeof AppProvidersIndexRoute
   AppCampaignsCampaignIdEditRoute: typeof AppCampaignsCampaignIdEditRoute
   AppProvidersProviderConnectionIdBouncesRoute: typeof AppProvidersProviderConnectionIdBouncesRoute
@@ -455,8 +516,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppSuppressionsRoute: AppSuppressionsRoute,
   AppIndexRoute: AppIndexRoute,
   AppCampaignsNewRoute: AppCampaignsNewRoute,
+  AppDomainsSendingDomainIdRoute: AppDomainsSendingDomainIdRoute,
+  AppDomainsNewRoute: AppDomainsNewRoute,
   AppProvidersNewRoute: AppProvidersNewRoute,
   AppCampaignsIndexRoute: AppCampaignsIndexRoute,
+  AppDomainsIndexRoute: AppDomainsIndexRoute,
   AppProvidersIndexRoute: AppProvidersIndexRoute,
   AppCampaignsCampaignIdEditRoute: AppCampaignsCampaignIdEditRoute,
   AppProvidersProviderConnectionIdBouncesRoute:

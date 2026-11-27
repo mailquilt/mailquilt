@@ -1,9 +1,5 @@
 import { Banner } from "@cloudflare/kumo";
-import {
-  DnsLookupFailed,
-  SendingDomainNotReady,
-  SendingDomainRequired,
-} from "@repo/domain";
+import { DnsLookupFailed } from "@repo/domain";
 import type { Campaign, List, Organization } from "@repo/domain";
 import { Predicate } from "effect";
 import { useId } from "react";
@@ -18,6 +14,8 @@ export type SendRefusal =
   | "address"
   | "already"
   | "connection"
+  | "domain"
+  | "domain-held"
   | "gone"
   | "nobody";
 
@@ -39,28 +37,27 @@ export const refusalOf = (failure: Error) => {
     return "address" satisfies SendRefusal;
   }
 
+  if (Predicate.isTagged(failure, "SendingDomainRequired")) {
+    return "domain" satisfies SendRefusal;
+  }
+
+  if (Predicate.isTagged(failure, "SendingDomainNotReady")) {
+    return "domain-held" satisfies SendRefusal;
+  }
+
   if (Predicate.isTagged(failure, "CampaignNotFound")) {
     return "gone" satisfies SendRefusal;
   }
 };
 
 /**
- * Why a Campaign's From address's domain stopped it being sent or
- * scheduled, in words ending with `outcome`, if that's why the API refused.
+ * Why a Campaign's Sending Domain couldn't be checked before it was sent or
+ * scheduled, in words ending with `outcome`, if that's why it failed.
  */
-export const sendingDomainProblemOf = (failure: Error, outcome: string) => {
-  if (failure instanceof SendingDomainRequired) {
-    return `${failure.domain} isn’t a sending domain yet, and a campaign is sent only from a domain whose DNS records have been checked. ${outcome}`;
-  }
-
-  if (failure instanceof SendingDomainNotReady) {
-    return `${failure.domain} failed its DKIM or DMARC check just now, so Gmail and Yahoo would reject this campaign. Fix its DNS records, then try again. ${outcome}`;
-  }
-
-  if (failure instanceof DnsLookupFailed) {
-    return `Mailquilt couldn’t check this campaign’s sending domain, because looking up ${failure.name} failed: ${failure.detail} Try again in a moment. ${outcome}`;
-  }
-};
+export const dnsProblemOf = (failure: Error, outcome: string) =>
+  failure instanceof DnsLookupFailed
+    ? `Mailquilt couldn’t check its sending domain, because looking up ${failure.name} failed: ${failure.detail} Try again in a moment. ${outcome}`
+    : undefined;
 
 const problemOf = (failure: Error) => {
   if (Predicate.isTagged(failure, "SignInRequired")) {
@@ -68,7 +65,7 @@ const problemOf = (failure: Error) => {
   }
 
   return (
-    sendingDomainProblemOf(failure, "It hasn’t been sent.") ??
+    dnsProblemOf(failure, "It hasn’t been sent.") ??
     "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be sent twice."
   );
 };

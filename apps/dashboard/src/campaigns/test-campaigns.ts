@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
 
+import { ACME_DOMAIN } from "../domains/test-domains.ts";
 import { ACME } from "../organizations/test-organizations.tsx";
 
 /** Shared answers for the Campaign tests, shaped as the API sends them. */
@@ -68,13 +69,15 @@ export const SENT = {
   status: "sent",
 };
 
-/** The Organization, its one connection, its one List, and how many a Campaign to its Lists reaches. */
+/** The Organization, its one connection, its one Sending Domain, its one List, and how many a Campaign to its Lists reaches. */
 export const ready = ({
   connections = [POSTMARK],
+  domains = [ACME_DOMAIN],
   lists = [ROAST],
   recipients = 3,
 }: {
   connections?: readonly object[];
+  domains?: readonly object[];
   lists?: readonly object[];
   recipients?: number;
 } = {}) => [
@@ -82,6 +85,7 @@ export const ready = ({
   http.get(`${ORGANIZATION}/provider-connections`, () =>
     HttpResponse.json(connections)
   ),
+  http.get(`${ORGANIZATION}/sending-domains`, () => HttpResponse.json(domains)),
   http.get(`${ORGANIZATION}/lists`, () => HttpResponse.json(lists)),
   http.get(RECIPIENT_COUNT, () => HttpResponse.json({ recipients })),
 ];

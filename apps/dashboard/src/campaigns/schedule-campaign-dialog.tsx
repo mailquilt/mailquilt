@@ -31,7 +31,7 @@ import {
   zonesOn,
 } from "./schedule-time.ts";
 import type { Zone } from "./schedule-time.ts";
-import { refusalOf, sendingDomainProblemOf } from "./send-campaign-dialog.tsx";
+import { dnsProblemOf, refusalOf } from "./send-campaign-dialog.tsx";
 import type { SendRefusal } from "./send-campaign-dialog.tsx";
 
 const TEXT_SAFARI_WONT_ZOOM_INTO = "max-sm:text-lg pointer-coarse:text-lg";
@@ -112,7 +112,7 @@ const problemOf = (failure: Error, moving: boolean) => {
   }
 
   return (
-    sendingDomainProblemOf(failure, outcome) ??
+    dnsProblemOf(failure, outcome) ??
     "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be scheduled twice."
   );
 };

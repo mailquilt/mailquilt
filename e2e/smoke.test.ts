@@ -63,18 +63,11 @@ const connectMailpit = async (page: Page) => {
 
 // WARNING: acme.example has no real DNS; its records come from DEV_DNS_RECORDS in e2e/smoke.env, which the selector must match.
 const addSendingDomain = async (page: Page) => {
-  const organizations = await page.request.get("/api/organizations");
-  const [organization] = await organizations.json();
-
-  const added = await page.request.post(
-    `/api/organizations/${organization?.id}/sending-domains`,
-    {
-      data: { dkimSelectors: ["mailquilt"], domain: "acme.example" },
-      headers: { origin: new URL(page.url()).origin },
-    }
-  );
-
-  expect(added.status()).toBe(201);
+  await page.goto("/domains/new");
+  await page.getByRole("textbox", { exact: true, name: "Domain" }).fill("acme.example");
+  await page.getByLabel("Selector 1").fill("mailquilt");
+  await page.getByRole("button", { name: "Add domain" }).click();
+  await expect(page.getByText("Ready", { exact: true })).toBeVisible();
 };
 
 const addContact = async (page: Page, email: string) => {

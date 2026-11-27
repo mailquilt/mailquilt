@@ -1,11 +1,13 @@
 import { LinkButton } from "@cloudflare/kumo";
 import { OrganizationIdSchema } from "@repo/domain";
+import type { SendingDomain } from "@repo/domain";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
 import { StepBlock, StepSeam } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
+import { useSendingDomains } from "../domains/domains-api.ts";
 import { PlusIcon } from "../icons/icons.tsx";
 import { LoadFailed } from "../layout/empty-state.tsx";
 import { CreateOrganizationForm } from "../organizations/create-organization-form.tsx";
@@ -39,11 +41,12 @@ const SETUP_STEPS: readonly SetupStep[] = [
     youllNeed: "your SMTP server’s host, port and sign-in, from your provider.",
   },
   {
-    about: "So inboxes trust that your email really comes from you.",
-    built: false,
+    about:
+      "Gmail and Yahoo reject email from a domain whose DKIM and DMARC records don’t pass, so Campaigns are sent only from one that does.",
+    built: true,
     title: "Verify your sending domain",
     youllNeed:
-      "access to your domain’s DNS, to add the records Mailquilt shows you.",
+      "the DKIM selectors your provider gave you, and access to your domain’s DNS.",
   },
   {
     about: "Bring your audience over from the tool you use today.",
@@ -121,6 +124,53 @@ const ProviderConnected = ({ name }: { name: string }) => (
   </p>
 );
 
+const DomainReady = ({ domain }: { domain: string }) => (
+  <p className="mt-1 text-base text-kumo-default">
+    <span className="font-medium text-kumo-strong">{domain}</span> is ready to
+    send from.{" "}
+    <Link className={INLINE_LINK} to="/domains">
+      Manage it in Domains
+    </Link>
+  </p>
+);
+
+const DomainDone = ({
+  readyDomain,
+  state,
+}: {
+  readyDomain?: string;
+  state: StepState;
+}) =>
+  state === "done" && readyDomain !== undefined ? (
+    <DomainReady domain={readyDomain} />
+  ) : null;
+
+const DomainAction = ({ unready }: { unready?: SendingDomain }) =>
+  unready === undefined ? (
+    <LinkButton
+      className="mt-3.5 w-fit"
+      href="/domains/new"
+      icon={PlusIcon}
+      variant="primary"
+    >
+      Add your domain
+    </LinkButton>
+  ) : (
+    <>
+      <p className="max-w-[36rem] text-base text-pretty text-kumo-default">
+        <span className="font-medium text-kumo-strong">{unready.domain}</span>{" "}
+        is added, and needs its DNS records to pass.
+      </p>
+      <LinkButton
+        className="mt-3.5 w-fit"
+        href={`/domains/${unready.id}`}
+        variant="primary"
+      >
+        See its DNS records
+      </LinkButton>
+    </>
+  );
+
 const YoullNeed = ({ children }: { children: string }) => (
   <p className="max-w-[36rem] text-base text-pretty text-kumo-subtle">
     <span className="font-semibold text-kumo-default">You’ll need</span>{" "}
@@ -184,10 +234,14 @@ const StepRow = ({
   connectedProvider,
   index,
   last,
+  readyDomain,
   state,
   step,
+  unreadyDomain,
 }: {
   connectedProvider?: string;
+  readyDomain?: string;
+  unreadyDomain?: SendingDomain;
   index: number;
   last: boolean;
   state: StepState;
@@ -223,7 +277,12 @@ const StepRow = ({
         {index === 1 && state === "done" && connectedProvider !== undefined ? (
           <ProviderConnected name={connectedProvider} />
         ) : null}
-        {step.youllNeed && (state === "later" || state === "next") ? (
+        {index === 2 ? (
+          <DomainDone readyDomain={readyDomain} state={state} />
+        ) : null}
+        {step.youllNeed &&
+        (state === "later" ||
+          (state === "next" && unreadyDomain === undefined)) ? (
           <div className={state === "later" ? "mt-1" : undefined}>
             <YoullNeed>{step.youllNeed}</YoullNeed>
           </div>
@@ -238,6 +297,9 @@ const StepRow = ({
             Connect SMTP server
           </LinkButton>
         ) : null}
+        {index === 2 && state === "next" ? (
+          <DomainAction unready={unreadyDomain} />
+        ) : null}
         {state === "waiting" ? <NotBuiltYet /> : null}
       </div>
     </li>
@@ -249,10 +311,11 @@ const NO_ORGANIZATION = OrganizationIdSchema.make(
 );
 
 /**
- * How many setup steps are done, and the first connected provider's name, or
- * `undefined` while that isn't known yet, so Home can wait instead of drawing
- * a step as next and then as done. If the connections can't be loaded, the
- * provider step stays next; its button still leads to Providers.
+ * How many setup steps are done, the first connected provider's name, and
+ * the first Sending Domain that can send (or, while none can, the first
+ * added), or `undefined` while that isn't known yet, so Home can wait
+ * instead of drawing a step as next and then as done. If the connections or
+ * domains can't be loaded, Home says its setup didn't load.
  */
 export const useSetupProgress = () => {
   const { active } = useOrganizations();
@@ -262,36 +325,66 @@ export const useSetupProgress = () => {
     retryWhenFailed: false,
   });
 
+  const domains = useSendingDomains(active?.id ?? NO_ORGANIZATION, {
+    enabled: active !== null,
+    retryWhenFailed: false,
+  });
+
   if (!active) {
     return { doneCount: 0 };
   }
 
-  if (loadingFirstTime(connections)) {
+  if (loadingFirstTime(connections) || loadingFirstTime(domains)) {
     return;
   }
 
-  if (connections.data === undefined) {
+  if (connections.data === undefined || domains.data === undefined) {
     return {
       doneCount: 1,
       failed: {
-        retry: () => connections.refetch(),
-        retrying: connections.isFetching,
+        retry: () => {
+          for (const query of [connections, domains]) {
+            if (query.isError) {
+              query.refetch();
+            }
+          }
+        },
+        retrying: connections.isFetching || domains.isFetching,
       },
     };
   }
 
   const [first] = connections.data;
 
-  return first === undefined
-    ? { doneCount: 1 }
-    : { connectedProvider: first.name, doneCount: 2 };
+  if (first === undefined) {
+    return { doneCount: 1 };
+  }
+
+  const ready = domains.data.find((domain) => {
+    const status = domain.check?.status;
+
+    return status === "ready" || status === "warning";
+  });
+
+  return ready === undefined
+    ? {
+        connectedProvider: first.name,
+        doneCount: 2,
+        unreadyDomain: domains.data.at(0),
+      }
+    : {
+        connectedProvider: first.name,
+        doneCount: 3,
+        readyDomain: ready.domain,
+      };
 };
 
 /** The five steps from a new account to the first Campaign, in order. */
 export const SetupSteps = () => {
-  const { connectedProvider, doneCount, failed } = useSetupProgress() ?? {
-    doneCount: 1,
-  };
+  const { connectedProvider, doneCount, failed, readyDomain, unreadyDomain } =
+    useSetupProgress() ?? {
+      doneCount: 1,
+    };
 
   if (failed !== undefined) {
     return (
@@ -313,6 +406,8 @@ export const SetupSteps = () => {
       {SETUP_STEPS.map((step, index) => (
         <StepRow
           connectedProvider={connectedProvider}
+          readyDomain={readyDomain}
+          unreadyDomain={unreadyDomain}
           index={index}
           key={step.title}
           last={index === SETUP_STEPS.length - 1}

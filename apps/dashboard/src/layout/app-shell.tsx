@@ -7,6 +7,7 @@ import {
 } from "../audience/audience-api.ts";
 import { AccountMenu } from "../auth/account-menu.tsx";
 import { useCampaignPage } from "../campaigns/campaigns-api.ts";
+import { useSendingDomains } from "../domains/domains-api.ts";
 import { OrganizationSwitcher } from "../organizations/organization-switcher.tsx";
 import { OrganizationsUnavailable } from "../organizations/organizations-unavailable.tsx";
 import {
@@ -26,6 +27,7 @@ const OrganizationNavigation = ({
   const campaigns = useCampaignPage(organizationId, {});
   const contacts = useContactPage(organizationId, {});
   const lists = useLists(organizationId);
+  const domains = useSendingDomains(organizationId);
   const providers = useProviderConnections(organizationId);
   const suppressions = useSuppressionPage(organizationId, {});
 
@@ -34,6 +36,7 @@ const OrganizationNavigation = ({
       counts={{
         campaigns: campaigns.data?.total,
         contacts: contacts.data?.total,
+        domains: domains.data?.length,
         lists: lists.data?.length,
         providers: providers.data?.length,
         suppressions: suppressions.data?.total,
