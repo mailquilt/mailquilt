@@ -138,7 +138,12 @@ const statusWords = (campaign: Campaign, connectionName: string) => {
   if (campaign.status === "paused") {
     return (
       <>
-        <Strong>Paused</Strong> after sending to {sentSoFar(campaign)}. The rest
+        <Strong>Paused</Strong> after sending to {sentSoFar(campaign)}.{" "}
+        {formatCount(
+          campaign.recipients.total -
+            campaign.recipients.sent -
+            campaign.recipients.failed
+        )}{" "}
         wait until it’s resumed.
       </>
     );

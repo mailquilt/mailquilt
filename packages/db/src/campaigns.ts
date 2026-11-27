@@ -20,7 +20,7 @@ import {
   ProviderConnectionIdSchema,
   ProviderConnectionNotFound,
 } from "@repo/domain";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -328,8 +328,13 @@ export const CampaignsLive = Layer.effect(
           .where(
             and(
               inOrganization(organization, id),
-              inArray(campaigns.status, from),
-              sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} < ${campaigns.recipientsTotal}`
+              or(
+                eq(campaigns.status, to),
+                and(
+                  inArray(campaigns.status, from),
+                  sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} < ${campaigns.recipientsTotal}`
+                )
+              )
             )
           )
           .returning({ id: campaigns.id })

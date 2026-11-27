@@ -1071,6 +1071,32 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "answers a second cancel with the Campaign, also once the email in flight when it was cancelled is recorded",
+    () =>
+      Effect.gen(function* cancelAgain() {
+        const owner = yield* draftCampaign;
+        const { campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* (yield* SmtpOutbox).afterNextSend(
+          Effect.orDie(client.campaigns.cancel({ params: campaignParams }))
+        );
+        yield* (yield* QueueWorker).deliverAll;
+
+        const again = yield* client.campaigns.cancel({
+          params: campaignParams,
+        });
+
+        assert.strictEqual(again.status, "cancelled");
+        assert.deepStrictEqual(
+          { ...again.recipients },
+          { failed: 0, sent: 1, total: 1 }
+        );
+      })
+  );
+
+  test.effect(
     "cancels a Campaign partway through, and never sends the emails it hadn't sent",
     () =>
       Effect.gen(function* cancelMidSend() {
