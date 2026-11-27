@@ -23,6 +23,7 @@ import { PageAreaLoading } from "./page-states.tsx";
 type CountedPage =
   | "campaigns"
   | "contacts"
+  | "domains"
   | "lists"
   | "providers"
   | "suppressions";
@@ -82,7 +83,12 @@ const NAV: readonly {
         icon: HardDrivesIcon,
         label: "Providers",
       },
-      { icon: GlobeHemisphereWestIcon, label: "Domains" },
+      {
+        counted: "domains",
+        href: "/domains",
+        icon: GlobeHemisphereWestIcon,
+        label: "Domains",
+      },
     ],
     label: "Deliverability",
   },

@@ -21,6 +21,7 @@ import {
   vi,
 } from "vitest";
 
+import { ACME_DOMAIN_HELD } from "../domains/test-domains.ts";
 import {
   ACME,
   renderWithOrganizations,
@@ -319,18 +320,18 @@ describe("scheduling a campaign", () => {
     ).resolves.toBeDefined();
   });
 
-  it("says its time hasn’t changed when Change time fails its sending domain’s DNS check", async () => {
+  it("says its time hasn’t changed when Change time can’t check its sending domain", async () => {
     api.use(
       ...ready(),
       http.get(CAMPAIGN, () => HttpResponse.json(SCHEDULED)),
       http.put(SCHEDULE, () =>
         HttpResponse.json(
           {
-            _tag: "SendingDomainNotReady",
-            domain: "fernhill.example",
-            sendingDomainId: "sdm_01h455vb4pex5vsknk084sn02q",
+            _tag: "DnsLookupFailed",
+            detail: "The DNS lookup timed out.",
+            name: "_dmarc.acme.example",
           },
-          { status: 409 }
+          { status: 502 }
         )
       )
     );
@@ -347,7 +348,7 @@ describe("scheduling a campaign", () => {
 
     await expect(within(dialog).findByRole("alert")).resolves.toHaveProperty(
       "textContent",
-      "fernhill.example failed its DKIM or DMARC check just now, so Gmail and Yahoo would reject this campaign. Fix its DNS records, then try again. Its time hasn’t changed."
+      "Mailquilt couldn’t check its sending domain, because looking up _dmarc.acme.example failed: The DNS lookup timed out. Try again in a moment. Its time hasn’t changed."
     );
     expect(statusLine()).toContain("Scheduled for Monday, Nov 30 at 9:00");
   });
@@ -436,6 +437,23 @@ describe("scheduling a campaign", () => {
         .getAllByRole("button")
         .map((button) => button.textContent)
     ).toStrictEqual(["Cancel schedule", "Change time"]);
+  });
+
+  it("warns that a scheduled campaign held by its domain won't be sent, and links to the domain", async () => {
+    api.use(
+      ...ready({ domains: [ACME_DOMAIN_HELD] }),
+      http.get(CAMPAIGN, () => HttpResponse.json(SCHEDULED))
+    );
+    renderPage();
+
+    await expect(
+      screen.findByText(
+        "acme.example didn’t pass its DKIM or DMARC check when it was last checked. Fix its DNS records, or it goes back to being a draft at its time."
+      )
+    ).resolves.toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "acme.example" }).getAttribute("href")
+    ).toBe(`/domains/${ACME_DOMAIN_HELD.id}`);
   });
 
   it("says a campaign someone else scheduled is scheduled, not already sending", async () => {
@@ -575,9 +593,39 @@ describe("scheduling a campaign", () => {
     expect(screen.queryByRole("button", { name: "Schedule" })).toBeNull();
   });
 
-  it("says a draft missed its time because its sending domain failed its DNS check", async () => {
+  it("checks its domain's state again when a scheduled campaign comes back as a draft its domain stopped", async () => {
+    let asked = 0;
     api.use(
       ...ready(),
+      http.get(CAMPAIGN, () => {
+        asked += 1;
+
+        if (asked === 1) {
+          return HttpResponse.json(SCHEDULED);
+        }
+
+        api.use(...ready({ domains: [ACME_DOMAIN_HELD] }));
+
+        return HttpResponse.json({
+          ...DRAFT,
+          schedule: { ...NINE_IN_NEW_YORK, missed: "sending-domain-not-ready" },
+        });
+      })
+    );
+    renderPage();
+
+    await expect.poll(statusLine).toContain("Scheduled for");
+
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60 * 1000));
+
+    await expect(
+      screen.findByRole("link", { name: "See its DNS records" })
+    ).resolves.toBeDefined();
+  });
+
+  it("says a draft missed its time because its sending domain failed its DNS check, and how to fix it while it still does", async () => {
+    api.use(
+      ...ready({ domains: [ACME_DOMAIN_HELD] }),
       http.get(CAMPAIGN, () =>
         HttpResponse.json({
           ...DRAFT,
@@ -589,9 +637,12 @@ describe("scheduling a campaign", () => {
 
     await expect(
       screen.findByText(
-        "Its sending domain failed its DKIM or DMARC check then, so Gmail and Yahoo would have rejected it, and it went back to being a draft. Fix its domain’s DKIM and DMARC records, then schedule it again or send it now."
+        "Its sending domain failed its DKIM or DMARC check then, so Gmail and Yahoo would have rejected it, and it went back to being a draft. Fix its DKIM and DMARC records, then schedule it again or send it now."
       )
     ).resolves.toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "See its DNS records" })
+    ).toBeDefined();
   });
 
   it("offers Schedule and Send now again once what a draft missed its time for has gone", async () => {

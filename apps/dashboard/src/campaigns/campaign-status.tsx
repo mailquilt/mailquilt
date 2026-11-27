@@ -32,7 +32,8 @@ const InSlot = ({ children }: { children?: React.ReactNode }) => (
   </svg>
 );
 
-const Slot = () => <InSlot />;
+/** The logo's dashed slot at 12px, drawn as an SVG dash, since a CSS dashed border draws solid at that size: a piece still missing. */
+export const Slot = () => <InSlot />;
 
 const Placed = () => (
   <InSlot>

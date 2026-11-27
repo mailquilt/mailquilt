@@ -2,6 +2,7 @@ import type {
   Organization,
   OrganizationId,
   ProviderConnection,
+  SendingDomain,
 } from "@repo/domain";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -14,6 +15,7 @@ import {
 } from "react";
 
 import { callApi, loadingFirstTime } from "../api.ts";
+import { sendingDomainsKey } from "../domains/domains-api.ts";
 import { FrameLoading } from "../layout/frame.tsx";
 import { useAccount } from "../layout/session-gates.tsx";
 import { connectionsKey } from "../providers/providers-api.ts";
@@ -188,9 +190,13 @@ export const useCreateOrganization = () => {
         queryKey,
         (organizations = []) => [...organizations, created]
       );
-      // WARNING: record that the new Organization has no Provider Connections before choosing it, or Home swaps to its loader and loses the setup step's focus move.
+      // WARNING: record that the new Organization has no Provider Connections or Sending Domains before choosing it, or Home swaps to its loader and loses the setup step's focus move.
       queryClient.setQueryData<readonly ProviderConnection[]>(
         connectionsKey(created.id),
+        []
+      );
+      queryClient.setQueryData<readonly SendingDomain[]>(
+        sendingDomainsKey(created.id),
         []
       );
       choose(created.id);

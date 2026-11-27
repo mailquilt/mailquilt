@@ -21,6 +21,7 @@ import {
   vi,
 } from "vitest";
 
+import { ACME_DOMAIN_HELD } from "../domains/test-domains.ts";
 import {
   ACME,
   renderWithOrganizations,
@@ -196,18 +197,18 @@ describe("one campaign's page", () => {
     expect(statusLine()).toContain("Draft, created");
   });
 
-  it("keeps the confirmation open, saying why, when its sending domain fails its DNS check", async () => {
+  it("keeps the confirmation open, saying why, when its sending domain's DNS can't be looked up", async () => {
     api.use(
       ...ready(),
       http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
       http.post(SEND, () =>
         HttpResponse.json(
           {
-            _tag: "SendingDomainNotReady",
-            domain: "fernhill.example",
-            sendingDomainId: "sdm_01h455vb4pex5vsknk084sn02q",
+            _tag: "DnsLookupFailed",
+            detail: "The DNS lookup timed out.",
+            name: "_dmarc.acme.example",
           },
-          { status: 409 }
+          { status: 502 }
         )
       )
     );
@@ -217,9 +218,65 @@ describe("one campaign's page", () => {
 
     await expect(within(dialog).findByRole("alert")).resolves.toHaveProperty(
       "textContent",
-      "fernhill.example failed its DKIM or DMARC check just now, so Gmail and Yahoo would reject this campaign. Fix its DNS records, then try again. It hasn’t been sent."
+      "Mailquilt couldn’t check its sending domain, because looking up _dmarc.acme.example failed: The DNS lookup timed out. Try again in a moment. It hasn’t been sent."
     );
     expect(statusLine()).toContain("Draft, created");
+  });
+
+  it.each([
+    [
+      "isn't added",
+      [],
+      "Add acme.example before sending",
+      "Add acme.example",
+      "/domains/new?domain=acme.example",
+    ],
+    [
+      "failed its last DNS check",
+      [ACME_DOMAIN_HELD],
+      "acme.example can’t send yet",
+      "See its DNS records",
+      `/domains/${ACME_DOMAIN_HELD.id}`,
+    ],
+  ])(
+    "says so before sending, and links to the fix, when its domain %s",
+    async (_, domains, title, action, href) => {
+      api.use(
+        ...ready({ domains }),
+        http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+      );
+      renderPage();
+
+      await expect(screen.findByText(title)).resolves.toBeDefined();
+      expect(
+        screen.getAllByRole("link", { name: action })[0]?.getAttribute("href")
+      ).toBe(href);
+      expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+    }
+  );
+
+  it("moves focus to what stops it when asking again finds its domain failing, as Send now goes", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
+    renderPage();
+
+    const sendNow = await screen.findByRole("button", { name: "Send now" });
+
+    sendNow.focus();
+    api.use(...ready({ domains: [ACME_DOMAIN_HELD] }));
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    await expect(
+      screen.findByText("acme.example can’t send yet")
+    ).resolves.toBeDefined();
+    expect(document.activeElement).toBe(
+      screen.getByText("acme.example can’t send yet").closest("[tabindex]")
+    );
   });
 
   const NOBODY = {
@@ -251,6 +308,18 @@ describe("one campaign's page", () => {
       DRAFT,
       {},
       "Add a postal address before sending",
+    ],
+    [
+      "its sending domain failed its DNS check",
+      {
+        _tag: "SendingDomainNotReady",
+        domain: "acme.example",
+        sendingDomainId: ACME_DOMAIN_HELD.id,
+      },
+      409,
+      DRAFT,
+      { domains: [ACME_DOMAIN_HELD] },
+      "acme.example can’t send yet",
     ],
     [
       "it was sent from another tab",

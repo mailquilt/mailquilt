@@ -7,14 +7,26 @@ import type {
   MissedScheduleReason,
   Organization,
   ProviderConnection,
+  SendingDomain,
 } from "@repo/domain";
 import type { UseQueryResult } from "@tanstack/react-query";
-import { Predicate } from "effect";
+import { Link } from "@tanstack/react-router";
+import { DateTime, Predicate } from "effect";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
 import { useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
+import {
+  blockedBy,
+  checkedWhen,
+  domainOf,
+  recordsOf,
+  statusOf,
+  warningsIn,
+} from "../domains/dns-records.ts";
+import { DomainStatusLabel } from "../domains/domain-status.tsx";
+import { useSendingDomains } from "../domains/domains-api.ts";
 import {
   CalendarIcon,
   PaperPlaneTiltIcon,
@@ -256,7 +268,18 @@ const Facts = ({ rows }: { rows: FactRows }) => (
   </dl>
 );
 
-type Problem = "connection" | "nobody" | "address" | "already";
+type Problem =
+  | "connection"
+  | "nobody"
+  | "address"
+  | "domain"
+  | "domain-held"
+  | "already";
+
+const sendingDomainOf = (
+  campaign: Campaign,
+  domains: readonly SendingDomain[]
+) => domains.find((domain) => domain.domain === domainOf(campaign.from.email));
 
 const isUnsent = (campaign: Campaign) =>
   campaign.status === "draft" || campaign.status === "scheduled";
@@ -333,9 +356,41 @@ const audienceFacts = (
   return rows satisfies FactRows;
 };
 
+const FACT_LINK =
+  "font-medium text-kumo-strong underline decoration-kumo-hairline underline-offset-4 hover:decoration-kumo-strong focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-kumo-focus";
+
+const domainFact = (campaign: Campaign, domain: SendingDomain | undefined) =>
+  domain === undefined ? (
+    <span className="flex flex-col gap-0.5">
+      <Link
+        className={`${FACT_LINK} w-fit`}
+        search={{ domain: domainOf(campaign.from.email) }}
+        to="/domains/new"
+      >
+        Add {domainOf(campaign.from.email)}
+      </Link>
+      <Missing>Not a sending domain yet</Missing>
+    </span>
+  ) : (
+    <span className="flex flex-col gap-0.5">
+      <Link
+        className={`${FACT_LINK} w-fit`}
+        params={{ sendingDomainId: domain.id }}
+        to="/domains/$sendingDomainId"
+      >
+        {domain.domain}
+      </Link>
+      <DomainStatusLabel
+        status={statusOf(domain)}
+        warnings={warningsIn(recordsOf(domain, []))}
+      />
+    </span>
+  );
+
 const senderFacts = (
   campaign: Campaign,
-  connection: ProviderConnection | undefined
+  connection: ProviderConnection | undefined,
+  domain: SendingDomain | undefined
 ) =>
   [
     [
@@ -353,6 +408,9 @@ const senderFacts = (
         </span>
       </span>,
     ],
+    ...(isUnsent(campaign)
+      ? [["Sending domain", domainFact(campaign, domain)] as const]
+      : []),
     [
       "Reply-to",
       campaign.replyTo ?? (
@@ -372,6 +430,7 @@ const senderFacts = (
 const problemOf = (
   campaign: Campaign,
   connection: ProviderConnection | undefined,
+  domain: SendingDomain | undefined,
   organization: Organization,
   count: number | undefined,
   refusal: SendRefusal | undefined
@@ -391,6 +450,15 @@ const problemOf = (
 
   if (organization.postalAddress === null || refusal === "address") {
     return "address" satisfies Problem;
+  }
+
+  if (domain === undefined || refusal === "domain") {
+    return "domain" satisfies Problem;
+  }
+
+  // WARNING: a domain not checked yet isn't held here; sending checks it, and refuses it then if it fails.
+  if (statusOf(domain) === "blocked" || refusal === "domain-held") {
+    return "domain-held" satisfies Problem;
   }
 
   if (count === 0 || refusal === "nobody") {
@@ -483,13 +551,23 @@ const nobodyWhy = (campaign: Campaign, lists: readonly List[]) => {
     : `No contacts are subscribed to ${names}. Add some, or edit the draft to choose other lists.`;
 };
 
+const heldBecause = (domain: SendingDomain | undefined) => {
+  const check = domain?.check;
+
+  return domain === undefined || check === null || check === undefined
+    ? "Its DKIM or DMARC records didn’t pass when it was last checked."
+    : `When it was checked ${checkedWhen(check.checkedAt, DateTime.nowUnsafe())}, ${blockedBy(recordsOf(domain, []))} didn’t pass.`;
+};
+
 const ProblemBanner = ({
   campaign,
+  domain,
   lists,
   organization,
   problem,
 }: {
   campaign: Campaign;
+  domain: SendingDomain | undefined;
   lists: readonly List[];
   organization: Organization;
   problem: Problem;
@@ -526,6 +604,14 @@ const ProblemBanner = ({
         "The provider connection this draft went through was deleted. Edit the draft to choose another.",
       title: "Choose a provider connection before sending",
     },
+    domain: {
+      description: `It’s from ${campaign.from.email}, and Campaigns are sent only from a domain whose DNS records Mailquilt has checked. Add ${domainOf(campaign.from.email)}, then add the records it shows.`,
+      title: `Add ${domainOf(campaign.from.email)} before sending`,
+    },
+    "domain-held": {
+      description: `${heldBecause(domain)} Gmail and Yahoo reject email like that, so it can’t be sent until they do.`,
+      title: `${domainOf(campaign.from.email)} can’t send yet`,
+    },
     nobody: {
       description: nobodyWhy(campaign, lists),
       title: "No one to send to yet",
@@ -541,13 +627,12 @@ const ProblemBanner = ({
   );
 };
 
-// WARNING: the page can't see a Sending Domain's DNS, so a schedule missed for one is never shown as still holding.
 const MISSED_AS_PROBLEM = {
   "no-provider-connection": "connection",
-  "no-sending-domain": null,
+  "no-sending-domain": "domain",
   "no-subscribed-contacts": "nobody",
-  "sending-domain-not-ready": null,
-} as const satisfies Record<MissedScheduleReason, Problem | null>;
+  "sending-domain-not-ready": "domain-held",
+} as const satisfies Record<MissedScheduleReason, Problem>;
 
 const MISSED_WHY = {
   "no-provider-connection":
@@ -560,21 +645,10 @@ const MISSED_WHY = {
     "Its sending domain failed its DKIM or DMARC check then, so Gmail and Yahoo would have rejected it, and it went back to being a draft.",
 } as const satisfies Record<MissedScheduleReason, string>;
 
-const nextAfterMissed = (schedule: Schedule, counted: number | undefined) => {
-  if (schedule.missed === "no-subscribed-contacts" && counted !== undefined) {
-    return `${contacts(counted)} would get it now: schedule it again, or send it now.`;
-  }
-
-  if (schedule.missed === "no-sending-domain") {
-    return "Add its from address’s domain as a sending domain, then schedule it again or send it now.";
-  }
-
-  if (schedule.missed === "sending-domain-not-ready") {
-    return "Fix its domain’s DKIM and DMARC records, then schedule it again or send it now.";
-  }
-
-  return "Schedule it again, or send it now.";
-};
+const nextAfterMissed = (schedule: Schedule, counted: number | undefined) =>
+  schedule.missed === "no-subscribed-contacts" && counted !== undefined
+    ? `${contacts(counted)} would get it now: schedule it again, or send it now.`
+    : "Schedule it again, or send it now.";
 
 const MissedBanner = ({
   campaign,
@@ -594,10 +668,14 @@ const MissedBanner = ({
   const why = schedule.missed === null ? "" : MISSED_WHY[schedule.missed];
 
   if (stillHolds) {
-    const what =
-      schedule.missed === "no-provider-connection"
-        ? "Edit it to choose another connection, then schedule it again or send it now."
-        : nobodyWhy(campaign, lists);
+    const what = {
+      "no-provider-connection":
+        "Edit it to choose another connection, then schedule it again or send it now.",
+      "no-sending-domain": `Add ${domainOf(campaign.from.email)} as a sending domain, then schedule it again or send it now.`,
+      "no-subscribed-contacts": nobodyWhy(campaign, lists),
+      "sending-domain-not-ready":
+        "Fix its DKIM and DMARC records, then schedule it again or send it now.",
+    }[schedule.missed ?? "no-subscribed-contacts"];
 
     return (
       <Banner description={`${why} ${what}`} title={title} variant="alert" />
@@ -632,6 +710,14 @@ const ScheduledProblemBanner = ({
         "Its provider connection was deleted. Cancel the schedule, then edit it to choose another, or it goes back to being a draft at its time.",
       title: `It won’t be sent at ${missedWhen(schedule)}`,
     },
+    domain: {
+      description: `${domainOf(campaign.from.email)} isn’t a sending domain any more. Add it again, and pass its DNS checks, or it goes back to being a draft at its time.`,
+      title: `It won’t be sent at ${missedWhen(schedule)}`,
+    },
+    "domain-held": {
+      description: `${domainOf(campaign.from.email)} didn’t pass its DKIM or DMARC check when it was last checked. Fix its DNS records, or it goes back to being a draft at its time.`,
+      title: `It won’t be sent at ${missedWhen(schedule)}`,
+    },
     nobody: {
       description: `If no one is subscribed to ${listsInWords(namesOf(campaign.listIds, lists))} by then, it isn’t sent and goes back to being a draft. Add contacts, or cancel the schedule and edit it to choose other lists.`,
       title: "No one would get it now",
@@ -647,12 +733,14 @@ const ScheduledProblemBanner = ({
 const PageBanner = ({
   campaign,
   counted,
+  domain,
   lists,
   organization,
   problem,
 }: {
   campaign: Campaign;
   counted: number | undefined;
+  domain: SendingDomain | undefined;
   lists: readonly List[];
   organization: Organization;
   problem: Problem | undefined;
@@ -703,6 +791,7 @@ const PageBanner = ({
   return problem === undefined ? null : (
     <ProblemBanner
       campaign={campaign}
+      domain={domain}
       lists={lists}
       organization={organization}
       problem={problem}
@@ -722,27 +811,51 @@ const EditLink = ({
   </LinkButton>
 );
 
+const fixElsewhere = (
+  problem: Problem,
+  campaign: Campaign,
+  domain: SendingDomain | undefined
+) => {
+  if (problem === "address") {
+    return { href: "/settings", label: "Add postal address" };
+  }
+
+  if (problem === "domain") {
+    const name = domainOf(campaign.from.email);
+
+    return {
+      href: `/domains/new?domain=${encodeURIComponent(name)}`,
+      label: `Add ${name}`,
+    };
+  }
+
+  if (problem === "domain-held" && domain !== undefined) {
+    return { href: `/domains/${domain.id}`, label: "See its DNS records" };
+  }
+};
+
 const BlockedActions = ({
   editHref,
-  problem,
+  fix,
 }: {
   editHref: string;
-  problem: Problem;
+  fix: { readonly href: string; readonly label: string } | undefined;
 }) =>
-  problem === "address" ? (
+  fix === undefined ? (
+    <EditLink href={editHref} variant="primary" />
+  ) : (
     <>
       <EditLink href={editHref} variant="secondary" />
-      <LinkButton href="/settings" variant="primary">
-        Add postal address
+      <LinkButton href={fix.href} variant="primary">
+        {fix.label}
       </LinkButton>
     </>
-  ) : (
-    <EditLink href={editHref} variant="primary" />
   );
 
 interface Loaded {
   readonly connections: readonly ProviderConnection[];
   readonly countedAt: number;
+  readonly domains: readonly SendingDomain[];
   readonly organization: Organization;
 }
 
@@ -761,6 +874,10 @@ const stillHolds = (refused: Refused, loaded: Loaded) => {
 
   if (refused.reason === "nobody") {
     return refused.countedAt === loaded.countedAt;
+  }
+
+  if (refused.reason === "domain" || refused.reason === "domain-held") {
+    return refused.domains === loaded.domains;
   }
 
   return refused.connections === loaded.connections;
@@ -798,6 +915,7 @@ const CampaignView = ({
   campaign,
   connections,
   count,
+  domains,
   lists,
   onMovedOn,
   onRefusal,
@@ -806,6 +924,7 @@ const CampaignView = ({
   campaign: Campaign;
   connections: readonly ProviderConnection[];
   count: RecipientCount;
+  domains: readonly SendingDomain[];
   lists: readonly List[];
   onMovedOn: () => Promise<Campaign | null | undefined>;
   onRefusal: () => void;
@@ -816,6 +935,7 @@ const CampaignView = ({
   const loaded: Loaded = {
     connections,
     countedAt: count.dataUpdatedAt,
+    domains,
     organization,
   };
 
@@ -840,9 +960,12 @@ const CampaignView = ({
 
   const connectionName = connection?.name ?? "the provider";
 
+  const sendingDomain = sendingDomainOf(campaign, domains);
+
   const problem = problemOf(
     campaign,
     connection,
+    sendingDomain,
     organization,
     counted,
     refusal
@@ -920,6 +1043,21 @@ const CampaignView = ({
       statusLine.current?.focus();
     }
   }, [campaign.status]);
+
+  const shownProblem = useRef(problem);
+
+  // WARNING: a problem found by asking again, such as its domain failing a check run elsewhere, puts what fixes it where Send now and Schedule were; focus would drop to the page with them, so it moves to the problem.
+  useEffect(() => {
+    if (shownProblem.current === problem) {
+      return;
+    }
+
+    shownProblem.current = problem;
+
+    if (problem !== undefined && document.activeElement === document.body) {
+      problemRegion.current?.focus();
+    }
+  }, [problem, shownProblem]);
 
   const sayMovedOn = async (tried: string) => {
     moveProblem.clear();
@@ -1031,7 +1169,12 @@ const CampaignView = ({
       </>
     );
   } else if (draft && problem !== undefined) {
-    actions = <BlockedActions editHref={editHref} problem={problem} />;
+    actions = (
+      <BlockedActions
+        editHref={editHref}
+        fix={fixElsewhere(problem, campaign, sendingDomain)}
+      />
+    );
   } else if (draft) {
     actions = (
       <>
@@ -1084,6 +1227,7 @@ const CampaignView = ({
           <PageBanner
             campaign={campaign}
             counted={counted}
+            domain={sendingDomain}
             lists={lists}
             organization={organization}
             problem={problem}
@@ -1102,7 +1246,7 @@ const CampaignView = ({
             about="Who it says it’s from, and the provider connection it goes out through."
             title="From"
           >
-            <Facts rows={senderFacts(campaign, connection)} />
+            <Facts rows={senderFacts(campaign, connection, sendingDomain)} />
           </SettingsSection>
           <SettingsSection about={aboutTheEmail(campaign)} title="Email">
             <EmailPreview
@@ -1213,6 +1357,7 @@ export const CampaignPage = ({
 }) => {
   const campaign = useCampaign(organization.id, campaignId);
   const connections = useProviderConnections(organization.id);
+  const domains = useSendingDomains(organization.id);
   const lists = useLists(organization.id);
 
   const unsent =
@@ -1234,13 +1379,15 @@ export const CampaignPage = ({
   const seenStatus = useRef(campaign.data?.status);
   const status = campaign.data?.status;
   const { refetch: countAgain } = count;
+  const { refetch: checkedAgain } = domains;
 
-  // WARNING: a scheduled Campaign that couldn't start at its time comes back as a draft; the count kept from while it waited would say who'd get it now, so it's asked for again. Declared before the effect below, which moves seenStatus on.
+  // WARNING: a scheduled Campaign that couldn't start at its time comes back as a draft; the count and the domains' checks kept from while it waited would say who'd get it now and whether it can go, so they're asked for again. Declared before the effect below, which moves seenStatus on.
   useEffect(() => {
     if (seenStatus.current === "scheduled" && status === "draft") {
       countAgain();
+      checkedAgain();
     }
-  }, [countAgain, status]);
+  }, [checkedAgain, countAgain, status]);
 
   // WARNING: only a send this page watched finish gets a toast; a Campaign opened already sent doesn't.
   useEffect(() => {
@@ -1273,10 +1420,10 @@ export const CampaignPage = ({
   ]);
 
   // WARNING: a draft's or scheduled Campaign's page waits for its recipient count too; drawn later, its "No one to send to yet" and Send now would change after the page appeared.
+  const queries = [campaign, connections, domains, lists];
+
   const waiting =
-    loadingFirstTime(campaign) ||
-    loadingFirstTime(connections) ||
-    loadingFirstTime(lists) ||
+    queries.some((query) => loadingFirstTime(query)) ||
     (unsent && loadingFirstTime(count));
 
   if (waiting) {
@@ -1311,6 +1458,7 @@ export const CampaignPage = ({
   if (
     campaign.data === undefined ||
     connections.data === undefined ||
+    domains.data === undefined ||
     lists.data === undefined
   ) {
     return (
@@ -1324,17 +1472,13 @@ export const CampaignPage = ({
           <TableRegion label="Campaign">
             <LoadFailed
               onRetry={() => {
-                for (const query of [campaign, connections, lists]) {
+                for (const query of queries) {
                   if (query.isError) {
                     query.refetch();
                   }
                 }
               }}
-              retrying={
-                campaign.isFetching ||
-                connections.isFetching ||
-                lists.isFetching
-              }
+              retrying={queries.some((query) => query.isFetching)}
               title="This campaign didn’t load"
             />
           </TableRegion>
@@ -1348,6 +1492,7 @@ export const CampaignPage = ({
       campaign={campaign.data}
       connections={connections.data}
       count={count}
+      domains={domains.data}
       lists={lists.data}
       onMovedOn={async () => {
         // WARNING: the page says why its Pause or Cancel did nothing, so it doesn't also add its own "Sent to …" toast when asking again shows the Campaign finished.
@@ -1360,6 +1505,7 @@ export const CampaignPage = ({
       onRefusal={() => {
         campaign.refetch();
         connections.refetch();
+        domains.refetch();
         lists.refetch();
         count.refetch();
       }}

@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest";
 
+import { ACME_DOMAIN, ACME_DOMAIN_HELD } from "../domains/test-domains.ts";
 import { SignedInOnly } from "../layout/session-gates.tsx";
 import {
   ACME,
@@ -22,6 +23,10 @@ import { SetupSteps } from "./setup-steps.tsx";
 const api = setupServer();
 
 const CONNECTIONS = "*/api/organizations/:organizationId/provider-connections";
+
+const DOMAINS = "*/api/organizations/:organizationId/sending-domains";
+
+const NO_DOMAINS = http.get(DOMAINS, () => HttpResponse.json([]));
 
 const SESSION = {
   session: { expiresAt: "2026-12-01T00:00:00.000Z", id: "s", userId: "u" },
@@ -79,7 +84,8 @@ describe("setup steps", () => {
   it("marks naming an organization done once one exists", async () => {
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),
-      http.get(CONNECTIONS, () => HttpResponse.json([]))
+      http.get(CONNECTIONS, () => HttpResponse.json([])),
+      NO_DOMAINS
     );
 
     renderWithOrganizations(<SetupSteps />);
@@ -101,7 +107,8 @@ describe("setup steps", () => {
         await vi.waitUntil(() => answered, { timeout: 5000 });
 
         return HttpResponse.json([]);
-      })
+      }),
+      NO_DOMAINS
     );
 
     renderWithOrganizations(<SignedInHome />);
@@ -174,7 +181,8 @@ describe("setup steps", () => {
     let connections: readonly object[] = [];
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),
-      http.get(CONNECTIONS, () => HttpResponse.json(connections))
+      http.get(CONNECTIONS, () => HttpResponse.json(connections)),
+      NO_DOMAINS
     );
 
     renderWithOrganizations(<SetupSteps />);
@@ -199,10 +207,49 @@ describe("setup steps", () => {
     ).toBeNull();
   });
 
+  it("leads to adding a domain, or to its records while it can't send, and marks it done once one is ready", async () => {
+    let domains: readonly object[] = [];
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK])),
+      http.get(DOMAINS, () => HttpResponse.json(domains))
+    );
+
+    renderWithOrganizations(<SetupSteps />);
+
+    const add = await screen.findByRole("link", { name: "Add your domain" });
+
+    expect(add.getAttribute("href")).toBe("/domains/new");
+    cleanup();
+
+    domains = [ACME_DOMAIN_HELD];
+    renderWithOrganizations(<SetupSteps />);
+
+    const records = await screen.findByRole("link", {
+      name: "See its DNS records",
+    });
+
+    expect(records.getAttribute("href")).toBe(
+      `/domains/${ACME_DOMAIN_HELD.id}`
+    );
+    cleanup();
+
+    domains = [ACME_DOMAIN];
+    renderWithOrganizations(<SetupSteps />);
+
+    await expect(
+      screen.findByRole("list", {
+        name: "Steps to your first campaign, 3 of 5 done",
+      })
+    ).resolves.toBeDefined();
+    expect(screen.getByText("Manage it in Domains")).toBeDefined();
+  });
+
   it("points to contacts and lists while the next step isn't built yet", async () => {
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),
-      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK]))
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK])),
+      http.get(DOMAINS, () => HttpResponse.json([ACME_DOMAIN]))
     );
 
     renderWithOrganizations(<SetupSteps />);
@@ -218,7 +265,8 @@ describe("setup steps", () => {
   it("says the setup didn't load, rather than guessing the next step", async () => {
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),
-      http.get(CONNECTIONS, () => new HttpResponse(null, { status: 500 }))
+      http.get(CONNECTIONS, () => new HttpResponse(null, { status: 500 })),
+      NO_DOMAINS
     );
 
     renderWithOrganizations(<SetupSteps />);
