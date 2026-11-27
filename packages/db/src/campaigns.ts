@@ -314,7 +314,7 @@ export const CampaignsLive = Layer.effect(
           )
         );
 
-    // WARNING: moving to the status it's already in answers with the Campaign, so a second click, or two members at once, aren't refused.
+    // WARNING: moving to the status it's already in answers with the Campaign, so a second click, or two members at once, aren't refused. One whose every email was recorded is done though not yet marked sent, so it's marked sent and refused rather than paused or cancelled.
     const moveSending = (
       organization: OrganizationId,
       id: CampaignId,
@@ -328,13 +328,16 @@ export const CampaignsLive = Layer.effect(
           .where(
             and(
               inOrganization(organization, id),
-              inArray(campaigns.status, from)
+              inArray(campaigns.status, from),
+              sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} < ${campaigns.recipientsTotal}`
             )
           )
           .returning({ id: campaigns.id })
           .pipe(Effect.orDie);
 
         if (moved === undefined) {
+          yield* finishIfDone(organization, id).pipe(Effect.orDie);
+
           return yield* refusedOrMissing(
             organization,
             id,

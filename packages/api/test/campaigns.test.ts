@@ -1086,7 +1086,10 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         const worker = yield* QueueWorker;
         const delivered = yield* worker.deliverAll;
 
-        yield* pipe(delivered, Effect.forEach(worker.deliver));
+        yield* pipe(
+          delivered,
+          Effect.forEach((message) => worker.deliver(message))
+        );
 
         const cancelled = yield* client.campaigns.get({
           params: campaignParams,
@@ -1115,6 +1118,38 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         assert.strictEqual(resumed._tag, "CampaignNotSending");
         assert.strictEqual(paused._tag, "CampaignNotSending");
         assert.strictEqual(cancelledAgain.status, "cancelled");
+      })
+  );
+
+  test.effect(
+    "won't pause or cancel a Campaign whose last email was recorded before it was marked sent, and marks it sent",
+    () =>
+      Effect.gen(function* lastEmailJustRecorded() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* (yield* QueueWorker).deliverAll;
+
+        const sql = yield* SqlClient.SqlClient;
+
+        yield* sql`update campaigns set status = 'sending', sent_at = null where id = ${campaign.id}`;
+
+        const paused = yield* client.campaigns
+          .pause({ params: campaignParams })
+          .pipe(Effect.flip);
+
+        const cancelled = yield* client.campaigns
+          .cancel({ params: campaignParams })
+          .pipe(Effect.flip);
+
+        const after = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(paused._tag, "CampaignNotSending");
+        assert.strictEqual(cancelled._tag, "CampaignNotSending");
+        assert.strictEqual(after.status, "sent");
+        assert.isNotNull(after.sentAt);
       })
   );
 
