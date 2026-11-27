@@ -1,0 +1,42 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "8990f715-d7b9-4880-bc21-a2eb6db04c76",
+  "prevIds": ["cedab4ad-8078-4ddc-b970-a1b51383e2b0"],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "campaign_recipients",
+        "deferrals"
+      ],
+      "writes": [
+        "s|col|public.campaign_recipients.deferrals",
+        "n|col|public.campaign_recipients.deferrals",
+        "e|col|public.campaign_recipients.deferrals"
+      ],
+      "reads": ["n|tbl|public.campaign_recipients", "n|sch|public"]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "deferrals",
+        "type": "integer",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "0",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    }
+  ]
+}

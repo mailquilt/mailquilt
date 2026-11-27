@@ -2,7 +2,7 @@ import { connect, isIP } from "node:net";
 import { connect as tlsConnect, rootCertificates } from "node:tls";
 import type { ConnectionOptions } from "node:tls";
 
-import { OutboundGuard, SmtpProvider } from "@repo/core";
+import { OutboundGuard, SendDeferred, SmtpProvider } from "@repo/core";
 import type {
   HostLookupFailed,
   HostNotFound,
@@ -50,19 +50,37 @@ const NodemailerError = Schema.Struct({
   command: Schema.optionalKey(Schema.String),
   originalCode: Schema.optionalKey(Schema.String),
   message: Schema.optionalKey(Schema.String),
+  responseCode: Schema.optionalKey(Schema.Number),
+  syscall: Schema.optionalKey(Schema.String),
+  timeoutType: Schema.optionalKey(Schema.String),
 });
 
 const parseNodemailerError = Schema.decodeUnknownOption(NodemailerError);
 
 const UNKNOWN_ERROR: typeof NodemailerError.Type = {};
 
-const toSendFailed = (error: Option.Option<typeof NodemailerError.Type>) => {
-  const {
-    code = "",
-    command,
-    message,
-    originalCode = "",
-  } = Option.getOrElse(error, () => UNKNOWN_ERROR);
+const BEFORE_GREETING_TIMEOUTS = new Set([
+  "CONNECT_TIMEOUT",
+  "GREETING_TIMEOUT",
+]);
+
+const TRY_LATER_REPLY = { max: 499, min: 400 };
+
+// WARNING: only a failure that shows the server never took the email may be tried again; a connection lost or timed out later may be after the server took it, and trying again would send it twice.
+const showsNotTaken = ({
+  code,
+  responseCode,
+  syscall,
+  timeoutType = "",
+}: typeof NodemailerError.Type) =>
+  (responseCode !== undefined &&
+    responseCode >= TRY_LATER_REPLY.min &&
+    responseCode <= TRY_LATER_REPLY.max) ||
+  syscall === "connect" ||
+  (code === "ETIMEDOUT" && BEFORE_GREETING_TIMEOUTS.has(timeoutType));
+
+const toSendFailed = (error: typeof NodemailerError.Type) => {
+  const { code = "", command, message, originalCode = "" } = error;
 
   const reason = CERTIFICATE_OR_HANDSHAKE_CODE.test(originalCode)
     ? "tls"
@@ -82,6 +100,14 @@ const toSendFailed = (error: Option.Option<typeof NodemailerError.Type>) => {
   });
 };
 
+const toSendFailure = (parsed: Option.Option<typeof NodemailerError.Type>) => {
+  const error = Option.getOrElse(parsed, () => UNKNOWN_ERROR);
+
+  const failed = toSendFailed(error);
+
+  return showsNotTaken(error) ? new SendDeferred({ failed }) : failed;
+};
+
 const refused = (error: OutboundBlocked | HostNotFound | HostLookupFailed) => {
   if (error._tag === "OutboundBlocked") {
     return new SendFailed({
@@ -91,9 +117,11 @@ const refused = (error: OutboundBlocked | HostNotFound | HostLookupFailed) => {
   }
 
   if (error._tag === "HostLookupFailed") {
-    return new SendFailed({
-      detail: `Couldn't look up ${error.host}: ${error.detail}`,
-      reason: "unreachable",
+    return new SendDeferred({
+      failed: new SendFailed({
+        detail: `Couldn't look up ${error.host}: ${error.detail}`,
+        reason: "unreachable",
+      }),
     });
   }
 
@@ -225,7 +253,10 @@ const messageFor = (email: OutgoingEmail) => {
  * afterwards. A connection waits at most 10 seconds to open and for the
  * server's greeting, and 30 seconds for any reply, and a whole send,
  * looking up the host included, at most 60 seconds; giving up, or the request being cancelled, closes the
- * connection. Nothing is logged. On Workers, `trustedCertificates` can't be
+ * connection. A 4xx reply, or a connection that never opened, fails with
+ * `SendDeferred`, since the email can be tried again later; anything else,
+ * such as a connection lost after the message was sent, fails with
+ * `SendFailed`. Nothing is logged. On Workers, `trustedCertificates` can't be
  * used, and port 25 is blocked.
  */
 export const smtpProviderLayer = (options: SmtpProviderOptions = {}) =>
@@ -244,7 +275,7 @@ export const smtpProviderLayer = (options: SmtpProviderOptions = {}) =>
             const transport = transportFor(settings, address, options);
 
             const sent = yield* Effect.tryPromise({
-              catch: (error) => toSendFailed(parseNodemailerError(error)),
+              catch: (error) => toSendFailure(parseNodemailerError(error)),
               try: (signal) =>
                 transport.sendMail({ ...messageFor(email), signal }),
             }).pipe(Effect.ensuring(Effect.sync(() => transport.close())));

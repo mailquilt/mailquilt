@@ -35,7 +35,11 @@ export {
   queueRetryDelaySeconds,
 } from "./queue.ts";
 
+export { BatchDeferred } from "./batch-deferred.ts";
+
 export { BatchStillSending } from "./batch-still-sending.ts";
+
+export { SendDeferred } from "./send-deferred.ts";
 
 export { Scheduler } from "./scheduler.ts";
 

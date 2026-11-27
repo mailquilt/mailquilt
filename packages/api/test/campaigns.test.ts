@@ -1,4 +1,5 @@
 import { assert, layer } from "@effect/vitest";
+import { QUEUE_RETRIES, SendDeferred } from "@repo/core";
 import { QueueInbox, SmtpOutbox } from "@repo/core/testing";
 import {
   CampaignIdSchema,
@@ -9,7 +10,7 @@ import {
   SendFailed,
 } from "@repo/domain";
 import type { ContactId, ListId } from "@repo/domain";
-import { DateTime, Duration, Effect, Exit, pipe } from "effect";
+import { Array as Arr, DateTime, Duration, Effect, Exit, pipe } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -43,6 +44,13 @@ const CONTENT = {
 } as const;
 
 const NOT_SENT = { failed: 0, sent: 0, total: 0 };
+
+const CONNECTION_REFUSED = new SendDeferred({
+  failed: new SendFailed({
+    detail: "connect ECONNREFUSED 192.0.2.25:587",
+    reason: "unreachable",
+  }),
+});
 
 const THREE_CONTACTS = [
   "ada@example.com",
@@ -769,6 +777,147 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         assert.deepStrictEqual(
           reasons.map((row) => row.failure_detail),
           ["Connection timed out"]
+        );
+      })
+  );
+
+  test.effect(
+    "tries a Contact again on the batch's next delivery when the Provider's server can't take their email now, and still sends to the others",
+    () =>
+      Effect.gen(function* mailboxBusy() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(
+          owner,
+          ["ada@example.com", "grace@example.com"],
+          [list.id]
+        );
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
+
+        yield* (yield* SmtpOutbox).failNextSend(
+          new SendDeferred({
+            failed: new SendFailed({
+              detail: "450 4.2.1 Mailbox busy, try again later",
+              reason: "rejected",
+            }),
+          })
+        );
+
+        const putOff = yield* Effect.exit(worker.deliver(batch));
+
+        const partway = yield* client.campaigns.get({
+          params: campaignParams,
+        });
+
+        const sentFirst = yield* sentTo(campaign.subject);
+
+        yield* worker.deliver(batch);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.isTrue(Exit.isFailure(putOff));
+        assert.strictEqual(partway.status, "sending");
+        assert.deepStrictEqual(sentFirst, ["grace@example.com"]);
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 0, sent: 2, total: 2 }
+        );
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "ada@example.com",
+          "grace@example.com",
+        ]);
+      })
+  );
+
+  test.effect(
+    "stops trying a batch while the Provider's server can't be connected to, and sends the rest on its next delivery",
+    () =>
+      Effect.gen(function* serverDown() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
+
+        yield* (yield* SmtpOutbox).failNextSend(CONNECTION_REFUSED);
+
+        const putOff = yield* Effect.exit(worker.deliver(batch));
+        const sentFirst = yield* sentTo(campaign.subject);
+
+        yield* worker.deliver(batch);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.isTrue(Exit.isFailure(putOff));
+        assert.isEmpty(sentFirst);
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 0, sent: 3, total: 3 }
+        );
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), THREE_CONTACTS);
+      })
+  );
+
+  test.effect(
+    "records a batch failed with why once the Provider's server couldn't be connected to on every delivery the queue makes",
+    () =>
+      Effect.gen(function* serverDownForGood() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(
+          owner,
+          ["ada@example.com", "grace@example.com"],
+          [list.id]
+        );
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const outbox = yield* SmtpOutbox;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
+
+        const deliveries = yield* pipe(
+          Arr.makeBy(QUEUE_RETRIES + 1, () => batch),
+          Effect.forEach((delivered) =>
+            outbox
+              .failNextSend(CONNECTION_REFUSED)
+              .pipe(Effect.andThen(Effect.exit(worker.deliver(delivered))))
+          )
+        );
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        const sql = yield* SqlClient.SqlClient;
+
+        const reasons = yield* sql<{ readonly failure_detail: string }>`
+          select distinct failure_detail from campaign_recipients
+          where campaign_id = ${campaign.id}`;
+
+        assert.deepStrictEqual(deliveries.map(Exit.isFailure), [
+          ...Arr.makeBy(QUEUE_RETRIES, () => true),
+          false,
+        ]);
+        assert.isEmpty(yield* sentTo(campaign.subject));
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 2, sent: 0, total: 2 }
+        );
+        assert.deepStrictEqual(
+          reasons.map((row) => row.failure_detail),
+          [CONNECTION_REFUSED.failed.detail]
         );
       })
   );

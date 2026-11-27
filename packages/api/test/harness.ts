@@ -9,6 +9,7 @@ import {
   SystemMailerLive,
 } from "@repo/core";
 import type {
+  BatchDeferred,
   BatchStillSending,
   Queue,
   QueueMessage,
@@ -141,11 +142,11 @@ export const QueueWorker = Context.Service<{
   /** Handles one message. It fails as the runtime's handler would, asking the queue to deliver it again. */
   readonly deliver: (
     message: QueueMessage
-  ) => Effect.Effect<void, BatchStillSending>;
+  ) => Effect.Effect<void, BatchDeferred | BatchStillSending>;
   /** Handles every queued message that's due by the `Clock`, and any they queue, until none are left. Returns what it handled. */
   readonly deliverAll: Effect.Effect<
     readonly QueueMessage[],
-    BatchStillSending
+    BatchDeferred | BatchStillSending
   >;
 }>("test/QueueWorker");
 

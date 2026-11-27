@@ -168,7 +168,9 @@ export const sendTestEmail = (id: ProviderConnectionId, to: string) =>
         `It was sent through your provider connection "${connection.name}" (${connection.smtp.host}:${connection.smtp.port}). If you can read it, the connection works.`,
       ].join("\n"),
       to,
-    });
+    }).pipe(
+      Effect.catchTag("SendDeferred", ({ failed }) => Effect.fail(failed))
+    );
 
     return new TestEmailSent({ messageId: sent.messageId });
   });

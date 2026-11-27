@@ -37,6 +37,7 @@ import {
 } from "effect";
 import type { Types } from "effect";
 
+import { BatchDeferred } from "./batch-deferred.ts";
 import { BatchStillSending } from "./batch-still-sending.ts";
 import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
@@ -44,10 +45,11 @@ import { preferencesUrl } from "./preferences-link.ts";
 import { ProviderConnections } from "./provider-connections.ts";
 import { sendThrough } from "./provider.ts";
 import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
-import { asQueuedFor, Queue } from "./queue.ts";
+import { asQueuedFor, Queue, QUEUE_RETRIES } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { Scheduler } from "./scheduler.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
+import type { SendDeferred } from "./send-deferred.ts";
 import { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
 import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 
@@ -60,10 +62,14 @@ export interface CampaignFilter {
   readonly before?: CampaignId;
 }
 
-/** A Contact a Campaign is still to be sent to, at the address they had when it started sending. */
+/**
+ * A Contact a Campaign is still to be sent to, at the address they had when
+ * it started sending, and how many times the Provider put off their email.
+ */
 export interface QueuedRecipient {
   readonly contactId: ContactId;
   readonly email: string;
+  readonly deferrals: number;
 }
 
 /** What one queue message sends: the Campaign's content, and its recipients in that batch still queued. */
@@ -225,6 +231,15 @@ export class Campaigns extends Context.Service<
     readonly recordOutcome: (
       id: CampaignId,
       outcome: RecipientOutcome
+    ) => Effect.Effect<void, never, CurrentOrganization>;
+    /**
+     * Puts a recipient this delivery claimed back in the queue, counting
+     * one more time the Provider put off their email, for the batch's next
+     * delivery to try.
+     */
+    readonly putBack: (
+      id: CampaignId,
+      contactId: ContactId
     ) => Effect.Effect<void, never, CurrentOrganization>;
     /**
      * Once a delivery of `batch` has tried everyone it could claim: records
@@ -424,24 +439,8 @@ const CUT_OFF = new SendFailed({
   reason: "failed",
 });
 
-const outcomeOf = <R>(
-  recipient: QueuedRecipient,
-  sending: Effect.Effect<SentEmail, SendFailed, R>
-) =>
-  sending.pipe(
-    Effect.match({
-      onFailure: (failed) =>
-        ({
-          contactId: recipient.contactId,
-          failed,
-        }) satisfies RecipientOutcome,
-      onSuccess: (sent) =>
-        ({
-          contactId: recipient.contactId,
-          sent,
-        }) satisfies RecipientOutcome,
-    })
-  );
+// WARNING: each delivery of a batch tries a put-off recipient once, so their last try is on its last delivery; a put-off email left queued after that would never be sent or recorded, and the Campaign would never finish.
+const SEND_TRIES = QUEUE_RETRIES + 1;
 
 const sendCampaignBatch = (message: SendCampaignBatch) =>
   Effect.gen(function* sendBatch() {
@@ -523,35 +522,75 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           email.replyTo = batch.replyTo;
         }
 
-        const sent: Effect.Effect<SentEmail, SendFailed, SmtpProvider> =
-          Option.match(connection, {
-            onNone: () => Effect.fail(NO_CONNECTION),
-            onSome: (opened) => sendThrough(opened, email),
-          });
+        const sent: Effect.Effect<
+          SentEmail,
+          SendFailed | SendDeferred,
+          SmtpProvider
+        > = Option.match(connection, {
+          onNone: () => Effect.fail(NO_CONNECTION),
+          onSome: (opened) => sendThrough(opened, email),
+        });
 
         return yield* sent;
       });
 
     const serverFailure = yield* Ref.make(Option.none<SendFailed>());
+    const serverPutOff = yield* Ref.make(false);
+    const anyPutOff = yield* Ref.make(false);
 
     const sendUnlessServerFailed = (recipient: QueuedRecipient) =>
       Effect.flatMap(Ref.get(serverFailure), (earlier) =>
         Option.match(earlier, {
           onNone: () =>
             sendTo(recipient).pipe(
-              Effect.tapError((failed) =>
-                SERVER_FAILURES.has(failed.reason)
-                  ? Ref.set(serverFailure, Option.some(failed))
-                  : Effect.void
-              )
+              Effect.catchTag("SendDeferred", (deferred) =>
+                Effect.fail(
+                  recipient.deferrals + 1 < SEND_TRIES
+                    ? deferred
+                    : deferred.failed
+                )
+              ),
+              Effect.tapError((notSent) => {
+                const failed =
+                  notSent._tag === "SendDeferred" ? notSent.failed : notSent;
+
+                if (!SERVER_FAILURES.has(failed.reason)) {
+                  return Effect.void;
+                }
+
+                return notSent._tag === "SendDeferred"
+                  ? Ref.set(serverPutOff, true)
+                  : Ref.set(serverFailure, Option.some(failed));
+              })
             ),
           onSome: Effect.fail,
         })
       );
 
+    const recordFor = (recipient: QueuedRecipient, sent: SentEmail) =>
+      campaigns.recordOutcome(message.campaignId, {
+        contactId: recipient.contactId,
+        sent,
+      });
+
+    const failFor = (recipient: QueuedRecipient, failed: SendFailed) =>
+      campaigns.recordOutcome(message.campaignId, {
+        contactId: recipient.contactId,
+        failed,
+      });
+
+    const putOff = (recipient: QueuedRecipient) =>
+      campaigns
+        .putBack(message.campaignId, recipient.contactId)
+        .pipe(Effect.andThen(Ref.set(anyPutOff, true)));
+
     // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes, opts out or is Suppressed partway through still gets it. Each outcome is recorded as soon as it's known, so a delivery cut off later never sends it again.
     const sendOnce = (recipient: QueuedRecipient) =>
       Effect.gen(function* sendOnceTo() {
+        if (yield* Ref.get(serverPutOff)) {
+          return;
+        }
+
         const claim = yield* campaigns.claim(
           message.campaignId,
           recipient.contactId,
@@ -562,18 +601,27 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           return;
         }
 
-        const outcome = yield* outcomeOf(
-          recipient,
-          claim === "consents"
-            ? sendUnlessServerFailed(recipient)
-            : Effect.fail(NO_LONGER_CONSENTS)
-        );
+        if (claim === "left") {
+          return yield* failFor(recipient, NO_LONGER_CONSENTS);
+        }
 
-        yield* campaigns.recordOutcome(message.campaignId, outcome);
+        yield* sendUnlessServerFailed(recipient).pipe(
+          Effect.matchEffect({
+            onFailure: (error) =>
+              error._tag === "SendDeferred"
+                ? putOff(recipient)
+                : failFor(recipient, error),
+            onSuccess: (sent) => recordFor(recipient, sent),
+          })
+        );
       });
 
     yield* Effect.forEach(batch.recipients, sendOnce, { discard: true });
     yield* settle;
+
+    if (yield* Ref.get(anyPutOff)) {
+      return yield* new BatchDeferred();
+    }
   }).pipe(asQueuedFor(message));
 
 /**

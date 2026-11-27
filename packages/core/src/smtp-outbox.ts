@@ -3,6 +3,7 @@ import { Context, Effect, Layer, Option, Ref } from "effect";
 
 import { SmtpProvider } from "./provider.ts";
 import type { OutgoingEmail, SmtpSettings } from "./provider.ts";
+import type { SendDeferred } from "./send-deferred.ts";
 
 /** One email the recording SMTP Provider was asked to send, with the settings it was given. */
 export interface RecordedSend {
@@ -19,7 +20,9 @@ export class SmtpOutbox extends Context.Service<
   SmtpOutbox,
   {
     readonly sent: Effect.Effect<readonly RecordedSend[]>;
-    readonly failNextSend: (error: SendFailed) => Effect.Effect<void>;
+    readonly failNextSend: (
+      error: SendFailed | SendDeferred
+    ) => Effect.Effect<void>;
     readonly afterNextSend: (
       effect: Effect.Effect<void>
     ) => Effect.Effect<void>;
@@ -34,7 +37,11 @@ export class SmtpOutbox extends Context.Service<
 export const RecordingSmtpProviderLive = Layer.effectContext(
   Effect.gen(function* recordingSmtpProvider() {
     const sent = yield* Ref.make<readonly RecordedSend[]>([]);
-    const nextFailure = yield* Ref.make(Option.none<SendFailed>());
+
+    const nextFailure = yield* Ref.make(
+      Option.none<SendFailed | SendDeferred>()
+    );
+
     const afterNext = yield* Ref.make(Option.none<Effect.Effect<void>>());
 
     return Context.make(SmtpProvider, {

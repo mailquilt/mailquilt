@@ -420,6 +420,7 @@ export const CampaignsLive = Layer.effect(
           const recipients = yield* db
             .select({
               contactId: campaignRecipients.contactId,
+              deferrals: campaignRecipients.deferrals,
               email: campaignRecipients.email,
             })
             .from(campaignRecipients)
@@ -449,6 +450,7 @@ export const CampaignsLive = Layer.effect(
                   ),
             recipients: recipients.map((recipient) => ({
               contactId: ContactIdSchema.make(recipient.contactId),
+              deferrals: recipient.deferrals,
               email: recipient.email,
             })),
             replyTo: campaign.replyTo,
@@ -526,6 +528,27 @@ export const CampaignsLive = Layer.effect(
             where organization_id = ${organization} and id = ${id}
               and exists (select 1 from recorded)
           `);
+        }).pipe(Effect.orDie),
+
+      putBack: (id, contactId) =>
+        Effect.gen(function* putBack() {
+          const organization = yield* currentOrganizationId;
+
+          yield* db
+            .update(campaignRecipients)
+            .set({
+              claimedAt: null,
+              deferrals: sql`${campaignRecipients.deferrals} + 1`,
+              status: "queued",
+            })
+            .where(
+              and(
+                eq(campaignRecipients.organizationId, organization),
+                eq(campaignRecipients.campaignId, id),
+                eq(campaignRecipients.contactId, contactId),
+                eq(campaignRecipients.status, "sending")
+              )
+            );
         }).pipe(Effect.orDie),
 
       // WARNING: the Campaign is marked sent in a statement after the cut-off claims commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
