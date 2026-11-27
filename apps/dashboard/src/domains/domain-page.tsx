@@ -8,7 +8,7 @@ import type {
 import { DnsLookupFailed } from "@repo/domain";
 import { useNavigate } from "@tanstack/react-router";
 import { DateTime, Predicate } from "effect";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
 import { StepBlock, StepSeam } from "../brand/quilt-block.tsx";
@@ -159,27 +159,45 @@ const Passed = ({ record }: { record: DnsRecordRow }) => (
   </p>
 );
 
-const ToDo = ({ record }: { record: DnsRecordRow }) => (
-  <div className="flex min-w-0 flex-col gap-2.5 rounded-xl bg-kumo-base p-4 ring ring-kumo-hairline">
-    <Found record={record} />
-    <dl className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm max-sm:grid-cols-[minmax(0,1fr)] max-sm:gap-y-1 max-sm:[&_dd]:mb-2">
-      <dt className="text-kumo-subtle">Type</dt>
-      <dd className="font-medium text-kumo-strong">{record.type}</dd>
-      <dt className="text-kumo-subtle">Name</dt>
-      <dd className="min-w-0">
-        <CopyValue label={`${record.label} name`} text={record.name} />
-      </dd>
-      <dt className="text-kumo-subtle">Value</dt>
-      <dd className="min-w-0">
-        {record.value === undefined ? (
-          <FromProvider text={record.valueFrom ?? ""} />
-        ) : (
-          <CopyValue label={`${record.label} value`} text={record.value} />
-        )}
-      </dd>
-    </dl>
-  </div>
-);
+const ToDo = ({ record }: { record: DnsRecordRow }) => {
+  const box = useRef<HTMLDivElement>(null);
+
+  // WARNING: a check that makes this record pass takes its copy buttons; a layout effect's cleanup runs while they're still in the page, so focus on one moves to its step's heading rather than dropping to the page.
+  useLayoutEffect(() => {
+    const node = box.current;
+
+    return () => {
+      if (node?.contains(document.activeElement)) {
+        node.closest("li")?.querySelector<HTMLElement>("h2")?.focus();
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      className="flex min-w-0 flex-col gap-2.5 rounded-xl bg-kumo-base p-4 ring ring-kumo-hairline"
+      ref={box}
+    >
+      <Found record={record} />
+      <dl className="grid grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm max-sm:grid-cols-[minmax(0,1fr)] max-sm:gap-y-1 max-sm:[&_dd]:mb-2">
+        <dt className="text-kumo-subtle">Type</dt>
+        <dd className="font-medium text-kumo-strong">{record.type}</dd>
+        <dt className="text-kumo-subtle">Name</dt>
+        <dd className="min-w-0">
+          <CopyValue label={`${record.label} name`} text={record.name} />
+        </dd>
+        <dt className="text-kumo-subtle">Value</dt>
+        <dd className="min-w-0">
+          {record.value === undefined ? (
+            <FromProvider text={record.valueFrom ?? ""} />
+          ) : (
+            <CopyValue label={`${record.label} value`} text={record.value} />
+          )}
+        </dd>
+      </dl>
+    </div>
+  );
+};
 
 const Steps = ({
   domain,
@@ -207,7 +225,10 @@ const Steps = ({
             {last ? null : <StepSeam done={state === "done"} />}
             <StepBlock number={index + 1} state={state} />
             <div className="flex min-w-0 flex-col gap-3 pt-1.5 max-sm:pt-0.5">
-              <h2 className="font-display text-display-xs font-semibold text-kumo-strong">
+              <h2
+                className="font-display text-display-xs font-semibold text-kumo-strong outline-none"
+                tabIndex={-1}
+              >
                 <span className="sr-only">
                   Step {index + 1}
                   {STEP_NOTE[state]}

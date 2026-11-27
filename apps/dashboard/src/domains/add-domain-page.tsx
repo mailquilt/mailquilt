@@ -9,6 +9,8 @@ import {
 import { useForm } from "@tanstack/react-form";
 import { useNavigate } from "@tanstack/react-router";
 import { Predicate, Schema } from "effect";
+import { useRef } from "react";
+import { flushSync } from "react-dom";
 
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
@@ -84,6 +86,13 @@ export const AddDomainPage = ({
 }) => {
   const add = useAddSendingDomain(organization.id);
   const navigate = useNavigate();
+  const selectorList = useRef<HTMLFieldSetElement>(null);
+
+  // WARNING: adding the last selector allowed takes away Add another selector, and removing one takes its own button, so focus moves to the selector added or the one before it, once it's drawn.
+  const focusSelector = (index: number) =>
+    selectorList.current
+      ?.querySelectorAll<HTMLInputElement>("input")
+      [index]?.focus();
 
   const form = useForm({
     defaultValues: {
@@ -173,7 +182,10 @@ export const AddDomainPage = ({
         >
           <form.Field mode="array" name="selectors">
             {(selectors) => (
-              <fieldset className="flex min-w-0 flex-col gap-3">
+              <fieldset
+                className="flex min-w-0 flex-col gap-3"
+                ref={selectorList}
+              >
                 <legend className="sr-only">DKIM selectors</legend>
                 {selectors.state.value.map((_, index) => (
                   <div
@@ -214,7 +226,10 @@ export const AddDomainPage = ({
                       <button
                         aria-label={`Remove selector ${index + 1}`}
                         className={`${ICON_BUTTON} mt-7 size-9`}
-                        onClick={() => selectors.removeValue(index)}
+                        onClick={() => {
+                          flushSync(() => selectors.removeValue(index));
+                          focusSelector(index - 1);
+                        }}
                         type="button"
                       >
                         <TrashIcon aria-hidden="true" className="size-4" />
@@ -226,7 +241,12 @@ export const AddDomainPage = ({
                   <Button
                     className="w-fit"
                     icon={PlusIcon}
-                    onClick={() => selectors.pushValue("")}
+                    onClick={() => {
+                      const added = selectors.state.value.length;
+
+                      flushSync(() => selectors.pushValue(""));
+                      focusSelector(added);
+                    }}
                     variant="secondary"
                   >
                     Add another selector

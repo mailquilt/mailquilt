@@ -159,6 +159,38 @@ describe("Sending Domains in the dashboard", () => {
     expect(posted).toBeFalsy();
   });
 
+  it("moves focus to the selector added, and to the one before a selector removed", async () => {
+    api.use(organizations);
+    renderWithOrganizations(<AddDomainPage organization={organization} />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Add another selector" })
+    );
+
+    await expect
+      .poll(() => document.activeElement)
+      .toBe(screen.getByLabelText("Selector 2"));
+
+    for (const _ of [3, 4, 5]) {
+      fireEvent.click(
+        screen.getByRole("button", { name: "Add another selector" })
+      );
+    }
+
+    await expect
+      .poll(() => document.activeElement)
+      .toBe(screen.getByLabelText("Selector 5"));
+    expect(
+      screen.queryByRole("button", { name: "Add another selector" })
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove selector 5" }));
+
+    await expect
+      .poll(() => document.activeElement)
+      .toBe(screen.getByLabelText("Selector 4"));
+  });
+
   it("adds a domain, lowercased, and opens its page", async () => {
     let payload: unknown;
     api.use(
@@ -375,6 +407,69 @@ describe("Sending Domains in the dashboard", () => {
     await act(() => vi.advanceTimersByTimeAsync(120_000));
 
     expect(checks).toBe(1);
+  });
+
+  it("moves focus to a step's heading when a check makes the record it was on pass", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let checks = 0;
+    api.use(
+      organizations,
+      http.get(CONNECTIONS, () => HttpResponse.json([])),
+      http.get(DOMAINS, () =>
+        HttpResponse.json([checks === 0 ? ACME_DOMAIN_HELD : ACME_DOMAIN])
+      ),
+      http.post(CHECK, () => {
+        checks += 1;
+
+        return HttpResponse.json(ACME_DOMAIN);
+      })
+    );
+    renderDomain();
+
+    const copyName = await screen.findByRole("button", {
+      name: "Copy the DMARC record name",
+    });
+
+    copyName.focus();
+    await act(() => vi.advanceTimersByTimeAsync(60_000));
+
+    await expect(screen.findByText("Ready")).resolves.toBeDefined();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: /^Step 2/u })
+    );
+  });
+
+  it("says a return path under the domain doesn't align when DMARC asks for strict SPF alignment", async () => {
+    api.use(
+      organizations,
+      http.get(CONNECTIONS, () => HttpResponse.json([])),
+      http.get(DOMAINS, () =>
+        HttpResponse.json([
+          {
+            ...ACME_DOMAIN,
+            check: {
+              ...ACME_DOMAIN.check,
+              returnPath: {
+                aligned: false,
+                hasMx: true,
+                name: "mail.acme.example",
+                status: "warn",
+              },
+              spf: { ...ACME_DOMAIN.check.spf, name: "mail.acme.example" },
+              status: "warning",
+            },
+            returnPath: "mail.acme.example",
+          },
+        ])
+      )
+    );
+    renderDomain();
+
+    await expect(
+      screen.findByText(
+        "acme.example’s DMARC record asks for strict SPF alignment (aspf=s), which counts SPF toward DMARC only for acme.example itself, not a subdomain."
+      )
+    ).resolves.toBeDefined();
   });
 
   it("removes a domain once confirmed, and goes back to Domains", async () => {

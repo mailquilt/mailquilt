@@ -593,6 +593,36 @@ describe("scheduling a campaign", () => {
     expect(screen.queryByRole("button", { name: "Schedule" })).toBeNull();
   });
 
+  it("checks its domain's state again when a scheduled campaign comes back as a draft its domain stopped", async () => {
+    let asked = 0;
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => {
+        asked += 1;
+
+        if (asked === 1) {
+          return HttpResponse.json(SCHEDULED);
+        }
+
+        api.use(...ready({ domains: [ACME_DOMAIN_HELD] }));
+
+        return HttpResponse.json({
+          ...DRAFT,
+          schedule: { ...NINE_IN_NEW_YORK, missed: "sending-domain-not-ready" },
+        });
+      })
+    );
+    renderPage();
+
+    await expect.poll(statusLine).toContain("Scheduled for");
+
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60 * 1000));
+
+    await expect(
+      screen.findByRole("link", { name: "See its DNS records" })
+    ).resolves.toBeDefined();
+  });
+
   it("says a draft missed its time because its sending domain failed its DNS check, and how to fix it while it still does", async () => {
     api.use(
       ...ready({ domains: [ACME_DOMAIN_HELD] }),

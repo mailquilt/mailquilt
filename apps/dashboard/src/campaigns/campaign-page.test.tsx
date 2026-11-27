@@ -255,6 +255,27 @@ describe("one campaign's page", () => {
     }
   );
 
+  it("moves focus to what stops it when asking again finds its domain failing, as Send now goes", async () => {
+    api.use(...ready(), http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)));
+    renderPage();
+
+    const sendNow = await screen.findByRole("button", { name: "Send now" });
+
+    sendNow.focus();
+    api.use(...ready({ domains: [ACME_DOMAIN_HELD] }));
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    await expect(
+      screen.findByText("acme.example can’t send yet")
+    ).resolves.toBeDefined();
+    expect(document.activeElement).toBe(
+      screen.getByText("acme.example can’t send yet").closest("[tabindex]")
+    );
+  });
+
   const NOBODY = {
     ...ROAST,
     subscriptions: { ...ROAST.subscriptions, subscribed: 0 },

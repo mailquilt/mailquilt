@@ -1044,6 +1044,21 @@ const CampaignView = ({
     }
   }, [campaign.status]);
 
+  const shownProblem = useRef(problem);
+
+  // WARNING: a problem found by asking again, such as its domain failing a check run elsewhere, puts what fixes it where Send now and Schedule were; focus would drop to the page with them, so it moves to the problem.
+  useEffect(() => {
+    if (shownProblem.current === problem) {
+      return;
+    }
+
+    shownProblem.current = problem;
+
+    if (problem !== undefined && document.activeElement === document.body) {
+      problemRegion.current?.focus();
+    }
+  }, [problem, shownProblem]);
+
   const sayMovedOn = async (tried: string) => {
     moveProblem.clear();
     toasts.add(movedOnMessage(await onMovedOn(), tried));
@@ -1364,13 +1379,15 @@ export const CampaignPage = ({
   const seenStatus = useRef(campaign.data?.status);
   const status = campaign.data?.status;
   const { refetch: countAgain } = count;
+  const { refetch: checkedAgain } = domains;
 
-  // WARNING: a scheduled Campaign that couldn't start at its time comes back as a draft; the count kept from while it waited would say who'd get it now, so it's asked for again. Declared before the effect below, which moves seenStatus on.
+  // WARNING: a scheduled Campaign that couldn't start at its time comes back as a draft; the count and the domains' checks kept from while it waited would say who'd get it now and whether it can go, so they're asked for again. Declared before the effect below, which moves seenStatus on.
   useEffect(() => {
     if (seenStatus.current === "scheduled" && status === "draft") {
       countAgain();
+      checkedAgain();
     }
-  }, [countAgain, status]);
+  }, [checkedAgain, countAgain, status]);
 
   // WARNING: only a send this page watched finish gets a toast; a Campaign opened already sent doesn't.
   useEffect(() => {

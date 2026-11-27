@@ -179,8 +179,13 @@ const spfFound = (domain: SendingDomain) => {
   }
 
   if (returnPath?.aligned === false) {
+    // WARNING: a return path under the domain is unaligned only when its DMARC record asks for strict SPF alignment (aspf=s).
+    const under = returnPath.name.endsWith(`.${domain.domain}`);
+
     return {
-      found: `It isn’t under ${domain.domain}, so SPF doesn’t count toward DMARC.`,
+      found: under
+        ? `${domain.domain}’s DMARC record asks for strict SPF alignment (aspf=s), which counts SPF toward DMARC only for ${domain.domain} itself, not a subdomain.`
+        : `It isn’t under ${domain.domain}, so SPF doesn’t count toward DMARC.`,
       mark: "warn" as const,
     };
   }

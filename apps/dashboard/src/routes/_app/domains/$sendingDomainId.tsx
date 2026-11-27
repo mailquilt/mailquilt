@@ -28,7 +28,7 @@ const Domain = () => {
 
   return (
     <DomainPage
-      key={active.id}
+      key={`${active.id}/${sendingDomainId}`}
       organization={active}
       sendingDomainId={sendingDomainId}
     />
