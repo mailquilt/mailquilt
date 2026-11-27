@@ -202,6 +202,11 @@ const TENANT_ENDPOINTS = {
       client.providerConnections.delete({
         params: { organizationId, providerConnectionId },
       }),
+  "PUT /api/organizations/:organizationId/provider-connections/:providerConnectionId/campaign-default":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.makeCampaignDefault({
+        params: { organizationId, providerConnectionId },
+      }),
   "POST /api/organizations/:organizationId/provider-connections/:providerConnectionId/test-emails":
     (client: Client, { organizationId, providerConnectionId }: Target) =>
       client.providerConnections.sendTestEmail({
@@ -462,6 +467,10 @@ layer(TestApp, { timeout: "2 minutes" })(
             .delete({ params: foreign })
             .pipe(Effect.flip);
 
+          const madeDefault = yield* outsider.providerConnections
+            .makeCampaignDefault({ params: foreign })
+            .pipe(Effect.flip);
+
           const connections = yield* outsider.providerConnections.list({
             params,
           });
@@ -469,6 +478,7 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.strictEqual(testEmail._tag, "ProviderConnectionNotFound");
           assert.strictEqual(edit._tag, "ProviderConnectionNotFound");
           assert.strictEqual(removal._tag, "ProviderConnectionNotFound");
+          assert.strictEqual(madeDefault._tag, "ProviderConnectionNotFound");
           assert.lengthOf(
             yield* owner.providerConnections.list({
               params: { organizationId: target.organizationId },

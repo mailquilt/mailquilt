@@ -117,6 +117,33 @@ describe("writing and editing a campaign", () => {
     ).resolves.toBeDefined();
   });
 
+  it("starts a new draft with the Organization's default connection for Campaigns", async () => {
+    const create = answerWith(DRAFT, 201);
+
+    const ses = {
+      ...POSTMARK,
+      defaultForCampaigns: true,
+      from: { email: "news@ses.example" },
+      id: "pcn_01h455vb4pex5vsknk084sn02r",
+      name: "SES",
+    };
+
+    api.use(
+      ...ready({ connections: [POSTMARK, ses] }),
+      http.post(CAMPAIGNS, create.handler)
+    );
+    renderWithOrganizations(<NewCampaignPage organization={organization} />);
+
+    await screen.findByLabelText("Subject");
+    writeTheEmail();
+    submit("Save draft");
+
+    await expect(create.received).resolves.toMatchObject({
+      from: ses.from,
+      providerConnectionId: ses.id,
+    });
+  });
+
   it("says what each field still needs, counts them, and focuses the first", async () => {
     const second = { ...POSTMARK, id: "pcn_01h455vb4pex5vsknk084sn02r" };
     api.use(

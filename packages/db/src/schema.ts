@@ -319,6 +319,8 @@ export const suppressions = pgTable(
  * ID (ADR 0009); both are null for an SMTP server that needs no sign-in,
  * and never for SES.
  * `emails_per_minute` is its sending rate, null when it has none.
+ * `default_for_campaigns` marks the one a new Campaign starts with, at most
+ * one per Organization.
  */
 export const providerConnections = pgTable(
   "provider_connections",
@@ -335,6 +337,9 @@ export const providerConnections = pgTable(
     credentials: text("credentials"),
     credentialsKeyVersion: integer("credentials_key_version"),
     emailsPerMinute: integer("emails_per_minute"),
+    defaultForCampaigns: boolean("default_for_campaigns")
+      .notNull()
+      .default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -355,6 +360,9 @@ export const providerConnections = pgTable(
       "provider_connections_credentials_check",
       sql`(${table.credentials} is null) = (${table.credentialsKeyVersion} is null)`
     ),
+    uniqueIndex("provider_connections_default_for_campaigns_key")
+      .on(table.organizationId)
+      .where(sql`${table.defaultForCampaigns}`),
     check(
       "provider_connections_emails_per_minute_check",
       sql`${table.emailsPerMinute} between 10 and 60000`

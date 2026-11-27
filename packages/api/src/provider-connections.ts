@@ -4,6 +4,7 @@ import {
   createProviderConnection,
   deleteProviderConnection,
   listProviderConnections,
+  makeCampaignDefault,
   sendTestEmail,
   updateProviderConnection,
 } from "@repo/core";
@@ -78,6 +79,12 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
       })
       .handle("delete", ({ params }) =>
         deleteProviderConnection(params.providerConnectionId).pipe(
+          asMemberOf(params.organizationId),
+          signedIn
+        )
+      )
+      .handle("makeCampaignDefault", ({ params }) =>
+        makeCampaignDefault(params.providerConnectionId).pipe(
           asMemberOf(params.organizationId),
           signedIn
         )

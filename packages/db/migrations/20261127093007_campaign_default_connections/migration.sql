@@ -1,0 +1,2 @@
+ALTER TABLE "provider_connections" ADD COLUMN "default_for_campaigns" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "provider_connections_default_for_campaigns_key" ON "provider_connections" ("organization_id") WHERE "default_for_campaigns";

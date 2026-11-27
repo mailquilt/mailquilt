@@ -101,6 +101,17 @@ export class ProviderConnections extends Context.Service<
     readonly remove: (
       id: ProviderConnectionId
     ) => Effect.Effect<void, ProviderConnectionNotFound, CurrentOrganization>;
+    /**
+     * Makes a connection the one a new Campaign starts with, in place of
+     * any other.
+     */
+    readonly makeCampaignDefault: (
+      id: ProviderConnectionId
+    ) => Effect.Effect<
+      ProviderConnection,
+      ProviderConnectionNotFound,
+      CurrentOrganization
+    >;
     readonly withCredentials: (
       id: ProviderConnectionId
     ) => Effect.Effect<
@@ -160,6 +171,14 @@ export const updateProviderConnection = (
     const connections = yield* ProviderConnections;
 
     return yield* connections.update(id, changes);
+  });
+
+/** Makes a Provider Connection the one the Organization's new Campaigns start with. */
+export const makeCampaignDefault = (id: ProviderConnectionId) =>
+  Effect.gen(function* makeOrganizationCampaignDefault() {
+    const connections = yield* ProviderConnections;
+
+    return yield* connections.makeCampaignDefault(id);
   });
 
 /** Removes a Provider Connection and its saved credentials. */

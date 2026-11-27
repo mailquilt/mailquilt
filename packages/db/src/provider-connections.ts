@@ -145,11 +145,13 @@ interface ConnectionRow {
   readonly settings: unknown;
   readonly signsIn: boolean;
   readonly emailsPerMinute: number | null;
+  readonly defaultForCampaigns: boolean;
   readonly createdAt: Date;
 }
 
 const connectionColumns = {
   createdAt: providerConnections.createdAt,
+  defaultForCampaigns: providerConnections.defaultForCampaigns,
   emailsPerMinute: providerConnections.emailsPerMinute,
   fromEmail: providerConnections.fromEmail,
   fromName: providerConnections.fromName,
@@ -163,6 +165,7 @@ const connectionColumns = {
 const toConnection = (row: ConnectionRow) => {
   const basics = {
     createdAt: DateTime.fromDateUnsafe(row.createdAt),
+    defaultForCampaigns: row.defaultForCampaigns,
     emailsPerMinute: row.emailsPerMinute,
     from:
       row.fromName === null
@@ -267,6 +270,49 @@ export const ProviderConnectionsLive = Layer.effect(
 
           return yield* decodeConnection(toConnection(created));
         }).pipe(Effect.orDie),
+
+      // WARNING: the partial unique index allows one default per Organization at every moment, so the Organization's connections are locked first, then the old default is cleared before the new one is set; without the lock, two at once could each miss the other's new default and fail on the index.
+      makeCampaignDefault: (id) =>
+        db
+          .transaction(() =>
+            Effect.gen(function* makeCampaignDefault() {
+              const organization = yield* currentOrganizationId;
+
+              yield* db
+                .select({ id: providerConnections.id })
+                .from(providerConnections)
+                .where(eq(providerConnections.organizationId, organization))
+                .for("update")
+                .pipe(Effect.orDie);
+
+              yield* db
+                .update(providerConnections)
+                .set({ defaultForCampaigns: false })
+                .where(
+                  and(
+                    eq(providerConnections.organizationId, organization),
+                    eq(providerConnections.defaultForCampaigns, true)
+                  )
+                )
+                .pipe(Effect.orDie);
+
+              const [made] = yield* db
+                .update(providerConnections)
+                .set({ defaultForCampaigns: true })
+                .where(inOrganization(organization, id))
+                .returning(connectionColumns)
+                .pipe(Effect.orDie);
+
+              if (made === undefined) {
+                return yield* new ProviderConnectionNotFound();
+              }
+
+              return yield* decodeConnection(toConnection(made)).pipe(
+                Effect.orDie
+              );
+            })
+          )
+          .pipe(Effect.catchTag("SqlError", Effect.die)),
 
       remove: (id) =>
         Effect.gen(function* removeConnection() {
