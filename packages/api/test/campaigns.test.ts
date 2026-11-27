@@ -182,6 +182,8 @@ const SIX_EMAILS = 6;
 
 const MAX_CLOCK_TICKS = 120;
 
+const STALL_MS = 30_000;
+
 layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   test.effect(
     "creates a draft, changes it, and lists Campaigns newest first",
@@ -1315,6 +1317,81 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         );
 
         yield* Fiber.join(sending);
+      }).pipe(withOwnClock)
+  );
+
+  test.effect(
+    "sends an email whose slot passed while its batch was held up at once, and the next with it, then spaces them again",
+    () =>
+      Effect.gen(function* lateWake() {
+        const owner = yield* draftCampaign;
+
+        const { campaign, campaignParams, client, connection, list, params } =
+          owner;
+
+        yield* client.providerConnections.update({
+          params: { ...params, providerConnectionId: connection.id },
+          payload: {
+            emailsPerMinute: TEN_A_MINUTE,
+            from: connection.from,
+            name: connection.name,
+            smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
+          },
+        });
+        yield* addContacts(
+          owner,
+          [...THREE_CONTACTS, "katherine@example.com"],
+          [list.id]
+        );
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const outbox = yield* SmtpOutbox;
+        const [batch] = yield* (yield* QueueInbox).takeAll;
+        const start = yield* Clock.currentTimeMillis;
+
+        const sentAt = outbox.sent.pipe(
+          Effect.map((sends) =>
+            sends
+              .filter((sent) => sent.email.subject === campaign.subject)
+              .map((sent) => DateTime.toEpochMillis(sent.at) - start)
+          )
+        );
+
+        // WARNING: the clock moves only when the test moves it, so each email is recorded at the exact time it was sent; the test waits in real time only for the batch's queries.
+        const sentOnce = (count: number) =>
+          Effect.promise(() => setTimeout(REAL_PAUSE_MS)).pipe(
+            Effect.andThen(sentAt),
+            Effect.repeat({
+              times: MAX_CLOCK_TICKS,
+              until: (sent) => sent.length >= count,
+            })
+          );
+
+        const sending = yield* worker
+          .deliver(batch ?? assert.fail())
+          .pipe(Effect.forkChild);
+
+        const beforeStall = yield* sentOnce(1);
+
+        yield* TestClock.adjust(Duration.millis(STALL_MS));
+
+        const afterStall = yield* sentOnce(3);
+
+        yield* TestClock.adjust(Duration.millis(SIX_SECONDS_MS));
+
+        const all = yield* sentOnce(4);
+
+        yield* Fiber.join(sending);
+
+        assert.deepStrictEqual(beforeStall, [0]);
+        assert.deepStrictEqual(afterStall, [0, STALL_MS, STALL_MS]);
+        assert.deepStrictEqual(all, [
+          0,
+          STALL_MS,
+          STALL_MS,
+          STALL_MS + SIX_SECONDS_MS,
+        ]);
       }).pipe(withOwnClock)
   );
 
