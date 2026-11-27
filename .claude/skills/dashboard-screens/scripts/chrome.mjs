@@ -21,6 +21,9 @@ const SESSION_COOKIE = "__Secure-mailquilt.session_token";
 
 const PHONE_BELOW = 700;
 
+// WARNING: a popup starts its opening animation a frame or two after the click, so settling needs this many frames in a row with nothing animating.
+const CALM_FRAMES = 6;
+
 /** Reads `--name value` pairs into an object; a repeated flag becomes an array. */
 export const readArgs = (argv) => {
   const args = {};
@@ -133,6 +136,56 @@ export const openPage = async ({ width, theme }) => {
     return reply.result?.result?.value;
   };
 
+  const inFlight = new Set();
+  let lastActivity = Date.now();
+
+  listeners.add(({ method, params }) => {
+    if (method === "Network.requestWillBeSent") {
+      inFlight.add(params.requestId);
+      lastActivity = Date.now();
+    } else if (
+      method === "Network.loadingFinished" ||
+      method === "Network.loadingFailed"
+    ) {
+      inFlight.delete(params.requestId);
+      lastActivity = Date.now();
+    }
+  });
+
+  const settle = async ({ quiet = 400, max = 10_000 } = {}) => {
+    const deadline = Date.now() + max;
+
+    lastActivity = Date.now();
+
+    while (
+      Date.now() < deadline &&
+      (inFlight.size > 0 || Date.now() - lastActivity < quiet)
+    ) {
+      await sleep(50);
+    }
+
+    await evaluate(`Promise.race([
+      new Promise((resolve) => setTimeout(resolve, ${Math.max(deadline - Date.now(), 0)})),
+      (async () => {
+        await document.fonts.ready;
+        const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+        const running = () => document.getAnimations().filter((animation) =>
+          animation.playState === "running" &&
+          Number.isFinite(animation.effect?.getComputedTiming().endTime));
+        for (let calmFrames = 0; calmFrames < ${CALM_FRAMES}; ) {
+          await frame();
+          const animations = running();
+          if (animations.length === 0) {
+            calmFrames += 1;
+          } else {
+            calmFrames = 0;
+            await Promise.all(animations.map((animation) => animation.finished.catch(() => {})));
+          }
+        }
+      })(),
+    ])`);
+  };
+
   await send("Network.enable");
 
   const session = process.env.MAILQUILT_SESSION;
@@ -175,6 +228,7 @@ export const openPage = async ({ width, theme }) => {
     evaluate,
     onMessage: (listener) => listeners.add(listener),
     send,
+    settle,
   };
 };
 
@@ -259,7 +313,9 @@ export const renderSheet = async (htmlPath, width) => {
 
   try {
     await navigate(page, `file://${htmlPath}`);
-    await sleep(800);
+    await page.evaluate(
+      "Promise.all([...document.images].map((image) => image.decode()))"
+    );
 
     const height = await page.evaluate("document.documentElement.scrollHeight");
 

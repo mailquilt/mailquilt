@@ -9,12 +9,14 @@ Makes the evidence `docs/agents/design.md` asks for: the screenshot matrix (ever
 
 ## 1. Run the app
 
-In its own terminal, from the repository root:
+In the background, from the repository root:
 
 ```bash
 pnpm --filter dashboard build          # the server serves dashboard/dist/client
-(cd apps/server && set -a && . ./.env && set +a && node src/main.ts)
+(cd apps/server && node --env-file=.env src/main.ts)
 ```
+
+Wait for it with one command that ends when it answers, such as `until curl -fs localhost:$PORT/health; do sleep 1; done` run in the background, not by sleeping and checking by hand. If another agent's app is running, give yours its own `PORT`, `APP_URL` and database, set `MAILQUILT_URL` to match, and stop only your own server.
 
 `apps/server/.env` is local only. It needs `DATABASE_URL` (the `mailquilt-postgres` container), `APP_URL=http://localhost:3000`, `AUTH_SECRET`, `ENCRYPTION_KEYS` (`1:` followed by `openssl rand -base64 32`) and `PORT`. Migrate a fresh database with `pnpm --filter @repo/db migrate`. Rebuild the dashboard after every change you want to see.
 
@@ -60,12 +62,14 @@ node $S/filmstrip.mjs --out /tmp/shots --name home-load --path / --width 1280
 ```
 
 - Widths default to 320, 390, 768, 1024, 1440, 1920 and 2560. Phones (below 700 px) are emulated as mobile, so dialogs open as sheets.
+- While you iterate, shoot only the state you changed with `--widths 390,1440`. Shoot the full matrix once, when the build is finished.
+- Each shot has its own Chrome, and 4 run at a time (`--parallel`). A shot is taken once the page has settled: no request in flight, fonts loaded, and no opening animation still running. Each step waits the same way.
 - Clicks are real mouse clicks at the element's centre, and keys are real key presses, so focus moves as it does for a person. Each line of output names what has focus in that shot: use it to check focus paths (where focus goes when a dialog opens and closes, after a submit, after an error).
 - `text=Label` matches only buttons, links and menu items. Reach a field with a CSS selector instead, such as `click=input[type=email]`.
 - `text=Label` matches the start of an element's text, so a menu row whose text continues ("Bolt WeeklyOwner") is found.
 - The scripts refuse to click Sign out, Delete, Remove or Revoke, so a run can't end the session or delete data. Sign-in is rate-limited, so a lost session costs a wait.
 - A run stops with a message, and saves nothing for that shot, when the app can't be reached or a click matches nothing, so a wrong screen is never saved as evidence. Each shot's Chrome and its temporary profile are removed afterwards.
-- A request the page retries (TanStack Query retries three times by default) needs a longer `--wait` before its error shows.
+- A request the page retries (TanStack Query retries three times by default) pauses between tries, so the page looks settled before its error shows. Pass `--wait <ms>` to wait that long instead.
 
 On phones the sidebar is a sheet, so anything in it (the Organization switcher, the account menu, navigation) is only reachable once the sheet is open. Shoot phones separately and open it first, as a person would, or the screenshot shows a menu no one can see:
 
