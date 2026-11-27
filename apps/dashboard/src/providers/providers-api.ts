@@ -206,3 +206,32 @@ export const useSendTestEmail = (
         })
       ),
   });
+
+/**
+ * The URL an SES connection's SNS topic posts its bounces and complaints
+ * to. It doesn't change, so it's asked for once per page. Only an SES
+ * connection has one, so it waits (`enabled`) until the connection is known
+ * to be one.
+ */
+export const useSesNotificationsUrl = (
+  organizationId: OrganizationId,
+  providerConnectionId: ProviderConnectionId,
+  { enabled = true }: { readonly enabled?: boolean } = {}
+) =>
+  useQuery({
+    enabled,
+    queryFn: ({ signal }) =>
+      callApi(
+        (client) =>
+          client.providerConnections.sesNotificationsUrl({
+            params: { organizationId, providerConnectionId },
+          }),
+        signal
+      ),
+    queryKey: [
+      ...connectionsKey(organizationId),
+      providerConnectionId,
+      "ses-notifications-url",
+    ],
+    staleTime: Number.POSITIVE_INFINITY,
+  });

@@ -80,3 +80,14 @@ export const StepBlock = ({
     </span>
   );
 };
+
+/**
+ * The seam joining one step's block to the next: solid ink below a done
+ * step, dashed for what's to come. Decorative.
+ */
+export const StepSeam = ({ done = false }: { done?: boolean }) => (
+  <span
+    aria-hidden="true"
+    className={`absolute top-10 bottom-0 left-[19px] w-0 border-l-2 max-sm:top-8 max-sm:left-[15px] ${done ? "border-solid border-(--mq-block-ink)" : "border-dashed border-kumo-fill"}`}
+  />
+);

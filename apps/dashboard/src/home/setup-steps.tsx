@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
-import { StepBlock } from "../brand/quilt-block.tsx";
+import { StepBlock, StepSeam } from "../brand/quilt-block.tsx";
 import type { StepState } from "../brand/quilt-block.tsx";
 import { PlusIcon } from "../icons/icons.tsx";
 import { LoadFailed } from "../layout/empty-state.tsx";
@@ -148,13 +148,6 @@ const NotBuiltYet = () => (
   </p>
 );
 
-const Seam = ({ done }: { done: boolean }) => (
-  <span
-    aria-hidden="true"
-    className={`absolute top-10 bottom-0 left-[19px] w-0 border-l-2 max-sm:top-8 max-sm:left-[15px] ${done ? "border-solid border-(--mq-block-ink)" : "border-dashed border-kumo-fill"}`}
-  />
-);
-
 const STEP_LOOK: Record<
   StepState,
   { row: string; text: string; title: string; titleNote: string }
@@ -211,7 +204,7 @@ const StepRow = ({
       aria-current={isNext ? "step" : undefined}
       className={`relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-5 max-sm:grid-cols-[2rem_minmax(0,1fr)] max-sm:gap-x-4 ${look.row}`}
     >
-      {last ? null : <Seam done={state === "done"} />}
+      {last ? null : <StepSeam done={state === "done"} />}
       <StepBlock number={number} state={state} />
       <div className={look.text}>
         <h2 className={look.title}>

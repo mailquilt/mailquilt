@@ -170,6 +170,35 @@ describe("providers page", () => {
     ).toStrictEqual([]);
   });
 
+  it("offers the steps for bounces and complaints in an SES connection's menu only", async () => {
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK, SES]))
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for SES" })
+    );
+
+    const bounces = await screen.findByRole("menuitem", {
+      name: "Bounces and complaints",
+    });
+
+    expect(bounces.getAttribute("href")).toBe(`/providers/${SES.id}/bounces`);
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "More for Postmark" }));
+
+    await screen.findByRole("menuitem", { name: "Edit" });
+
+    expect(
+      screen.queryByRole("menuitem", { name: "Bounces and complaints" })
+    ).toBeNull();
+  });
+
   it("makes another connection the default for new Campaigns from its menu", async () => {
     let made = "";
     api.use(
