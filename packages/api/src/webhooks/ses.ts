@@ -9,8 +9,8 @@ import {
 
 import { tokenParam } from "../public-pages/responses.ts";
 
-// WARNING: SNS posts messages of up to 256 KB, more than the 64 KiB the API's own routes take, and one refused for size is never sent again.
-const MAX_SNS_BODY_SIZE = ByteSize.kibibytes(256);
+// WARNING: SNS's 256 KB limit is on the Message, which its envelope wraps and escapes again, doubling each quote and backslash; 1 MiB holds the largest one, and one refused for size is never sent again.
+const MAX_SNS_BODY_SIZE = ByteSize.mebibytes(1);
 
 const answer = (status: number, text: string) =>
   HttpServerResponse.text(text, { status });

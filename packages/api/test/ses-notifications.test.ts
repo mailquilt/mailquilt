@@ -147,6 +147,12 @@ const postBody = (url: string, body: string) =>
 
 const DAY_MS = 86_400_000;
 
+const RECIPIENTS_AT_ONCE = [1, 2, 3, 4, 5, 6, 7, 8];
+
+const QUOTES_NEAR_SNS_LIMIT = 120_000;
+
+const OVER_ONE_MIB = 1024 * 1024 + 1;
+
 const EIGHT_DAYS_AGO = new Date(Date.now() - 8 * DAY_MS);
 
 // WARNING: delivery events have partitions only from the month the database was made, so an event moved into an earlier month needs one made for it.
@@ -355,31 +361,56 @@ layer(TestApp, { timeout: "2 minutes" })(
         Effect.gen(function* reportedTwice() {
           const owner = yield* sesOrganization;
           const sql = yield* SqlClient.SqlClient;
-          const sent = yield* sendThroughSes(owner, ["full@example.com"]);
+          const emails = RECIPIENTS_AT_ONCE.map((n) => `full-${n}@example.com`);
+          const sent = yield* sendThroughSes(owner, emails);
 
-          const bounce = sesBounce(
-            sent.messageIdOf("full@example.com"),
-            "Transient"
+          // WARNING: both copies of each bounce are posted at once, so a check that can't see the other's uncommitted event would record it twice.
+          yield* Effect.all(
+            emails.flatMap((email) => {
+              const bounce = sesBounce(sent.messageIdOf(email), "Transient");
+
+              return [
+                postSigned(owner.url, notification(bounce)),
+                postSigned(owner.url, notification(bounce)),
+              ];
+            }),
+            { concurrency: "unbounded" }
           );
-
-          yield* postSigned(owner.url, notification(bounce));
-          yield* postSigned(owner.url, notification(bounce));
 
           const events = yield* sql`
           select 1 from delivery_events where campaign_id = ${sent.campaignId} and kind = 'soft-bounced'
         `;
 
-          assert.strictEqual(events.length, 1);
+          assert.strictEqual(events.length, emails.length);
         })
     );
 
-    test.effect("refuses a message larger than SNS sends", () =>
-      Effect.gen(function* tooLarge() {
-        const { url } = yield* sesOrganization;
-        const status = yield* postBody(url, "x".repeat(257 * 1024));
+    test.effect(
+      "records a bounce SNS sends at its largest, and refuses a body larger than any it sends",
+      () =>
+        Effect.gen(function* sizes() {
+          const owner = yield* sesOrganization;
+          const signer = yield* SnsSigner;
+          const sent = yield* sendThroughSes(owner, ["gone@example.com"]);
 
-        assert.strictEqual(status, 413);
-      })
+          // WARNING: SES's own words can be long and full of quotes, each of which SNS's envelope escapes again, so this body is far over SNS's 256 KB Message limit.
+          const message = JSON.stringify({
+            ...JSON.parse(
+              sesBounce(sent.messageIdOf("gone@example.com"), "Permanent")
+            ),
+            diagnosticCode: '"'.repeat(QUOTES_NEAR_SNS_LIMIT),
+          });
+
+          const body = JSON.stringify(signer.sign(notification(message)));
+          const largest = yield* postBody(owner.url, body);
+          const tooLarge = yield* postBody(owner.url, "x".repeat(OVER_ONE_MIB));
+
+          assert.isAbove(body.length, 256 * 1024);
+          assert.deepStrictEqual([largest, tooLarge], [200, 413]);
+          assert.deepStrictEqual(yield* suppressionsOf(owner), [
+            ["gone@example.com", "hard-bounce"],
+          ]);
+        })
     );
 
     test.effect("refuses a message SNS sent more than an hour ago", () =>

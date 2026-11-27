@@ -18,6 +18,8 @@ const EVENT_KIND = {
 } as const satisfies Record<SesFeedbackKind, string>;
 
 interface RecipientRow {
+  readonly campaign_id: string;
+  readonly contact_id: string;
   readonly email: string;
 }
 
@@ -59,27 +61,14 @@ export const DeliveryFeedbackLive = Layer.effect(
                 return;
               }
 
+              // WARNING: the recipient's row is locked in a statement of its own, so a second copy of this bounce in another SNS message waits here, and its check below then sees this one's event.
               const { rows: recipients } = yield* db.execute<RecipientRow>(sql`
-                with recipient as (
-                  select campaign_id, contact_id, email
-                  from campaign_recipients
-                  where organization_id = ${organization}
-                    and provider_message_id = ${feedback.providerMessageId}
-                  limit 1
-                ),
-                event as (
-                  insert into delivery_events (organization_id, campaign_id, contact_id, kind, provider_message_id)
-                  select ${organization}, r.campaign_id, r.contact_id, ${EVENT_KIND[feedback.kind]}, ${feedback.providerMessageId}
-                  from recipient r
-                  where not exists (
-                    select 1 from delivery_events e
-                    where e.organization_id = ${organization}
-                      and e.campaign_id = r.campaign_id
-                      and e.contact_id = r.contact_id
-                      and e.kind = ${EVENT_KIND[feedback.kind]}
-                  )
-                )
-                select email from recipient
+                select campaign_id, contact_id, email
+                from campaign_recipients
+                where organization_id = ${organization}
+                  and provider_message_id = ${feedback.providerMessageId}
+                limit 1
+                for update
               `);
 
               const [recipient] = recipients;
@@ -87,6 +76,18 @@ export const DeliveryFeedbackLive = Layer.effect(
               if (recipient === undefined) {
                 return;
               }
+
+              yield* db.execute(sql`
+                insert into delivery_events (organization_id, campaign_id, contact_id, kind, provider_message_id)
+                select ${organization}, ${recipient.campaign_id}, ${recipient.contact_id}, ${EVENT_KIND[feedback.kind]}, ${feedback.providerMessageId}
+                where not exists (
+                  select 1 from delivery_events
+                  where organization_id = ${organization}
+                    and campaign_id = ${recipient.campaign_id}
+                    and contact_id = ${recipient.contact_id}
+                    and kind = ${EVENT_KIND[feedback.kind]}
+                )
+              `);
 
               const id = yield* newSuppressionId.pipe(
                 Effect.provideService(SecureRandom.SecureRandom, random)
