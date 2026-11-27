@@ -83,7 +83,7 @@ Backends are listed in [architecture.md](architecture.md#deployment-targets).
 
 ### Public endpoints
 
-- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe and preferences links use it now (#12, #13); tracking and bounce (VERP) tokens will (#21, #23).
+- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe and preferences links use it now (#12, #13), and so do SES notifications URLs (#19); tracking and bounce (VERP) tokens will (#21, #23).
 - **Unsubscribe and preferences pages** send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and a Content Security Policy that loads nothing from elsewhere, because the token is in the address. They escape every value they show.
 
 Planned, with the features they protect.
@@ -98,18 +98,21 @@ Planned, with the features they protect.
 
 ### Incoming webhooks
 
-Planned, with the first Provider that sends them (#19).
+SES's bounces and complaints arrive through SNS at a URL per SES Provider Connection (#19, [ADR 0019](adr/0019-a-provider-webhook-url-carries-a-signed-token-naming-its-connection.md)).
 
-- Every Provider's signature is verified. The SNS signing certificate URL must be HTTPS on an `amazonaws.com` host.
-- Replay protection: timestamps and message-ID deduplication.
-- Processing is idempotent.
+- The URL carries a signed token naming the Organization and the connection, since SNS's signature doesn't say whose topic a message came from. It's the only credential, so the URL is a secret.
+- SNS's signature is verified, versions 1 (SHA-1) and 2 (SHA-256). The signing certificate URL must be HTTPS on `sns.<region>.amazonaws.com`, not just any `amazonaws.com` host, which an S3 bucket could be; so must a subscription's `SubscribeURL`.
+- Replay protection: a message SNS first sent more than an hour ago is refused, and each SNS message ID is recorded for that hour, so a copy changes nothing.
+- A message's ID, delivery event and Suppression are written in one transaction, so a failure leaves nothing and SNS's next try records it whole.
+- A bounce or complaint acts only on an email the Organization sent, found by the message ID SES gave it.
 
 ### Outbound requests (SSRF)
 
 All of these go through one outbound guard:
 
 - SMTP hosts
-- planned, as each is built: outgoing webhooks, RSS fetches, image import from a URL (#25), SNS certificate fetches (#19)
+- SNS signing certificates and subscription confirmations (#19), which connect by name after the check, since the host is always SNS's own; they follow no redirects, time out after 10 seconds and read at most 16 KB
+- planned, as each is built: outgoing webhooks, RSS fetches, image import from a URL (#25)
 
 SES requests don't need it: they go only to SES's own endpoint for the connection's Region, `https://email.<region>.amazonaws.com`, and a Region is checked to be letters, hyphens and a number before it's saved, so a member can't point one at another host (#18).
 

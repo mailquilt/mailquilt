@@ -4,11 +4,13 @@ import { ContactEmail } from "./contact.ts";
 import { SuppressionIdSchema } from "./ids.ts";
 
 /**
- * Why an address is Suppressed: a hard bounce, a spam complaint, or a
- * member adding it by hand (`manual`), on its own or from a CSV file.
+ * Why an address is Suppressed: a hard bounce, a third soft bounce within
+ * 7 days, a spam complaint, or a member adding it by hand (`manual`), on
+ * its own or from a CSV file.
  */
 export const SuppressionReasonSchema = Schema.Literals([
   "hard-bounce",
+  "soft-bounce",
   "complaint",
   "manual",
 ]);

@@ -1,17 +1,7 @@
-import { NodeAddressResolver, NodeDns } from "@effect/platform-node";
-import { outboundGuardLayer } from "@repo/core";
 import { smtpProviderLayer } from "@repo/providers/smtp";
-import { Config, Effect, Layer } from "effect";
+import { Layer } from "effect";
 
-const OutboundGuardFromEnv = Layer.unwrap(
-  Effect.gen(function* outboundGuardFromEnv() {
-    return outboundGuardLayer({
-      blockPrivateNetworks: yield* Config.Boolean(
-        "BLOCK_PRIVATE_NETWORKS"
-      ).pipe(Config.withDefault(false)),
-    });
-  })
-).pipe(Layer.provide(NodeAddressResolver.layer), Layer.provide(NodeDns.layer));
+import { OutboundGuardFromEnv } from "./outbound-guard.ts";
 
 /**
  * Sends through SMTP servers with Nodemailer, behind the outbound guard on the

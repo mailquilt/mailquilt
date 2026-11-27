@@ -29,8 +29,8 @@ export interface SentEmail {
  * again later and `SendFailed` when it can't. Each Provider is its own port, such as
  * `SmtpProvider`, so each runtime provides the adapters that run on it. Use
  * cases don't call one directly: they send with `sendThrough` (ADR 0015).
- * Reading the notifications a Provider sends back joins the port with
- * Provider events (#19, #21).
+ * The notifications a Provider sends back are read by a port of their own,
+ * such as `SesNotifications`.
  */
 export interface Provider<Settings> {
   readonly send: (

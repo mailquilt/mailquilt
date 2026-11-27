@@ -442,6 +442,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../db
+      '@repo/providers':
+        specifier: workspace:*
+        version: link:../providers
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

@@ -6,9 +6,11 @@ import {
   listProviderConnections,
   makeCampaignDefault,
   sendTestEmail,
+  sesNotificationsUrl,
   updateProviderConnection,
 } from "@repo/core";
-import { Option } from "effect";
+import { SesNotificationsUrl } from "@repo/domain";
+import { Effect, Option } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 import { signedIn } from "./auth/signed-in.ts";
@@ -85,6 +87,13 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
       )
       .handle("makeCampaignDefault", ({ params }) =>
         makeCampaignDefault(params.providerConnectionId).pipe(
+          asMemberOf(params.organizationId),
+          signedIn
+        )
+      )
+      .handle("sesNotificationsUrl", ({ params }) =>
+        sesNotificationsUrl(params.providerConnectionId).pipe(
+          Effect.map((url) => new SesNotificationsUrl({ url })),
           asMemberOf(params.organizationId),
           signedIn
         )

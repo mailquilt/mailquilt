@@ -33,12 +33,14 @@ const REASON_LABELS: Record<SuppressionReason, string> = {
   complaint: "Spam complaint",
   "hard-bounce": "Hard bounce",
   manual: "Added by hand",
+  "soft-bounce": "Soft bounces",
 };
 
 const REASON_FILLS: Record<SuppressionReason, string> = {
   complaint: "bg-(--mq-patch-pale)",
   "hard-bounce": "bg-(--mq-patch-grey)",
   manual: "bg-(--mq-block-ink)",
+  "soft-bounce": "bg-(--mq-patch-grey)",
 };
 
 const ReasonLabel = ({

@@ -10,6 +10,7 @@ import {
   forwardOutboxTo,
   postgresPortsLive,
   providePerRequest,
+  SesNotificationsLive,
   SesProviderLive,
   SmtpProviderLive,
   SmtpProviderUnavailable,
@@ -28,7 +29,7 @@ interface Env {
   readonly AUTH_SECRET: string;
   /** Keys that seal Provider Connection credentials, a secret like AUTH_SECRET (ADR 0009). Unset, every request fails saying so. */
   readonly ENCRYPTION_KEYS?: string;
-  /** `true` stops SMTP connections to private networks and loopback too (ADR 0010). */
+  /** `true` stops SMTP connections and SNS fetches to private networks and loopback too (ADR 0010). */
   readonly BLOCK_PRIVATE_NETWORKS?: string;
   /**
    * The System Mailer, optional: `SYSTEM_MAILER_SMTP_HOST`, `_PORT`,
@@ -56,6 +57,9 @@ const configFromEnv = (env: Env) =>
 
 const smtpProviderLive = (env: Env) =>
   SmtpProviderLive.pipe(Layer.provide(configFromEnv(env)));
+
+const sesNotificationsLive = (env: Env) =>
+  SesNotificationsLive.pipe(Layer.provide(configFromEnv(env)));
 
 const postgresPorts = (env: Env) =>
   postgresPortsLive(
@@ -89,6 +93,7 @@ const makeApp = (env: Env) =>
           ),
           smtpProviderLive(env),
           SesProviderLive,
+          sesNotificationsLive(env),
           emailLinks(env)
         )
       ),

@@ -280,8 +280,9 @@ export const subscriptions = pgTable(
  * An Organization-wide block on one email address (`sup_…`): no Campaign
  * goes to it, whatever its Subscriptions. The address is kept as entered and
  * unique per Organization regardless of case, and needn't belong to a
- * Contact. `reason` says where it came from: a hard bounce, a complaint, or a
- * member (`manual`); only a manual one can be removed.
+ * Contact. `reason` says where it came from: a hard bounce, a third soft
+ * bounce within 7 days, a complaint, or a member (`manual`); only a manual
+ * one can be removed.
  */
 export const suppressions = pgTable(
   "suppressions",
@@ -305,7 +306,7 @@ export const suppressions = pgTable(
     ),
     check(
       "suppressions_reason_check",
-      sql`${table.reason} in ('hard-bounce', 'complaint', 'manual')`
+      sql`${table.reason} in ('hard-bounce', 'soft-bounce', 'complaint', 'manual')`
     ),
   ]
 );
@@ -524,6 +525,9 @@ export const campaignRecipients = pgTable(
       table.campaignId,
       table.batch
     ),
+    index("campaign_recipients_provider_message_id_idx")
+      .on(table.organizationId, table.providerMessageId)
+      .where(sql`${table.providerMessageId} is not null`),
     foreignKey({
       columns: [table.organizationId, table.campaignId],
       foreignColumns: [campaigns.organizationId, campaigns.id],
@@ -537,7 +541,9 @@ export const campaignRecipients = pgTable(
 );
 
 /**
- * What happened to each email a Campaign sent, such as `sent`. Partitioned by
+ * What happened to each email a Campaign sent: `sent`, then any `bounced`
+ * (a hard bounce), `soft-bounced` or `complained` its Provider reports.
+ * Partitioned by
  * month of `occurred_at` in its hand-written migration, which Drizzle can't
  * declare; `create_delivery_event_partitions` makes the coming months'
  * partitions, and a scheduled job calls it. Nothing drops them yet; retention
@@ -564,7 +570,36 @@ export const deliveryEvents = pgTable(
       foreignColumns: [campaigns.organizationId, campaigns.id],
       name: "delivery_events_campaign_fkey",
     }).onDelete("cascade"),
-    check("delivery_events_kind_check", sql`${table.kind} in ('sent')`),
+    index("delivery_events_soft_bounces_idx")
+      .on(table.organizationId, table.occurredAt)
+      .where(sql`${table.kind} = 'soft-bounced'`),
+    check(
+      "delivery_events_kind_check",
+      sql`${table.kind} in ('sent', 'bounced', 'soft-bounced', 'complained')`
+    ),
+  ]
+);
+
+/**
+ * The SNS messages an Organization's SES notifications URL has recorded,
+ * by SNS's `MessageId`, so a second copy changes nothing. Each is kept
+ * until `expires_at`, an hour after SNS first sent it, after which a copy
+ * is refused as too old anyway.
+ */
+export const snsMessages = pgTable(
+  "sns_messages",
+  {
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    messageId: text("message_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.organizationId, table.messageId],
+      name: "sns_messages_pkey",
+    }),
   ]
 );
 

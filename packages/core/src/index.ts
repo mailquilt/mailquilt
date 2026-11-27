@@ -208,3 +208,24 @@ export type {
 } from "./instance.ts";
 
 export type { SystemEmail } from "./system-mailer.ts";
+
+export {
+  receiveSesNotification,
+  SesNotifications,
+  sesNotificationsUrl,
+  SNS_MESSAGE_LIFETIME,
+} from "./ses-notifications.ts";
+
+export type { SnsMessage } from "./ses-notifications.ts";
+
+export { DeliveryFeedback } from "./delivery-feedback.ts";
+
+export type {
+  ReceivedSnsMessage,
+  SesFeedback,
+  SesFeedbackKind,
+} from "./delivery-feedback.ts";
+
+export { InvalidSnsMessage } from "./invalid-sns-message.ts";
+
+export { SnsUnreachable } from "./sns-unreachable.ts";

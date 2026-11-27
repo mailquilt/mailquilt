@@ -173,6 +173,8 @@ export { SendFailed, SendFailureReasonSchema } from "./send-failed.ts";
 
 export type { SendFailureReason } from "./send-failed.ts";
 
+export { SesNotificationsUrl } from "./ses-notifications-url.ts";
+
 export { TestEmailSent } from "./test-email-sent.ts";
 
 export { Subscription, SubscriptionStatusSchema } from "./subscription.ts";

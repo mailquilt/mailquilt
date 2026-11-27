@@ -207,6 +207,11 @@ const TENANT_ENDPOINTS = {
       client.providerConnections.makeCampaignDefault({
         params: { organizationId, providerConnectionId },
       }),
+  "GET /api/organizations/:organizationId/provider-connections/:providerConnectionId/ses-notifications-url":
+    (client: Client, { organizationId, providerConnectionId }: Target) =>
+      client.providerConnections.sesNotificationsUrl({
+        params: { organizationId, providerConnectionId },
+      }),
   "POST /api/organizations/:organizationId/provider-connections/:providerConnectionId/test-emails":
     (client: Client, { organizationId, providerConnectionId }: Target) =>
       client.providerConnections.sendTestEmail({
@@ -471,6 +476,26 @@ layer(TestApp, { timeout: "2 minutes" })(
             .makeCampaignDefault({ params: foreign })
             .pipe(Effect.flip);
 
+          const foreignSes = yield* owner.providerConnections.create({
+            params: { organizationId: target.organizationId },
+            payload: {
+              credentials: {
+                accessKeyId: Redacted.make("AKIAIOSFODNN7EXAMPLE"),
+                secretAccessKey: Redacted.make("not a real secret"),
+              },
+              from: { email: "hello@acme.example" },
+              name: "Amazon SES",
+              provider: "ses",
+              ses: { region: "eu-west-1" },
+            },
+          });
+
+          const notificationsUrl = yield* outsider.providerConnections
+            .sesNotificationsUrl({
+              params: { ...params, providerConnectionId: foreignSes.id },
+            })
+            .pipe(Effect.flip);
+
           const connections = yield* outsider.providerConnections.list({
             params,
           });
@@ -479,11 +504,15 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.strictEqual(edit._tag, "ProviderConnectionNotFound");
           assert.strictEqual(removal._tag, "ProviderConnectionNotFound");
           assert.strictEqual(madeDefault._tag, "ProviderConnectionNotFound");
+          assert.strictEqual(
+            notificationsUrl._tag,
+            "ProviderConnectionNotFound"
+          );
           assert.lengthOf(
             yield* owner.providerConnections.list({
               params: { organizationId: target.organizationId },
             }),
-            1
+            2
           );
           assert.deepStrictEqual(
             connections.map((connection) => connection.id),

@@ -1,0 +1,267 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "2a55e831-011e-414f-b00b-88e951db2bbf",
+  "prevIds": ["be8617c9-466f-4610-b0c6-ab215c3a9148"],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": ["table", "public", "sns_messages"],
+      "writes": [
+        "s|tbl|public.sns_messages",
+        "n|tbl|public.sns_messages",
+        "e|tbl|public.sns_messages",
+        "n|rel|public.sns_messages",
+        "n|type|public.sns_messages",
+        "n|rel|public.sns_messages_pkey"
+      ],
+      "reads": ["n|sch|public"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "campaign_recipients",
+        "campaign_recipients_provider_message_id_idx"
+      ],
+      "writes": [
+        "s|idx|public.campaign_recipients_provider_message_id_idx",
+        "n|idx|public.campaign_recipients_provider_message_id_idx",
+        "e|idx|public.campaign_recipients_provider_message_id_idx",
+        "n|rel|public.campaign_recipients_provider_message_id_idx"
+      ],
+      "reads": [
+        "n|tbl|public.campaign_recipients",
+        "n|sch|public",
+        "n|col|public.campaign_recipients.organization_id",
+        "n|col|public.campaign_recipients.provider_message_id"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "delivery_events",
+        "delivery_events_soft_bounces_idx"
+      ],
+      "writes": [
+        "s|idx|public.delivery_events_soft_bounces_idx",
+        "n|idx|public.delivery_events_soft_bounces_idx",
+        "e|idx|public.delivery_events_soft_bounces_idx",
+        "n|rel|public.delivery_events_soft_bounces_idx"
+      ],
+      "reads": [
+        "n|tbl|public.delivery_events",
+        "n|sch|public",
+        "n|col|public.delivery_events.organization_id",
+        "n|col|public.delivery_events.occurred_at"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": ["table", "public", "sns_messages"],
+      "writes": [
+        "s|fk|public.sns_messages.sns_messages_organization_id_organizations_id_fkey",
+        "n|fk|public.sns_messages.sns_messages_organization_id_organizations_id_fkey",
+        "e|fk|public.sns_messages.sns_messages_organization_id_organizations_id_fkey",
+        "n|con|public.sns_messages.sns_messages_organization_id_organizations_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.sns_messages",
+        "n|sch|public",
+        "n|tbl|public.organizations",
+        "n|sch|public",
+        "n|col|public.sns_messages.organization_id",
+        "n|col|public.organizations.id",
+        "e|uniqueness|public.organizations.id"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": ["table", "public", "delivery_events"],
+      "writes": ["s|ck|public.delivery_events.delivery_events_kind_check"],
+      "reads": [
+        "n|tbl|public.delivery_events",
+        "n|sch|public",
+        "n|col|public.delivery_events.kind",
+        "e|col|public.delivery_events.kind"
+      ],
+      "sqlHash": "2a3aa76e398911bd"
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": ["table", "public", "suppressions"],
+      "writes": ["s|ck|public.suppressions.suppressions_reason_check"],
+      "reads": [
+        "n|tbl|public.suppressions",
+        "n|sch|public",
+        "n|col|public.suppressions.reason",
+        "e|col|public.suppressions.reason"
+      ],
+      "sqlHash": "2c46d06807b28ddc"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "sns_messages",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sns_messages",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sns_messages",
+        "name": "message_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sns_messages",
+        "name": "expires_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaign_recipients",
+        "name": "campaign_recipients_provider_message_id_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "provider_message_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"provider_message_id\" is not null",
+        "with": "",
+        "method": "btree",
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "delivery_events",
+        "name": "delivery_events_soft_bounces_idx",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "occurred_at",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": false,
+        "where": "\"kind\" = 'soft-bounced'",
+        "with": "",
+        "method": "btree",
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sns_messages",
+        "name": "sns_messages_organization_id_organizations_id_fkey",
+        "nameExplicit": false,
+        "columns": ["organization_id"],
+        "schemaTo": "public",
+        "tableTo": "organizations",
+        "columnsTo": ["id"],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sns_messages",
+        "name": "sns_messages_pkey",
+        "columns": ["organization_id", "message_id"],
+        "nameExplicit": true,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"delivery_events\",\"delivery_events_kind_check\"]",
+      "set": {
+        "value": "\"kind\" in ('sent', 'bounced', 'soft-bounced', 'complained')"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"suppressions\",\"suppressions_reason_check\"]",
+      "set": {
+        "value": "\"reason\" in ('hard-bounce', 'soft-bounce', 'complaint', 'manual')"
+      }
+    }
+  ]
+}
