@@ -1,6 +1,6 @@
 import { assert } from "@effect/vitest";
 import type { Vitest } from "@effect/vitest";
-import type { OutgoingEmail, SentEmail } from "@repo/core";
+import type { OutgoingEmail, SendDeferred, SentEmail } from "@repo/core";
 import type { SendFailed } from "@repo/domain";
 import { Array as Arr, Effect } from "effect";
 
@@ -8,7 +8,9 @@ import type { ReceivedEmail } from "./mailpit.ts";
 
 /** A Provider adapter set up against a real or recorded inbox. */
 export interface ProviderUnderTest {
-  readonly send: (email: OutgoingEmail) => Effect.Effect<SentEmail, SendFailed>;
+  readonly send: (
+    email: OutgoingEmail
+  ) => Effect.Effect<SentEmail, SendFailed | SendDeferred>;
   readonly received: (to: string) => Effect.Effect<readonly ReceivedEmail[]>;
 }
 

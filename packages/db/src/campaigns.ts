@@ -528,6 +528,26 @@ export const CampaignsLive = Layer.effect(
           `);
         }).pipe(Effect.orDie),
 
+      putBack: (id, contactId) =>
+        Effect.gen(function* putBack() {
+          const organization = yield* currentOrganizationId;
+
+          yield* db
+            .update(campaignRecipients)
+            .set({
+              claimedAt: null,
+              status: "queued",
+            })
+            .where(
+              and(
+                eq(campaignRecipients.organizationId, organization),
+                eq(campaignRecipients.campaignId, id),
+                eq(campaignRecipients.contactId, contactId),
+                eq(campaignRecipients.status, "sending")
+              )
+            );
+        }).pipe(Effect.orDie),
+
       // WARNING: the Campaign is marked sent in a statement after the cut-off claims commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
       settleBatch: (id, batch, claimedBefore, cutOff) =>
         Effect.gen(function* settleBatch() {
@@ -565,19 +585,20 @@ export const CampaignsLive = Layer.effect(
               )
             );
 
+          // WARNING: a recipient another delivery put back in the queue after this one read the batch is unfinished too; counting only claims would let this delivery succeed and leave them queued with no delivery left to send them.
           const { rows } = yield* db.execute<{
-            readonly stillSending: boolean;
+            readonly unsettled: boolean;
           }>(sql`
             select exists (
               select 1 from ${campaignRecipients}
               where organization_id = ${organization}
                 and campaign_id = ${id}
                 and batch = ${batch}
-                and status = 'sending'
-            ) as "stillSending"
+                and status in ('queued', 'sending')
+            ) as "unsettled"
           `);
 
-          return { stillSending: rows[0]?.stillSending === true };
+          return { unsettled: rows[0]?.unsettled === true };
         }).pipe(Effect.orDie),
 
       startSending: (id, batchSize, enqueue, scheduledAt) =>

@@ -92,7 +92,7 @@ export const consumeQueueBatch = (batch: {
               "A queue message didn't decode; it was dropped",
               error
             ),
-          onSuccess: handleQueueMessage,
+          onSuccess: (decoded) => handleQueueMessage(decoded, message.attempts),
         }),
         Effect.matchCauseEffect({
           onFailure: (cause) =>

@@ -102,16 +102,86 @@ const sendWith = (
     }).pipe(Effect.provide(adapter));
   });
 
+const failedFor = (
+  smtp: SmtpSettings,
+  email: OutgoingEmail,
+  options: { readonly blockPrivateNetworks?: boolean } = {}
+) =>
+  Effect.gen(function* sendFailedForGood() {
+    const error = yield* sendWith(smtp, email, options).pipe(Effect.flip);
+
+    if (error._tag === "SendDeferred") {
+      return assert.fail(
+        `Expected a failure for good, got ${error.failed.detail}`
+      );
+    }
+
+    return error;
+  });
+
 const failure = (
   smtp: SmtpSettings,
   to: string,
   options: { readonly blockPrivateNetworks?: boolean } = {}
 ) =>
-  Effect.gen(function* sendFailure() {
-    const error = yield* sendWith(smtp, emailTo(to), options).pipe(Effect.flip);
+  failedFor(smtp, emailTo(to), options).pipe(
+    Effect.map((error) => error.reason)
+  );
 
-    return error.reason;
+const deferral = (smtp: SmtpSettings, to: string) =>
+  Effect.gen(function* sendDeferral() {
+    const error = yield* sendWith(smtp, emailTo(to)).pipe(Effect.flip);
+
+    if (error._tag === "SendFailed") {
+      return assert.fail(`Expected a deferral, got ${error.detail}`);
+    }
+
+    return error.failed.reason;
   });
+
+const END_OF_DATA = "\r\n.\r\n";
+
+const scriptedServer = (
+  replyTo: (command: string) => string,
+  afterMessage: (socket: Socket) => void
+) =>
+  localServer((socket) => {
+    let message: string | undefined;
+
+    socket.write("220 local.test ESMTP\r\n");
+    socket.on("data", (chunk) => {
+      if (message !== undefined) {
+        message += chunk.toString();
+
+        if (message.includes(END_OF_DATA)) {
+          message = undefined;
+          afterMessage(socket);
+        }
+
+        return;
+      }
+
+      for (const line of chunk.toString().split("\r\n").filter(Boolean)) {
+        const command = line.split(" ")[0]?.toUpperCase() ?? "";
+
+        if (command === "DATA") {
+          message = "";
+          socket.write("354 Go ahead\r\n");
+        } else {
+          socket.write(`${replyTo(command)}\r\n`);
+        }
+      }
+    });
+  });
+
+const toLocal = (port: number) =>
+  ({
+    credentials: Option.none(),
+    server: { host: LOCAL_HOST, port, security: "none" },
+  }) satisfies SmtpSettings;
+
+const everythingOk = (command: string) =>
+  command === "QUIT" ? "221 Bye" : "250 OK";
 
 layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
   providerContract(
@@ -266,21 +336,57 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
     })
   );
 
-  test.effect("says a server that doesn't answer is unreachable", () =>
-    Effect.gen(function* closedPort() {
-      const { plain } = yield* Mailpits;
+  test.effect(
+    "says a server that refuses the connection is unreachable, and that it can be tried again later",
+    () =>
+      Effect.gen(function* closedPort() {
+        const { plain } = yield* Mailpits;
 
-      assert.strictEqual(
-        yield* failure(
-          {
-            ...settings(plain, "none"),
-            server: { host: CERTIFICATE_HOST, port: 1, security: "none" },
-          },
-          "closed-port@example.com"
-        ),
-        "unreachable"
-      );
-    })
+        assert.strictEqual(
+          yield* deferral(
+            {
+              ...settings(plain, "none"),
+              server: { host: CERTIFICATE_HOST, port: 1, security: "none" },
+            },
+            "closed-port@example.com"
+          ),
+          "unreachable"
+        );
+      })
+  );
+
+  test.effect(
+    "says the email can be tried again later when the server answers that it can't take it now",
+    () =>
+      Effect.gen(function* busyMailbox() {
+        const port = yield* scriptedServer(
+          (command) =>
+            command === "RCPT"
+              ? "450 4.2.1 Mailbox busy, try again later"
+              : everythingOk(command),
+          (socket) => socket.write("250 OK\r\n")
+        );
+
+        assert.strictEqual(
+          yield* deferral(toLocal(port), "busy@example.com"),
+          "rejected"
+        );
+      })
+  );
+
+  test.effect(
+    "never says to try again an email whose connection was lost after the message was sent, since the server may have taken it",
+    () =>
+      Effect.gen(function* lostAfterMessage() {
+        const port = yield* scriptedServer(everythingOk, (socket) =>
+          socket.destroy()
+        );
+
+        assert.strictEqual(
+          yield* failure(toLocal(port), "lost@example.com"),
+          "unreachable"
+        );
+      })
   );
 
   test.effect("never repeats what a server that isn't SMTP says", () =>
@@ -289,13 +395,10 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
         socket.end("SSH-2.0-OpenSSH_9.6 internal-host\r\n");
       });
 
-      const error = yield* sendWith(
-        {
-          credentials: Option.none(),
-          server: { host: LOCAL_HOST, port, security: "none" },
-        },
+      const error = yield* failedFor(
+        toLocal(port),
         emailTo("not-smtp@example.com")
-      ).pipe(Effect.flip);
+      );
 
       assert.notInclude(error.detail, "OpenSSH");
       assert.notInclude(error.detail, "internal-host");
@@ -331,7 +434,7 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
 
       const error = yield* Fiber.join(sending);
 
-      assert.strictEqual(error.reason, "unreachable");
+      assert.deepInclude(error, { _tag: "SendFailed", reason: "unreachable" });
     })
   );
 
@@ -361,7 +464,10 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
         const error = yield* Fiber.join(sending);
         yield* closed.await;
 
-        assert.strictEqual(error.reason, "unreachable");
+        assert.deepInclude(error, {
+          _tag: "SendFailed",
+          reason: "unreachable",
+        });
       })
   );
 });

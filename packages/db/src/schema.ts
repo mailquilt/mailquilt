@@ -451,7 +451,8 @@ export const campaignLists = pgTable(
  * that send them. Each starts `queued`. A delivery of its batch claims it
  * (`sending`, at `claimed_at`) before handing its email to the Provider, so
  * only that delivery sends it, and then records it `sent`, with the
- * Provider's message ID, or `failed`, with why.
+ * Provider's message ID, or `failed`, with why, or, when the Provider put
+ * it off, puts it back `queued`.
  */
 export const campaignRecipients = pgTable(
   "campaign_recipients",

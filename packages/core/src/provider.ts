@@ -8,6 +8,8 @@ import type {
 import { Context, Effect } from "effect";
 import type { Option } from "effect";
 
+import type { SendDeferred } from "./send-deferred.ts";
+
 /**
  * One email to hand to a Provider: its plain text, its HTML, or both, where
  * replies go when that isn't the sender, and any headers of its own, such as
@@ -30,7 +32,8 @@ export interface SentEmail {
 
 /**
  * What every Provider adapter does: send one email with a Provider
- * Connection's settings. Each Provider is its own port, such as
+ * Connection's settings, failing with `SendDeferred` when it can be tried
+ * again later and `SendFailed` when it can't. Each Provider is its own port, such as
  * `SmtpProvider`, so each runtime provides the adapters that run on it. Use
  * cases don't call one directly: they send with `sendThrough` (ADR 0015).
  * Reading the notifications a Provider sends back joins the port with
@@ -40,7 +43,7 @@ export interface Provider<Settings> {
   readonly send: (
     settings: Settings,
     email: OutgoingEmail
-  ) => Effect.Effect<SentEmail, SendFailed>;
+  ) => Effect.Effect<SentEmail, SendFailed | SendDeferred>;
 }
 
 /** Where an SMTP Provider Connection sends, and what it signs in with, if anything. */

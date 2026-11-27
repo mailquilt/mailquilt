@@ -75,7 +75,13 @@ export const SystemMailerLive = Layer.effect(
               Effect.catch((error) =>
                 Effect.logWarning(
                   "System Mailer couldn't send an account email",
-                  { reason: error.reason, subject: email.subject }
+                  {
+                    reason:
+                      error._tag === "SendDeferred"
+                        ? error.failed.reason
+                        : error.reason,
+                    subject: email.subject,
+                  }
                 )
               )
             );

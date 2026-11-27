@@ -55,7 +55,7 @@ Today a Campaign is sent now, or at a time a member schedules in a time zone the
    - Drop excluded Lists and Segments, pending or unsubscribed Subscriptions, Contacts with an Opt-out, and Suppressed addresses.
    - Remove duplicates.
 3. **Snapshot** the recipients for the Campaign.
-4. **Enqueue** batches. Consumers throttle per Provider Connection, call the Provider adapter, and record the Provider's message ID.
+4. **Enqueue** batches. Consumers throttle per Provider Connection (#18), claim each recipient, call the Provider adapter, and record the outcome right away, so no one is sent it twice (ADR 0014). An email the Provider puts off, with a 4xx reply or a connection that never opened, goes back in the queue for the batch's next delivery, up to the queue's last.
 5. **Update state:** Provider webhooks or inbound bounces update delivery events, Suppressions and Campaign totals.
 6. **Pause, resume and cancel** act on the snapshot. Batches not yet sent are skipped or re-enqueued.
 
