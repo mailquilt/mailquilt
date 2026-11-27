@@ -44,13 +44,15 @@ import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
 import { preferencesUrl } from "./preferences-link.ts";
 import { ProviderConnections } from "./provider-connections.ts";
-import { sendThrough } from "./provider.ts";
-import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
+import type { OutgoingEmail, SentEmail } from "./provider-port.ts";
+import { sendingRateOf, sendThrough } from "./provider.ts";
 import { asQueuedFor, Queue, QUEUE_RETRIES } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { Scheduler } from "./scheduler.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
 import type { SendDeferred } from "./send-deferred.ts";
+import type { SesProvider } from "./ses-provider.ts";
+import type { SmtpProvider } from "./smtp-provider.ts";
 import { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
 import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 
@@ -558,10 +560,11 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
             .withCredentials(batch.providerConnectionId)
             .pipe(Effect.option);
 
-    const interval = connection.pipe(
-      Option.flatMap((opened) =>
-        Option.fromNullishOr(opened.connection.emailsPerMinute)
-      ),
+    const rate = Option.isSome(connection)
+      ? yield* sendingRateOf(connection.value)
+      : Option.none<number>();
+
+    const interval = rate.pipe(
       Option.map((perMinute) => Duration.millis(MINUTE_MS / perMinute))
     );
 
@@ -621,7 +624,7 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         const sent: Effect.Effect<
           SentEmail,
           SendFailed | SendDeferred,
-          SmtpProvider
+          SmtpProvider | SesProvider
         > = Option.match(connection, {
           onNone: () => Effect.fail(NO_CONNECTION),
           onSome: (opened) => sendThrough(opened, email),
@@ -648,6 +651,10 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
               Effect.tapError((notSent) => {
                 const failed =
                   notSent._tag === "SendDeferred" ? notSent.failed : notSent;
+
+                if (notSent._tag === "SendDeferred" && notSent.everyEmail) {
+                  return Ref.set(serverPutOff, true);
+                }
 
                 if (!SERVER_FAILURES.has(failed.reason)) {
                   return Effect.void;

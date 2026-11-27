@@ -25,29 +25,57 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
         )
       )
       .handle("create", ({ params, payload }) =>
-        createProviderConnection({
-          credentials: Option.fromUndefinedOr(payload.credentials),
-          emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
-          from: payload.from,
-          name: payload.name,
-          smtp: payload.smtp,
-        }).pipe(asMemberOf(params.organizationId), signedIn)
+        createProviderConnection(
+          payload.provider === "ses"
+            ? {
+                credentials: payload.credentials,
+                emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
+                from: payload.from,
+                name: payload.name,
+                provider: "ses",
+                ses: payload.ses,
+              }
+            : {
+                credentials: Option.fromUndefinedOr(payload.credentials),
+                emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
+                from: payload.from,
+                name: payload.name,
+                provider: "smtp",
+                smtp: payload.smtp,
+              }
+        ).pipe(asMemberOf(params.organizationId), signedIn)
       )
-      .handle("update", ({ params, payload }) =>
-        updateProviderConnection(params.providerConnectionId, {
-          credentials:
-            payload.credentials === undefined
-              ? "keep"
-              : Option.fromNullishOr(payload.credentials),
+      .handle("update", ({ params, payload }) => {
+        const basics = {
           emailsPerMinute:
             payload.emailsPerMinute === undefined
-              ? "keep"
+              ? ("keep" as const)
               : Option.fromNullishOr(payload.emailsPerMinute),
           from: payload.from,
           name: payload.name,
+        };
+
+        if (payload.provider === "ses") {
+          return updateProviderConnection(params.providerConnectionId, {
+            ...basics,
+            credentials: payload.credentials ?? "keep",
+            provider: "ses",
+            ses: payload.ses,
+          }).pipe(asMemberOf(params.organizationId), signedIn);
+        }
+
+        const credentials =
+          payload.credentials === undefined
+            ? ("keep" as const)
+            : Option.fromNullishOr(payload.credentials);
+
+        return updateProviderConnection(params.providerConnectionId, {
+          ...basics,
+          credentials,
+          provider: "smtp",
           smtp: payload.smtp,
-        }).pipe(asMemberOf(params.organizationId), signedIn)
-      )
+        }).pipe(asMemberOf(params.organizationId), signedIn);
+      })
       .handle("delete", ({ params }) =>
         deleteProviderConnection(params.providerConnectionId).pipe(
           asMemberOf(params.organizationId),

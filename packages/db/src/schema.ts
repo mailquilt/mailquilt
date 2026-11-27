@@ -312,10 +312,12 @@ export const suppressions = pgTable(
 
 /**
  * An Organization's configured sending service (`pcn_…`). `settings` holds
- * where it sends, such as an SMTP server's host, port and encryption, and
- * never a secret. `credentials` is sealed with AES-256-GCM under the key
- * numbered `credentials_key_version`, bound to this row's Organization and
- * ID (ADR 0009); both are null for a server that needs no sign-in.
+ * where it sends, an SMTP server's host, port and encryption or an SES
+ * account's Region, and never a secret. `credentials` is sealed with
+ * AES-256-GCM under the key numbered `credentials_key_version`, bound to
+ * this row's Organization and
+ * ID (ADR 0009); both are null for an SMTP server that needs no sign-in,
+ * and never for SES.
  * `emails_per_minute` is its sending rate, null when it has none.
  */
 export const providerConnections = pgTable(
@@ -343,7 +345,11 @@ export const providerConnections = pgTable(
     ),
     check(
       "provider_connections_provider_check",
-      sql`${table.provider} in ('smtp')`
+      sql`${table.provider} in ('smtp', 'ses')`
+    ),
+    check(
+      "provider_connections_ses_credentials_check",
+      sql`${table.provider} <> 'ses' or ${table.credentials} is not null`
     ),
     check(
       "provider_connections_credentials_check",

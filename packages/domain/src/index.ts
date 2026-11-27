@@ -144,10 +144,12 @@ export {
   MAX_CREDENTIAL_LENGTH,
   MAX_EMAILS_PER_MINUTE,
   MIN_EMAILS_PER_MINUTE,
-  ProviderConnection,
   ProviderConnectionName,
   Sender,
   SenderName,
+  SesAccount,
+  SesCredentials,
+  SesRegion,
   SmtpCredentials,
   SmtpHost,
   SmtpPort,
@@ -156,6 +158,14 @@ export {
 } from "./provider-connection.ts";
 
 export type { SmtpSecurity } from "./provider-connection.ts";
+
+export { ProviderConnectionSchema } from "./provider-connection-schema.ts";
+
+export type { ProviderConnection } from "./provider-connection-schema.ts";
+
+export { SesConnection } from "./ses-connection.ts";
+
+export { SmtpConnection } from "./smtp-connection.ts";
 
 export { RateLimited } from "./rate-limited.ts";
 

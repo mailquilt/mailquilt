@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./ses": "./src/ses.ts",
     "./smtp": "./src/smtp.ts"
   },
   "scripts": {
@@ -13,6 +14,7 @@
   "dependencies": {
     "@repo/core": "workspace:*",
     "@repo/domain": "workspace:*",
+    "aws4fetch": "catalog:",
     "effect": "catalog:",
     "nodemailer": "catalog:"
   },

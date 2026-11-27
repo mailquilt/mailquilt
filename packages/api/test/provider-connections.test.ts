@@ -1,5 +1,6 @@
 import { assert, layer } from "@effect/vitest";
-import { SmtpOutbox } from "@repo/core/testing";
+import { SesOutbox, SmtpOutbox } from "@repo/core/testing";
+import type { ProviderConnection } from "@repo/domain";
 import {
   ProviderConnectionIdSchema,
   SendFailed,
@@ -29,6 +30,11 @@ const SMTP = {
 
 const FROM = { email: "news@acme.example", name: "Acme News" };
 
+const smtpOf = (connection: ProviderConnection) =>
+  connection.provider === "smtp"
+    ? connection
+    : assert.fail("Not an SMTP connection");
+
 const owner = Effect.gen(function* ownerOfOrganization() {
   const cookie = yield* signedInPerson;
   const client = yield* clientWithCookie(cookie);
@@ -49,6 +55,30 @@ const WITH_CREDENTIALS = {
     username: Redacted.make(USERNAME),
   },
 };
+
+const ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
+
+const SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+
+const SES = {
+  credentials: {
+    accessKeyId: Redacted.make(ACCESS_KEY_ID),
+    secretAccessKey: Redacted.make(SECRET_ACCESS_KEY),
+  },
+  from: FROM,
+  name: "SES",
+  provider: "ses",
+  ses: { region: "eu-west-1" },
+} as const;
+
+const lastSesSend = Effect.gen(function* lastRecordedSesSend() {
+  const outbox = yield* SesOutbox;
+  const sent = yield* outbox.sent;
+
+  return Arr.isReadonlyArrayNonEmpty(sent)
+    ? Arr.lastNonEmpty(sent)
+    : assert.fail("Nothing was sent through SES");
+});
 
 const lastSend = Effect.gen(function* lastRecordedSend() {
   const outbox = yield* SmtpOutbox;
@@ -75,8 +105,8 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
         assert.strictEqual(created.name, "Postmark");
         assert.strictEqual(created.provider, "smtp");
         assert.deepStrictEqual({ ...created.from }, FROM);
-        assert.deepStrictEqual({ ...created.smtp }, SMTP);
-        assert.isTrue(created.signsIn);
+        assert.deepStrictEqual({ ...smtpOf(created).smtp }, SMTP);
+        assert.isTrue(smtpOf(created).signsIn);
         assert.deepStrictEqual(
           yield* client.providerConnections.list({ params }),
           [created]
@@ -312,7 +342,7 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
 
       yield* testEmail;
 
-      assert.isFalse(withoutSignIn.signsIn);
+      assert.isFalse(smtpOf(withoutSignIn).signsIn);
 
       assert.strictEqual(
         Redacted.value(replaced.password),
@@ -383,8 +413,8 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
           },
         });
 
-        assert.strictEqual(moved.smtp.host, "relay.acme.example");
-        assert.isFalse(moved.signsIn);
+        assert.strictEqual(smtpOf(moved).smtp.host, "relay.acme.example");
+        assert.isFalse(smtpOf(moved).signsIn);
       })
   );
 
@@ -446,6 +476,204 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
         );
 
         assert.deepStrictEqual(statuses, [400, 400, 400, 201, 201]);
+      })
+  );
+
+  test.effect(
+    "connects an SES account and lists it without its access key",
+    () =>
+      Effect.gen(function* createSes() {
+        const { client, cookie, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: SES,
+        });
+
+        const listed = yield* send(
+          "GET",
+          `/api/organizations/${params.organizationId}/provider-connections`,
+          { headers: { cookie } }
+        );
+
+        const body = yield* Effect.promise(() => listed.text());
+
+        assert.strictEqual(created.provider, "ses");
+        assert.deepStrictEqual(
+          created.provider === "ses" ? { ...created.ses } : undefined,
+          { region: "eu-west-1" }
+        );
+        assert.isNull(created.emailsPerMinute);
+        assert.deepStrictEqual(
+          yield* client.providerConnections.list({ params }),
+          [created]
+        );
+        assert.notInclude(body, ACCESS_KEY_ID);
+        assert.notInclude(body, SECRET_ACCESS_KEY);
+      })
+  );
+
+  test.effect(
+    "sends a test email through the SES account with its access key",
+    () =>
+      Effect.gen(function* sesTestEmail() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: SES,
+        });
+
+        const sent = yield* client.providerConnections.sendTestEmail({
+          params: { ...params, providerConnectionId: created.id },
+          payload: { to: "ada@example.com" },
+        });
+
+        const { email, settings } = yield* lastSesSend;
+
+        assert.strictEqual(sent.messageId, "ses-1");
+        assert.strictEqual(email.to, "ada@example.com");
+        assert.strictEqual(email.subject, TEST_EMAIL_SUBJECT);
+        assert.include(email.text, "(Amazon SES, eu-west-1)");
+        assert.deepStrictEqual(
+          { ...settings.account },
+          { region: "eu-west-1" }
+        );
+        assert.strictEqual(
+          Redacted.value(settings.credentials.accessKeyId),
+          ACCESS_KEY_ID
+        );
+        assert.strictEqual(
+          Redacted.value(settings.credentials.secretAccessKey),
+          SECRET_ACCESS_KEY
+        );
+      })
+  );
+
+  test.effect(
+    "keeps an SES access key for the same Region, and needs it entered again for another Region or Provider",
+    () =>
+      Effect.gen(function* sesKeyFollowsTheAccount() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: SES,
+        });
+
+        const noSignIn = yield* client.providerConnections.create({
+          params,
+          payload: WITHOUT_CREDENTIALS,
+        });
+
+        const { credentials: _entered, ...withoutKey } = SES;
+
+        const connectionParams = {
+          ...params,
+          providerConnectionId: created.id,
+        };
+
+        const renamed = yield* client.providerConnections.update({
+          params: connectionParams,
+          payload: { ...withoutKey, name: "SES (Ireland)" },
+        });
+
+        const errors = yield* Effect.forEach(
+          [
+            {
+              id: created.id,
+              payload: { ...withoutKey, ses: { region: "us-east-1" } },
+            },
+            { id: created.id, payload: WITHOUT_CREDENTIALS },
+            { id: noSignIn.id, payload: withoutKey },
+          ],
+          ({ id, payload }) =>
+            client.providerConnections
+              .update({
+                params: { ...params, providerConnectionId: id },
+                payload,
+              })
+              .pipe(Effect.flip)
+        );
+
+        assert.strictEqual(renamed.name, "SES (Ireland)");
+        assert.deepStrictEqual(
+          errors.map((error) => error._tag),
+          ["CredentialsRequired", "CredentialsRequired", "CredentialsRequired"]
+        );
+        assert.deepStrictEqual(
+          yield* client.providerConnections.list({ params }),
+          [renamed, noSignIn]
+        );
+      })
+  );
+
+  test.effect(
+    "moves a connection from SMTP to SES with the account's access key",
+    () =>
+      Effect.gen(function* smtpToSes() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: WITH_CREDENTIALS,
+        });
+
+        const connectionParams = {
+          ...params,
+          providerConnectionId: created.id,
+        };
+
+        const moved = yield* client.providerConnections.update({
+          params: connectionParams,
+          payload: SES,
+        });
+
+        yield* client.providerConnections.sendTestEmail({
+          params: connectionParams,
+          payload: { to: "ada@example.com" },
+        });
+
+        const { settings } = yield* lastSesSend;
+
+        assert.strictEqual(moved.provider, "ses");
+        assert.strictEqual(
+          Redacted.value(settings.credentials.accessKeyId),
+          ACCESS_KEY_ID
+        );
+      })
+  );
+
+  test.effect(
+    "refuses an SES account without an access key, or with a Region that isn't one",
+    () =>
+      Effect.gen(function* sesRefused() {
+        const { cookie, params } = yield* owner;
+        const { credentials: _entered, ...withoutKey } = SES;
+
+        const sesPayload = {
+          ...SES,
+          credentials: {
+            accessKeyId: ACCESS_KEY_ID,
+            secretAccessKey: SECRET_ACCESS_KEY,
+          },
+        };
+
+        const statuses = yield* Effect.forEach(
+          [
+            withoutKey,
+            { ...sesPayload, ses: { region: "attacker.example/" } },
+            { ...sesPayload, ses: { region: "eu-west-1" } },
+          ],
+          (body) =>
+            send(
+              "POST",
+              `/api/organizations/${params.organizationId}/provider-connections`,
+              { body, headers: { cookie } }
+            ).pipe(Effect.map((response) => response.status))
+        );
+
+        assert.deepStrictEqual(statuses, [400, 400, 201]);
       })
   );
 

@@ -6,7 +6,11 @@ import { Array as Arr, Effect } from "effect";
 
 import type { ReceivedEmail } from "./mailpit.ts";
 
-/** A Provider adapter set up against a real or recorded inbox. */
+/**
+ * A Provider adapter set up against a real or recorded inbox. `received`
+ * gives each email's `messageId` in the form the Provider names it by, such
+ * as an SMTP server's `Message-ID` header.
+ */
 export interface ProviderUnderTest {
   readonly send: (
     email: OutgoingEmail
@@ -80,7 +84,7 @@ export const providerContract = <R>(
     })
   );
 
-  test.effect("returns the ID the message arrives with", () =>
+  test.effect("returns the ID the Provider gave the message", () =>
     Effect.gen(function* messageId() {
       const { received, send } = yield* provider;
       const to = "contract-message-id@example.com";
@@ -89,7 +93,7 @@ export const providerContract = <R>(
       const emails = yield* received(to);
 
       assert.isTrue(Arr.isReadonlyArrayNonEmpty(emails));
-      assert.strictEqual(sent.messageId, `<${emails[0]?.messageId}>`);
+      assert.strictEqual(sent.messageId, emails[0]?.messageId);
     })
   );
 };

@@ -1,9 +1,10 @@
 import type { SendFailed } from "@repo/domain";
 import { Context, DateTime, Effect, Layer, Option, Ref } from "effect";
 
-import { SmtpProvider } from "./provider.ts";
-import type { OutgoingEmail, SmtpSettings } from "./provider.ts";
+import type { OutgoingEmail } from "./provider-port.ts";
 import type { SendDeferred } from "./send-deferred.ts";
+import { SmtpProvider } from "./smtp-provider.ts";
+import type { SmtpSettings } from "./smtp-provider.ts";
 
 /** One email the recording SMTP Provider was asked to send, with the settings it was given, and when by the `Clock`. */
 export interface RecordedSend {

@@ -2,7 +2,7 @@ import { VERIFICATION_EMAIL_SUBJECT } from "@repo/domain";
 import { Cause, Context, Effect, Layer, Option } from "effect";
 
 import { Instance } from "./instance.ts";
-import { SmtpProvider } from "./provider.ts";
+import { SmtpProvider } from "./smtp-provider.ts";
 import { SystemMailerConfig } from "./system-mailer-config.ts";
 
 /** One of Mailquilt's own account emails, in plain text. */

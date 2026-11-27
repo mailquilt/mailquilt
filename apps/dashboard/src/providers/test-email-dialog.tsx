@@ -52,7 +52,15 @@ const sendFailure = (
   reason: SendFailureReason,
   detail: string
 ) => {
-  const server = `${connection.smtp.host}:${connection.smtp.port}`;
+  const host =
+    connection.provider === "ses"
+      ? `email.${connection.ses.region}.amazonaws.com`
+      : connection.smtp.host;
+
+  const server =
+    connection.provider === "ses"
+      ? `Amazon SES in ${connection.ses.region}`
+      : `${connection.smtp.host}:${connection.smtp.port}`;
 
   const byReason: Record<SendFailureReason, Omit<Failure, "detail">> = {
     auth: {
@@ -64,7 +72,7 @@ const sendFailure = (
     blocked: {
       canEdit: true,
       fix: "Mailquilt doesn’t connect to internal addresses, such as a cloud server’s own metadata service. Use your provider’s public host name.",
-      title: `${connection.smtp.host} resolves to an address Mailquilt won’t connect to`,
+      title: `${host} resolves to an address Mailquilt won’t connect to`,
     },
     failed: {
       canEdit: true,
@@ -74,7 +82,7 @@ const sendFailure = (
     "host-not-found": {
       canEdit: true,
       fix: "Check the host name for typos.",
-      title: `${connection.smtp.host} doesn’t exist`,
+      title: `${host} doesn’t exist`,
     },
     rejected: {
       canEdit: true,
@@ -100,7 +108,20 @@ const sendFailure = (
     },
   };
 
-  return { ...byReason[reason], detail } satisfies Failure;
+  if (connection.provider === "smtp") {
+    return { ...byReason[reason], detail } satisfies Failure;
+  }
+
+  const sesFailure =
+    reason === "auth"
+      ? {
+          ...byReason.auth,
+          fix: "Check the access key ID and secret access key in AWS IAM, and that the key may send email through SES.",
+          title: "SES refused the access key",
+        }
+      : byReason[reason];
+
+  return { ...sesFailure, canEdit: false, detail } satisfies Failure;
 };
 
 const failureOf = (connection: ProviderConnection, error: Error) => {

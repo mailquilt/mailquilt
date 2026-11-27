@@ -8,4 +8,6 @@ export { consumeQueueBatch, forwardOutboxTo } from "./queue.ts";
 
 export { providePerRequest } from "./request.ts";
 
+export { SesProviderLive } from "./ses.ts";
+
 export { SmtpProviderLive, SmtpProviderUnavailable } from "./smtp.ts";
