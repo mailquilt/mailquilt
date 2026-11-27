@@ -256,7 +256,10 @@ describe("one campaign's page", () => {
   );
 
   it("moves focus to what stops it when asking again finds its domain failing, as Send now goes", async () => {
-    api.use(...ready(), http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)));
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT))
+    );
     renderPage();
 
     const sendNow = await screen.findByRole("button", { name: "Send now" });

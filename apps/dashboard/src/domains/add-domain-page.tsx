@@ -89,10 +89,12 @@ export const AddDomainPage = ({
   const selectorList = useRef<HTMLFieldSetElement>(null);
 
   // WARNING: adding the last selector allowed takes away Add another selector, and removing one takes its own button, so focus moves to the selector added or the one before it, once it's drawn.
-  const focusSelector = (index: number) =>
-    selectorList.current
-      ?.querySelectorAll<HTMLInputElement>("input")
-      [index]?.focus();
+  const focusSelector = (index: number) => {
+    const inputs =
+      selectorList.current?.querySelectorAll<HTMLInputElement>("input");
+
+    inputs?.[index]?.focus();
+  };
 
   const form = useForm({
     defaultValues: {
