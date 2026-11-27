@@ -14,12 +14,15 @@ export const PasswordField = ({
   className,
   description,
   field,
+  label = "Password",
   size,
 }: {
   autoComplete: "current-password" | "new-password";
   className?: string;
   description?: string;
   field: AnyFieldApi;
+  /** What the field is called, such as "Secret access key"; "Password" by default. */
+  label?: string;
   size?: React.ComponentProps<typeof FormField>["size"];
 }) => {
   const [visible, setVisible] = useState(false);
@@ -29,7 +32,7 @@ export const PasswordField = ({
     <FormField
       addon={
         <InputGroup.Button
-          aria-label="Show password"
+          aria-label={`Show ${label.toLowerCase()}`}
           aria-pressed={visible}
           onClick={() => setVisible((shown) => !shown)}
           size="sm"
@@ -42,7 +45,7 @@ export const PasswordField = ({
       className={className}
       description={description}
       field={field}
-      label="Password"
+      label={label}
       required
       size={size}
       type={visible ? "text" : "password"}

@@ -1,5 +1,9 @@
 import { LinkButton } from "@cloudflare/kumo";
-import type { Organization, ProviderConnectionId } from "@repo/domain";
+import type {
+  Organization,
+  ProviderConnection,
+  ProviderConnectionId,
+} from "@repo/domain";
 import { useNavigate } from "@tanstack/react-router";
 
 import { loadingFirstTime } from "../api.ts";
@@ -20,6 +24,9 @@ import {
 
 const SENDER_DESCRIPTION =
   "Who email sent through this connection is from. Your provider must allow this address.";
+
+const SES_SENDER_DESCRIPTION =
+  "Who email sent through this connection is from. It must be an address or domain verified in SES.";
 
 const SENDER_EXAMPLE = { email: "news@example.com", name: "Acme News" };
 
@@ -44,7 +51,10 @@ const FormPage = ({
   </PageFrame>
 );
 
-/** Connects an SMTP server, then opens its test email on Providers. */
+const senderDescription = (provider: "smtp" | "ses") =>
+  provider === "ses" ? SES_SENDER_DESCRIPTION : SENDER_DESCRIPTION;
+
+/** Connects an SMTP server or an SES account, then opens its test email on Providers. */
 export const ConnectPage = ({
   organization,
 }: {
@@ -56,34 +66,44 @@ export const ConnectPage = ({
   return (
     <FormPage
       description="You’ll send yourself a test email next, to check it works."
-      title="Connect an SMTP server"
+      title="Connect a provider"
     >
       <ConnectionForm
         busy={create.isPending}
         busyLabel="Connecting…"
         cancelHref="/providers"
-        failureMessage={connectionFailureMessage(create.error)}
-        senderDescription={SENDER_DESCRIPTION}
+        chooseProvider
+        failureMessage={(provider) =>
+          connectionFailureMessage(create.error, provider)
+        }
+        onProviderChange={() => create.reset()}
+        senderDescription={senderDescription}
         senderExample={SENDER_EXAMPLE}
-        onSubmit={({ credentials, settings }) =>
-          create.mutate(
-            credentials === "keep" || credentials === null
-              ? settings
-              : { ...settings, credentials },
-            {
-              onSuccess: (connection) => {
-                navigate({
-                  search: { connected: connection.id },
-                  to: "/providers",
-                });
-              },
-            }
-          )
+        sendingRate
+        onSubmit={(connection) =>
+          create.mutate(connection, {
+            onSuccess: (created) => {
+              navigate({
+                search: { connected: created.id },
+                to: "/providers",
+              });
+            },
+          })
         }
         submitLabel="Connect"
       />
     </FormPage>
   );
+};
+
+const editDescription = (connection: ProviderConnection | undefined) => {
+  if (connection?.provider === "ses") {
+    return "Changing the Region asks for the access key again.";
+  }
+
+  return connection?.signsIn === true
+    ? "Changing the host, port or encryption asks for the username and password again."
+    : "Change where and how this connection sends.";
 };
 
 /** Changes a connection's settings, then opens its test email on Providers. */
@@ -121,24 +141,6 @@ export const EditPage = ({
       );
     }
 
-    if (connection?.provider === "ses") {
-      return (
-        <div className="mq-capped">
-          <TableRegion label="Connection">
-            <EmptyState
-              actions={
-                <LinkButton href="/providers" variant="primary">
-                  Go to Providers
-                </LinkButton>
-              }
-              description="Change it through the API for now."
-              title="SES connections can’t be edited here yet"
-            />
-          </TableRegion>
-        </div>
-      );
-    }
-
     if (connection === undefined) {
       return (
         <div className="mq-capped">
@@ -164,18 +166,18 @@ export const EditPage = ({
         busyLabel="Saving…"
         connection={connection}
         cancelHref="/providers"
-        failureMessage={connectionFailureMessage(update.error)}
-        senderDescription={SENDER_DESCRIPTION}
+        failureMessage={(provider) =>
+          connectionFailureMessage(update.error, provider)
+        }
+        senderDescription={senderDescription}
         senderExample={SENDER_EXAMPLE}
-        onSubmit={({ credentials, settings }) =>
-          update.mutate(
-            credentials === "keep" ? settings : { ...settings, credentials },
-            {
-              onSuccess: (saved) => {
-                navigate({ search: { saved: saved.id }, to: "/providers" });
-              },
-            }
-          )
+        sendingRate
+        onSubmit={(changes) =>
+          update.mutate(changes, {
+            onSuccess: (saved) => {
+              navigate({ search: { saved: saved.id }, to: "/providers" });
+            },
+          })
         }
         submitLabel="Save changes"
       />
@@ -184,11 +186,7 @@ export const EditPage = ({
 
   return (
     <FormPage
-      description={
-        connection?.provider === "smtp" && connection.signsIn
-          ? "Changing the host, port or encryption asks for the username and password again."
-          : "Change where and how this connection sends."
-      }
+      description={editDescription(connection)}
       title={
         connection === undefined ? "Edit connection" : `Edit ${connection.name}`
       }
