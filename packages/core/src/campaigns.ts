@@ -579,8 +579,10 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         now
       );
 
-      if (Option.isSome(slot) && DateTime.isGreaterThan(slot.value, now)) {
-        yield* Effect.sleep(DateTime.distance(now, slot.value));
+      const reserved = yield* DateTime.now;
+
+      if (Option.isSome(slot) && DateTime.isGreaterThan(slot.value, reserved)) {
+        yield* Effect.sleep(DateTime.distance(reserved, slot.value));
       }
     });
 
