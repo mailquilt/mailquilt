@@ -18,7 +18,7 @@ import {
 import { QueueWorker, TestApp } from "./harness.ts";
 import {
   addReadySendingDomain,
-  DKIM_KEY,
+  DKIM_PUBLISHED,
   READY_SELECTOR,
   readyDomainRecords,
 } from "./ready-sending-domain.ts";
@@ -223,7 +223,7 @@ layer(TestApp, { timeout: "2 minutes" })("Sending Domains", (test) => {
         const domain = uniqueDomain("checked");
 
         yield* zone.set(`s1._domainkey.${domain}`, [
-          txtRecord(`v=DKIM1; p=${DKIM_KEY}`),
+          txtRecord(`v=DKIM1; p=${DKIM_PUBLISHED}`),
         ]);
         yield* zone.set(`_dmarc.${domain}`, [txtRecord("v=DMARC1; p=none")]);
 

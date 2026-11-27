@@ -13,7 +13,7 @@ import {
   spfCheckOf,
 } from "./sending-domain-check.ts";
 
-const KEY = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDwIRP/UC3SBsEmGqZ9ZJW3/DkM";
+const PUBLISHED = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDwIRP/UC3SBsEmGqZ9ZJW3/DkM";
 
 const txt = (...chunks: [string, ...string[]]) =>
   Dns.makeRecordUnsafe("TXT", { chunks });
@@ -30,16 +30,16 @@ const ACME = {
 describe("whether a DKIM selector's records publish a key", () => {
   it.each([
     ["no records", [], "missing"],
-    ["a DKIM key", [`v=DKIM1; k=rsa; p=${KEY}`], null],
-    ["a key without a version", [`k=rsa; p=${KEY}`], null],
+    ["a DKIM key", [`v=DKIM1; k=rsa; p=${PUBLISHED}`], null],
+    ["a key without a version", [`k=rsa; p=${PUBLISHED}`], null],
     [
       "a key folded across lines",
-      [`v=DKIM1; p=${KEY.slice(0, 20)} ${KEY.slice(20)}`],
+      [`v=DKIM1; p=${PUBLISHED.slice(0, 20)} ${PUBLISHED.slice(20)}`],
       null,
     ],
     ["only an empty key", ["v=DKIM1; k=rsa; p="], "revoked"],
     ["a record that isn't a key", ["v=spf1 -all"], "invalid"],
-    ["another DKIM version", [`v=DKIM2; p=${KEY}`], "invalid"],
+    ["another DKIM version", [`v=DKIM2; p=${PUBLISHED}`], "invalid"],
     ["a key that isn't base64", ["v=DKIM1; p=not a key!"], "invalid"],
   ] as const)("%s is %s", (_, records, problem) => {
     assert.strictEqual(dkimProblemOf(records), problem);
@@ -210,9 +210,9 @@ describe("checking a Sending Domain's DNS", () => {
                 priority: 10,
               }),
             ],
-            "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${KEY}`)],
+            "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${PUBLISHED}`)],
             "s2._domainkey.acme.example": [
-              txt(`v=DKIM1; p=${KEY.slice(0, 30)}`, KEY.slice(30)),
+              txt(`v=DKIM1; p=${PUBLISHED.slice(0, 30)}`, PUBLISHED.slice(30)),
             ],
           })
         )
@@ -268,7 +268,7 @@ describe("checking a Sending Domain's DNS", () => {
           zone({
             "_dmarc.acme.example": [txt("v=DMARC1; p=reject")],
             "acme.example": [txt("v=spf1 -all")],
-            "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${KEY}`)],
+            "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${PUBLISHED}`)],
           })
         )
       );
@@ -288,7 +288,7 @@ describe("checking a Sending Domain's DNS", () => {
           zone({
             "_dmarc.news.acme.example": [txt("google-site-verification=x")],
             "news.acme.example": [txt("v=spf1 -all")],
-            "s1._domainkey.news.acme.example": [txt(`v=DKIM1; p=${KEY}`)],
+            "s1._domainkey.news.acme.example": [txt(`v=DKIM1; p=${PUBLISHED}`)],
           })
         )
       );
@@ -309,7 +309,7 @@ describe("checking a Sending Domain's DNS", () => {
           zone({
             "_dmarc.acme.example": [txt("v=DMARC1; p=reject")],
             "news.acme.example": [txt("v=spf1 -all")],
-            "s1._domainkey.news.acme.example": [txt(`v=DKIM1; p=${KEY}`)],
+            "s1._domainkey.news.acme.example": [txt(`v=DKIM1; p=${PUBLISHED}`)],
           })
         )
       );
@@ -329,7 +329,7 @@ describe("checking a Sending Domain's DNS", () => {
           zone({
             "_dmarc.acme.example": [txt("v=DMARC1; p=reject")],
             "bounce.acme.example": [txt("v=spf1 include:amazonses.com ~all")],
-            "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${KEY}`)],
+            "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${PUBLISHED}`)],
           })
         )
       );
@@ -362,7 +362,7 @@ describe("checking a Sending Domain's DNS", () => {
                   priority: 0,
                 }),
               ],
-              "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${KEY}`)],
+              "s1._domainkey.acme.example": [txt(`v=DKIM1; p=${PUBLISHED}`)],
             })
           )
         );

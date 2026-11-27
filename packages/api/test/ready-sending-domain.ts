@@ -9,7 +9,7 @@ type Owner = Pick<Effect.Success<typeof ownOrganization>, "client"> & {
 };
 
 /** A DKIM public key, as a Provider would publish it. */
-export const DKIM_KEY =
+export const DKIM_PUBLISHED =
   "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDwIRP/UC3SBsEmGqZ9ZJW3/DkM";
 
 /** The DKIM selector `readyDomainRecords` publishes a key under. */
@@ -21,7 +21,7 @@ export const readyDomainRecords = (domain: string) =>
     const zone = yield* DnsZone;
 
     yield* zone.set(`${READY_SELECTOR}._domainkey.${domain}`, [
-      txtRecord(`v=DKIM1; k=rsa; p=${DKIM_KEY}`),
+      txtRecord(`v=DKIM1; k=rsa; p=${DKIM_PUBLISHED}`),
     ]);
     yield* zone.set(`_dmarc.${domain}`, [txtRecord("v=DMARC1; p=reject")]);
     yield* zone.set(domain, [txtRecord("v=spf1 include:spf.example.com -all")]);
