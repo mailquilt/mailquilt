@@ -29,7 +29,9 @@ import {
   MinusSignIcon,
   Moon02Icon,
   MoreHorizontalIcon,
+  PauseIcon as HugePauseIcon,
   PencilEdit02Icon,
+  PlayIcon as HugePlayIcon,
   Refresh01Icon,
   Search01Icon,
   SentIcon,
@@ -193,7 +195,9 @@ export const MegaphoneIcon = hugeicon(Megaphone01Icon, "MegaphoneIcon");
 export const MonitorIcon = hugeicon(ComputerIcon, "MonitorIcon");
 export const MoonIcon = hugeicon(Moon02Icon, "MoonIcon");
 export const PaperPlaneTiltIcon = hugeicon(SentIcon, "PaperPlaneTiltIcon");
+export const PauseIcon = hugeicon(HugePauseIcon, "PauseIcon");
 export const PencilSimpleIcon = hugeicon(PencilEdit02Icon, "PencilSimpleIcon");
+export const PlayIcon = hugeicon(HugePlayIcon, "PlayIcon");
 export const PlusIcon = hugeicon(Add01Icon, "PlusIcon");
 export const SidebarSimpleIcon = hugeicon(SidebarLeftIcon, "SidebarSimpleIcon");
 export const SignOutIcon = hugeicon(Logout03Icon, "SignOutIcon");

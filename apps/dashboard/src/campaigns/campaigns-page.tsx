@@ -69,6 +69,12 @@ const ListsCell = ({ names }: { names: readonly string[] }) => {
   );
 };
 
+const startedButNotSent = ({ status }: CampaignSummary) =>
+  status === "sending" || status === "paused" || status === "cancelled";
+
+const sentOfTotal = ({ recipients }: CampaignSummary) =>
+  `${formatCount(recipients.sent)} of ${formatCount(recipients.total)}`;
+
 // WARNING: a scheduled time is shown on the viewer's own clock, like every other date in the column, so rows can be compared; the Campaign's page also gives it in the zone it was scheduled in.
 const dateOf = (campaign: CampaignSummary) => {
   const { schedule } = campaign;
@@ -102,7 +108,7 @@ const dateOf = (campaign: CampaignSummary) => {
     };
   }
 
-  if (campaign.status === "sending" && campaign.sendingStartedAt !== null) {
+  if (startedButNotSent(campaign) && campaign.sendingStartedAt !== null) {
     const since = formatSince(campaign.sendingStartedAt);
 
     return {
@@ -154,9 +160,23 @@ const COLUMNS = helper.columns([
     cell: ({ getValue }) => {
       const campaign = getValue();
 
-      return campaign.status === "sent" ? (
-        <span className="font-medium text-kumo-strong">
-          {formatCount(campaign.recipients.sent)}
+      if (campaign.status === "sent") {
+        return (
+          <span className="font-medium text-kumo-strong">
+            {formatCount(campaign.recipients.sent)}
+          </span>
+        );
+      }
+
+      return startedButNotSent(campaign) ? (
+        <span>
+          <span className="font-medium text-kumo-strong">
+            {formatCount(campaign.recipients.sent)}
+          </span>
+          <span className="text-kumo-subtle">
+            {" "}
+            of {formatCount(campaign.recipients.total)}
+          </span>
         </span>
       ) : null;
     },
@@ -180,12 +200,15 @@ const COLUMNS = helper.columns([
   }),
   helper.display({
     cell: ({ row }) => {
-      const date = dateOf(row.original.campaign);
+      const { campaign } = row.original;
+      const date = dateOf(campaign);
 
       return (
         <span className="line-clamp-2 text-sm text-kumo-subtle">
-          {listSummary(row.original.listNames)},{" "}
-          <span className={date.tone}>{date.line}</span>
+          {startedButNotSent(campaign)
+            ? `${sentOfTotal(campaign)} sent`
+            : listSummary(row.original.listNames)}
+          , <span className={date.tone}>{date.line}</span>
         </span>
       );
     },
