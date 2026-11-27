@@ -116,8 +116,8 @@ const sendFailure = (
     reason === "auth"
       ? {
           ...byReason.auth,
-          fix: "Check the access key ID and secret access key in AWS IAM, and that the key may send email through SES.",
-          title: "SES refused the access key",
+          fix: "Check the access key ID and secret access key in AWS IAM, that the key may send email through SES, and that sending isn’t paused in the SES console.",
+          title: "SES refused to send for this account",
         }
       : byReason[reason];
 

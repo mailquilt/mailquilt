@@ -286,6 +286,11 @@ layer(SesLive)("SES Provider", (test) => {
               "Maximum sending rate exceeded."
             ),
             refused(503, "ServiceUnavailable", "Service unavailable."),
+            refused(
+              400,
+              "SendingPausedException",
+              "Email sending is disabled for your entire account."
+            ),
             refused(500, "InternalFailure", "An internal error occurred."),
             "unanswered" as const,
             "unreachable" as const,
@@ -328,6 +333,11 @@ layer(SesLive)("SES Provider", (test) => {
               "every email deferred",
               "failed",
               "ServiceUnavailable: Service unavailable.",
+            ],
+            [
+              "failed",
+              "auth",
+              "SendingPausedException: Email sending is disabled for your entire account.",
             ],
             [
               "failed",

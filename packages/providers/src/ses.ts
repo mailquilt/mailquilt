@@ -139,6 +139,13 @@ const NOT_TAKEN_ERRORS = new Set([
 
 const NOT_TAKEN_STATUSES = new Set([429, 503]);
 
+// WARNING: these refuse every email the account sends, not one, so they're `auth`, a failure of the whole connection, and the rest of the batch is recorded with them untried.
+const ACCOUNT_ERRORS = new Set([
+  "AccountSuspendedException",
+  "MailFromDomainNotVerifiedException",
+  "SendingPausedException",
+]);
+
 const FORBIDDEN = 403;
 
 const SERVER_ERROR = 500;
@@ -205,7 +212,11 @@ const refusal = (response: HttpClientResponse.HttpClientResponse) =>
 
     const detail = type === "" ? words : `${type}: ${words}`;
 
-    if (AUTH_ERRORS.has(type) || response.status === FORBIDDEN) {
+    if (
+      AUTH_ERRORS.has(type) ||
+      ACCOUNT_ERRORS.has(type) ||
+      response.status === FORBIDDEN
+    ) {
       return new SendFailed({ detail, reason: "auth" });
     }
 

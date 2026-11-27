@@ -229,10 +229,15 @@ const COLUMNS = helper.columns([
           ? LockSimpleOpenIcon
           : LockSimpleIcon;
 
+      const signIn =
+        connection.provider === "smtp" && connection.signsIn
+          ? "with sign-in"
+          : "without sign-in";
+
       const security =
         connection.provider === "ses"
           ? "HTTPS, with an access key"
-          : `${ENCRYPTION_NAME[connection.smtp.security]}, ${connection.signsIn ? "with sign-in" : "without sign-in"}`;
+          : `${ENCRYPTION_NAME[connection.smtp.security]}, ${signIn}`;
 
       return (
         <span className="inline-flex items-center gap-1.5">

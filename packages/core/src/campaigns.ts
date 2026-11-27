@@ -646,7 +646,17 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
           onNone: () =>
             sendTo(recipient).pipe(
               Effect.catchTag("SendDeferred", (deferred) =>
-                Effect.fail(lastDelivery ? deferred.failed : deferred)
+                Effect.gen(function* putOffOrFail() {
+                  if (!lastDelivery) {
+                    return yield* deferred;
+                  }
+
+                  if (deferred.everyEmail) {
+                    yield* Ref.set(serverFailure, Option.some(deferred.failed));
+                  }
+
+                  return yield* deferred.failed;
+                })
               ),
               Effect.tapError((notSent) => {
                 const failed =

@@ -1105,6 +1105,33 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "records the rest of a batch failed, untried, when the Provider puts off every email on the queue's last delivery",
+    () =>
+      Effect.gen(function* everyEmailPutOffLast() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+
+        yield* (yield* SmtpOutbox).failNextSend(SENDING_RATE_EXCEEDED);
+        yield* worker.deliver(message ?? assert.fail(), QUEUE_RETRIES + 1);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.isEmpty(yield* sentTo(campaign.subject));
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 3, sent: 0, total: 3 }
+        );
+      })
+  );
+
+  test.effect(
     "records a batch failed with why once the Provider's server couldn't be connected to on every delivery the queue makes",
     () =>
       Effect.gen(function* serverDownForGood() {
