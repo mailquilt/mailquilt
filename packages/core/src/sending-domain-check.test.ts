@@ -42,6 +42,11 @@ describe("whether a DKIM selector's records publish a key", () => {
     ["a record that isn't a key", ["v=spf1 -all"], "invalid"],
     ["another DKIM version", [`v=DKIM2; p=${PUBLISHED}`], "invalid"],
     ["a key that isn't base64", ["v=DKIM1; p=not a key!"], "invalid"],
+    [
+      "a record that repeats a tag",
+      [`v=DKIM1; p=not a key!; p=${PUBLISHED}`],
+      "invalid",
+    ],
   ] as const)("%s is %s", (_, records, problem) => {
     assert.strictEqual(dkimProblemOf(records), problem);
   });
@@ -112,12 +117,20 @@ describe("what a DMARC record says for a domain", () => {
       "quarantine",
     ],
     [
-      "a parent's invalid subdomain policy, falling back to its own",
+      "a parent's invalid subdomain policy",
       ["v=DMARC1; p=reject; sp=bogus"],
       false,
-      "pass",
+      "fail",
+      "invalid",
       null,
-      "reject",
+    ],
+    [
+      "the domain's own, with an invalid subdomain policy",
+      ["v=DMARC1; p=reject; sp=bogus"],
+      true,
+      "fail",
+      "invalid",
+      null,
     ],
     ["no records", [], true, "fail", "missing", null],
     [

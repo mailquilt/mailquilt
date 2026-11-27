@@ -73,22 +73,25 @@ const hasMxRecords = (name: string) =>
     return exchanges.some((exchange) => exchange !== NULL_MX);
   });
 
-const tagsOf = (record: string) => {
-  const tags = new Map<string, string>();
-
-  for (const part of record.split(";")) {
+const tagPairsOf = (record: string) =>
+  record.split(";").flatMap((part) => {
     const equals = part.indexOf("=");
 
-    if (equals !== -1) {
-      tags.set(
-        part.slice(0, equals).trim().toLowerCase(),
-        part.slice(equals + 1).trim()
-      );
-    }
-  }
+    return equals === -1
+      ? []
+      : [
+          [
+            part.slice(0, equals).trim().toLowerCase(),
+            part.slice(equals + 1).trim(),
+          ] as const,
+        ];
+  });
 
-  return tags;
-};
+const tagsOf = (record: string) => new Map(tagPairsOf(record));
+
+// WARNING: RFC 6376 makes a DKIM record that repeats a tag invalid as a whole, so receivers discard it whichever value is a key.
+const repeatsATag = (record: string) =>
+  tagPairsOf(record).length !== tagsOf(record).size;
 
 /**
  * Whether one DKIM selector's TXT records publish a key: `missing` with no
@@ -101,6 +104,10 @@ export const dkimProblemOf = (records: readonly string[]) => {
   }
 
   const keys = records.flatMap((record) => {
+    if (repeatsATag(record)) {
+      return [];
+    }
+
     const tags = tagsOf(record);
     const key = tags.get("p");
     const isDkim = (tags.get("v") ?? "DKIM1").toUpperCase() === "DKIM1";
@@ -152,8 +159,8 @@ const policyOf = (value: string | undefined) => {
 /**
  * What the DMARC records found at `name` say for the domain: `ownDomain`
  * when they're the domain's own, else a parent's, whose subdomain policy
- * (`sp`) applies if it has a valid one. Several records, or no valid `p`,
- * are `invalid`.
+ * (`sp`) applies if it has one. Several records, no valid `p`, or an `sp`
+ * that isn't valid, are `invalid`: receivers then apply no DMARC policy.
  */
 export const dmarcCheckOf = (
   name: string,
@@ -178,13 +185,13 @@ export const dmarcCheckOf = (
   const tags = tagsOf(record);
   const domainPolicy = policyOf(tags.get("p"));
 
-  const policy = ownDomain
-    ? domainPolicy
-    : (policyOf(tags.get("sp")) ?? domainPolicy);
+  const subdomainPolicy = tags.has("sp")
+    ? policyOf(tags.get("sp"))
+    : domainPolicy;
 
   const strictSpf = tags.get("aspf")?.toLowerCase() === "s";
 
-  if (domainPolicy === undefined || policy === undefined) {
+  if (domainPolicy === undefined || subdomainPolicy === undefined) {
     return {
       check: {
         name,
@@ -196,6 +203,8 @@ export const dmarcCheckOf = (
       strictSpf,
     };
   }
+
+  const policy = ownDomain ? domainPolicy : subdomainPolicy;
 
   return {
     check: {

@@ -4,8 +4,6 @@ import { SendingDomainIdSchema } from "./ids.ts";
 
 const MAX_DOMAIN_LENGTH = 253;
 
-const MAX_SELECTOR_LENGTH = 63;
-
 /** The most DKIM selectors a Sending Domain can have: SES gives three. */
 export const MAX_DKIM_SELECTORS = 5;
 
@@ -48,9 +46,6 @@ export const DkimSelector = Schema.Trim.pipe(
   Schema.decodeTo(
     Schema.String.check(
       Schema.isNonEmpty({ message: "Enter a selector." }),
-      Schema.isMaxLength(MAX_SELECTOR_LENGTH, {
-        message: `Use at most ${MAX_SELECTOR_LENGTH} characters.`,
-      }),
       Schema.isPattern(DKIM_SELECTOR, {
         message: "Enter only the selector, the part before ._domainkey.",
       })
