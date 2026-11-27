@@ -530,6 +530,8 @@ export const DomainPage = ({
   return (
     <DomainView
       connections={connections.data}
+      // WARNING: a check's error belongs to its domain; moving to another domain starts a fresh view, so it doesn't carry over.
+      key={domain.id}
       domain={domain}
       organization={organization}
     />

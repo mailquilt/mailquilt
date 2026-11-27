@@ -9,6 +9,7 @@ import {
 import { Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
+import { useState } from "react";
 import {
   afterAll,
   afterEach,
@@ -470,6 +471,62 @@ describe("Sending Domains in the dashboard", () => {
         "acme.example’s DMARC record asks for strict SPF alignment (aspf=s), which counts SPF toward DMARC only for acme.example itself, not a subdomain."
       )
     ).resolves.toBeDefined();
+  });
+
+  it("doesn't carry one domain's failed check over to the next domain opened", async () => {
+    const BETA = {
+      ...ACME_DOMAIN,
+      domain: "beta.example",
+      id: "sdm_01h455vb4pex5vsknk084sn02r",
+    };
+
+    api.use(
+      organizations,
+      http.get(CONNECTIONS, () => HttpResponse.json([])),
+      http.get(DOMAINS, () => HttpResponse.json([ACME_DOMAIN_HELD, BETA])),
+      http.post(CHECK, () =>
+        HttpResponse.json(
+          {
+            _tag: "DnsLookupFailed",
+            detail: "The DNS lookup timed out.",
+            name: "_dmarc.acme.example",
+          },
+          { status: 502 }
+        )
+      )
+    );
+
+    const OneThenTheOther = () => {
+      const [id, setId] = useState(ACME_DOMAIN_HELD.id);
+
+      return (
+        <>
+          <button onClick={() => setId(BETA.id)} type="button">
+            Open beta.example
+          </button>
+          <DomainPage
+            organization={organization}
+            sendingDomainId={SendingDomainIdSchema.make(id)}
+          />
+        </>
+      );
+    };
+
+    renderWithOrganizations(<OneThenTheOther />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Check now" }));
+    await expect(
+      screen.findByText("Mailquilt couldn’t check its DNS records")
+    ).resolves.toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open beta.example" }));
+
+    await expect(
+      screen.findByRole("heading", { name: "beta.example" })
+    ).resolves.toBeDefined();
+    expect(
+      screen.queryByText("Mailquilt couldn’t check its DNS records")
+    ).toBeNull();
   });
 
   it("removes a domain once confirmed, and goes back to Domains", async () => {
