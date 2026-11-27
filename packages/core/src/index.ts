@@ -149,6 +149,7 @@ export type { SmtpSettings } from "./smtp-provider.ts";
 export {
   createProviderConnection,
   deleteProviderConnection,
+  makeCampaignDefault,
   listProviderConnections,
   ProviderConnections,
   sendTestEmail,

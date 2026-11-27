@@ -120,7 +120,9 @@ const defaultsFor = (
     return values;
   }
 
-  const connection = only(connections);
+  const connection =
+    connections.find((candidate) => candidate.defaultForCampaigns) ??
+    only(connections);
 
   const list = only(lists);
 
@@ -308,9 +310,9 @@ const ContentField = ({
 /**
  * A Campaign's draft: the Lists it goes to and leaves out, with how many
  * Contacts they reach now, the Provider Connection it goes through and who
- * it's from, its subject and its HTML, with a preview. With one List or one
- * connection, it's chosen already; choosing a connection fills in who it's
- * from. Fields are checked with the same schemas the API uses.
+ * it's from, its subject and its HTML, with a preview. A new draft starts
+ * with the Organization's default connection for Campaigns, or the only
+ * one, and the only List; choosing a connection fills in who it's from. Fields are checked with the same schemas the API uses.
  */
 export const CampaignForm = ({
   busy,

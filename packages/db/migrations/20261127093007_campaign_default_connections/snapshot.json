@@ -1,0 +1,85 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "be8617c9-466f-4610-b0c6-ab215c3a9148",
+  "prevIds": ["46e0da92-612f-4b7f-bcb4-7bb9727d3ca5"],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "provider_connections",
+        "default_for_campaigns"
+      ],
+      "writes": [
+        "s|col|public.provider_connections.default_for_campaigns",
+        "n|col|public.provider_connections.default_for_campaigns",
+        "e|col|public.provider_connections.default_for_campaigns"
+      ],
+      "reads": ["n|tbl|public.provider_connections", "n|sch|public"]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "provider_connections",
+        "provider_connections_default_for_campaigns_key"
+      ],
+      "writes": [
+        "s|idx|public.provider_connections_default_for_campaigns_key",
+        "n|idx|public.provider_connections_default_for_campaigns_key",
+        "e|idx|public.provider_connections_default_for_campaigns_key",
+        "n|rel|public.provider_connections_default_for_campaigns_key"
+      ],
+      "reads": [
+        "n|tbl|public.provider_connections",
+        "n|sch|public",
+        "n|col|public.provider_connections.organization_id"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "provider_connections",
+        "name": "default_for_campaigns",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "provider_connections",
+        "name": "provider_connections_default_for_campaigns_key",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": "\"default_for_campaigns\"",
+        "with": "",
+        "method": "btree",
+        "entityType": "indexes"
+      }
+    }
+  ]
+}

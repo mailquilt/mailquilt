@@ -171,11 +171,16 @@ export const SesCredentials = Schema.Struct({
   secretAccessKey: AccessKeyPart("Enter the secret access key."),
 });
 
-/** What every Provider Connection has, whichever Provider it sends through. */
+/**
+ * What every Provider Connection has, whichever Provider it sends through.
+ * `defaultForCampaigns` marks the one a new Campaign starts with, at most
+ * one per Organization.
+ */
 export const providerConnectionFields = {
   id: ProviderConnectionIdSchema,
   name: ProviderConnectionName,
   from: Sender,
   emailsPerMinute: Schema.NullOr(EmailsPerMinute),
+  defaultForCampaigns: Schema.Boolean,
   createdAt: Schema.DateTimeUtc,
 };

@@ -677,6 +677,85 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
       })
   );
 
+  test.effect(
+    "makes one connection the Organization's default for Campaigns, moving it from any other",
+    () =>
+      Effect.gen(function* campaignDefault() {
+        const { client, params } = yield* owner;
+
+        const smtp = yield* client.providerConnections.create({
+          params,
+          payload: WITHOUT_CREDENTIALS,
+        });
+
+        const ses = yield* client.providerConnections.create({
+          params,
+          payload: SES,
+        });
+
+        const madeDefault =
+          yield* client.providerConnections.makeCampaignDefault({
+            params: { ...params, providerConnectionId: smtp.id },
+          });
+
+        yield* client.providerConnections.makeCampaignDefault({
+          params: { ...params, providerConnectionId: ses.id },
+        });
+
+        const listed = yield* client.providerConnections.list({ params });
+
+        const missing = yield* client.providerConnections
+          .makeCampaignDefault({
+            params: { ...params, providerConnectionId: NO_SUCH_CONNECTION },
+          })
+          .pipe(Effect.flip);
+
+        assert.isTrue(madeDefault.defaultForCampaigns);
+        assert.deepStrictEqual(
+          listed.map((connection) => [
+            connection.name,
+            connection.defaultForCampaigns,
+          ]),
+          [
+            ["Postmark", false],
+            ["SES", true],
+          ]
+        );
+        assert.strictEqual(missing._tag, "ProviderConnectionNotFound");
+      })
+  );
+
+  test.effect(
+    "makes a connection the default for Campaigns when the Organization has none, and only then",
+    () =>
+      Effect.gen(function* firstIsDefault() {
+        const { client, params } = yield* owner;
+
+        const first = yield* client.providerConnections.create({
+          params,
+          payload: WITHOUT_CREDENTIALS,
+        });
+
+        const second = yield* client.providerConnections.create({
+          params,
+          payload: SES,
+        });
+
+        yield* client.providerConnections.delete({
+          params: { ...params, providerConnectionId: first.id },
+        });
+
+        const afterDefaultDeleted = yield* client.providerConnections.create({
+          params,
+          payload: { ...WITHOUT_CREDENTIALS, name: "Relay" },
+        });
+
+        assert.isTrue(first.defaultForCampaigns);
+        assert.isFalse(second.defaultForCampaigns);
+        assert.isTrue(afterDefaultDeleted.defaultForCampaigns);
+      })
+  );
+
   test.effect("deletes a connection", () =>
     Effect.gen(function* deleteConnection() {
       const { client, params } = yield* owner;
