@@ -1,5 +1,5 @@
 import { dnsWithDevRecords } from "@repo/core";
-import { Duration, Effect, Layer, Schema } from "effect";
+import { Duration, Effect, Layer, Result, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { Dns, Host } from "effect/net";
 
@@ -58,12 +58,14 @@ const recordsOf = (type: "MX" | "TXT", data: string) => {
 
   const mx = type === "MX" ? MX_DATA.exec(data.trim())?.groups : undefined;
 
-  if (mx?.priority !== undefined && mx.exchange !== undefined) {
+  const exchange =
+    mx?.exchange === undefined
+      ? undefined
+      : Result.getOrUndefined(Host.domainNameFromString(mx.exchange));
+
+  if (mx?.priority !== undefined && exchange !== undefined) {
     records.push(
-      Dns.makeRecordUnsafe("MX", {
-        exchange: Host.domainNameFromStringUnsafe(mx.exchange),
-        priority: Number(mx.priority),
-      })
+      Dns.makeRecordUnsafe("MX", { exchange, priority: Number(mx.priority) })
     );
   }
 
@@ -113,15 +115,7 @@ export const dnsOverHttpsLayer = Layer.effect(
           )
         )
         .pipe(
-          Effect.timeoutOrElse({
-            duration: LOOKUP_TIMEOUT,
-            orElse: () => Effect.fail(failure(name, type, "Timeout")),
-          }),
-          Effect.mapError((cause) =>
-            cause instanceof Dns.DnsError
-              ? cause
-              : failure(name, type, "Refused", cause)
-          ),
+          Effect.mapError((cause) => failure(name, type, "Refused", cause)),
           Effect.flatMap((response) =>
             response.status === 200
               ? response.json.pipe(
@@ -132,6 +126,11 @@ export const dnsOverHttpsLayer = Layer.effect(
                 )
               : Effect.fail(failure(name, type, "ServerFailure"))
           ),
+          // WARNING: the limit covers reading the answer too, not only its headers, so a resolver that stalls mid-answer still gives up.
+          Effect.timeoutOrElse({
+            duration: LOOKUP_TIMEOUT,
+            orElse: () => Effect.fail(failure(name, type, "Timeout")),
+          }),
           Effect.flatMap((answer) => {
             if (answer.Status === NO_SUCH_NAME) {
               return Effect.succeed<readonly Dns.DnsRecord[]>([]);

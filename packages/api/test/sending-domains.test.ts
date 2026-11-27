@@ -199,6 +199,10 @@ layer(TestApp, { timeout: "2 minutes" })("Sending Domains", (test) => {
               domain: "acme.example",
               returnPath: "not a domain",
             },
+            {
+              dkimSelectors: ["s".repeat(63)],
+              domain: `${["a".repeat(59), "b".repeat(59), "c".repeat(59)].join(".")}.example`,
+            },
           ],
           (payload) =>
             send("POST", path, { body: payload, headers: { cookie } }).pipe(
@@ -206,7 +210,7 @@ layer(TestApp, { timeout: "2 minutes" })("Sending Domains", (test) => {
             )
         );
 
-        assert.deepStrictEqual(statuses, [400, 400, 400, 400, 400]);
+        assert.deepStrictEqual(statuses, [400, 400, 400, 400, 400, 400]);
       })
   );
 

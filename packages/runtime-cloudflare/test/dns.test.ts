@@ -10,7 +10,8 @@ import { dnsOverHttpsLayer, txtChunksOf } from "../src/dns.ts";
 type Answer =
   | { readonly status: number; readonly body: unknown }
   | "unreachable"
-  | "silent";
+  | "silent"
+  | "stalls";
 
 const resolverAnswering = (
   answer: Answer,
@@ -28,6 +29,16 @@ const resolverAnswering = (
 
             if (answer === "silent") {
               return yield* Effect.never;
+            }
+
+            if (answer === "stalls") {
+              return HttpClientResponse.fromWeb(
+                request,
+                new Response(new ReadableStream({ start: () => {} }), {
+                  headers: { "content-type": "application/dns-json" },
+                  status: 200,
+                })
+              );
             }
 
             if (answer === "unreachable") {
@@ -179,13 +190,36 @@ describe("looking up DNS records over Cloudflare's DNS-over-HTTPS", () => {
     })
   );
 
-  it.effect("gives up on a lookup after 5 seconds", () =>
-    Effect.gen(function* silentResolver() {
-      const lookup = yield* reasonOf("silent").pipe(Effect.forkChild);
+  it.effect(
+    "gives up on a lookup after 5 seconds, also when its answer stalls after its headers",
+    () =>
+      Effect.gen(function* silentResolver() {
+        const silent = yield* reasonOf("silent").pipe(Effect.forkChild);
+        const stalls = yield* reasonOf("stalls").pipe(Effect.forkChild);
 
-      yield* TestClock.adjust("5 seconds");
+        yield* TestClock.adjust("5 seconds");
 
-      assert.strictEqual(yield* Fiber.join(lookup), "Timeout");
+        assert.deepStrictEqual(
+          [yield* Fiber.join(silent), yield* Fiber.join(stalls)],
+          ["Timeout", "Timeout"]
+        );
+      })
+  );
+
+  it.effect("leaves out an MX record whose host isn't a host name", () =>
+    Effect.gen(function* badExchange() {
+      const reason = yield* resolve("MX").pipe(
+        Effect.flip,
+        Effect.map((error) => error.reason),
+        Effect.provide(
+          resolverAnswering({
+            body: { Answer: [{ data: "10 bad!host.", type: 15 }], Status: 0 },
+            status: 200,
+          })
+        )
+      );
+
+      assert.strictEqual(reason, "NotFound");
     })
   );
 });

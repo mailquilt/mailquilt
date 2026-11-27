@@ -134,17 +134,13 @@ const checkDkim = (domain: string, selector: string) =>
  */
 export const dmarcNamesFor = (domain: string) => {
   const labels = domain.split(".");
-  const names = [domain];
+  const longest = Math.min(labels.length - 1, MAX_DMARC_LABELS);
 
-  for (
-    let count = Math.min(labels.length - 1, MAX_DMARC_LABELS);
-    count >= 2;
-    count -= 1
-  ) {
-    names.push(labels.slice(-count).join("."));
-  }
+  const parents = Array.from({ length: Math.max(longest - 1, 0) }, (_, index) =>
+    labels.slice(-(longest - index)).join(".")
+  );
 
-  return names.map((name) => `_dmarc.${name}`);
+  return [domain, ...parents].map((name) => `_dmarc.${name}`);
 };
 
 const policyOf = (value: string | undefined) => {

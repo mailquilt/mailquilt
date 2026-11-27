@@ -153,9 +153,29 @@ export class SendingDomain extends Schema.Class<SendingDomain>("SendingDomain")(
   }
 ) {}
 
-/** What a new Sending Domain is made from. Without `returnPath`, it has none. */
+// WARNING: DNS names stop at 253 characters, and a check looks up `_dmarc.<domain>` and `<selector>._domainkey.<domain>`; a longer one could never be looked up, so every check, and every send from it, would fail.
+const fitsDns = ({
+  dkimSelectors,
+  domain,
+}: {
+  readonly dkimSelectors: readonly string[];
+  readonly domain: string;
+}) =>
+  `_dmarc.${domain}`.length <= MAX_DOMAIN_LENGTH &&
+  dkimSelectors.every(
+    (selector) => `${selector}._domainkey.${domain}`.length <= MAX_DOMAIN_LENGTH
+  );
+
+/**
+ * What a new Sending Domain is made from. Without `returnPath`, it has none.
+ * Each name a check looks up must fit DNS's 253 characters.
+ */
 export const NewSendingDomain = Schema.Struct({
   domain: DomainName,
   dkimSelectors: DkimSelectors,
   returnPath: Schema.optionalKey(DomainName),
-});
+}).check(
+  Schema.makeFilter(fitsDns, {
+    message: "This domain and its selectors are too long for DNS to look up.",
+  })
+);
