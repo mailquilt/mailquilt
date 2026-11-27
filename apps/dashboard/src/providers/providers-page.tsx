@@ -114,12 +114,14 @@ const ConnectionActions = ({
           <DotsThreeIcon aria-hidden="true" className="size-5" weight="bold" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" className="min-w-44 rounded-xl">
-          <DropdownMenu.Item
-            href={`/providers/${connection.id}/edit`}
-            icon={PencilSimpleIcon}
-          >
-            Edit
-          </DropdownMenu.Item>
+          {connection.provider === "smtp" && (
+            <DropdownMenu.Item
+              href={`/providers/${connection.id}/edit`}
+              icon={PencilSimpleIcon}
+            >
+              Edit
+            </DropdownMenu.Item>
+          )}
           <DropdownMenu.Item
             icon={TrashIcon}
             onClick={() => deleting.setOpen(true)}
@@ -201,10 +203,20 @@ const COLUMNS = helper.columns([
     header: "Sends as",
     id: "sendsAs",
   }),
-  helper.accessor((row) => row.connection.smtp, {
-    cell: ({ getValue }) => (
-      <Breakable value={`${getValue().host}:${getValue().port}`} />
-    ),
+  helper.accessor((row) => row.connection, {
+    cell: ({ getValue }) => {
+      const connection = getValue();
+
+      return (
+        <Breakable
+          value={
+            connection.provider === "ses"
+              ? `Amazon SES, ${connection.ses.region}`
+              : `${connection.smtp.host}:${connection.smtp.port}`
+          }
+        />
+      );
+    },
     header: "Server",
     id: "server",
   }),
@@ -213,9 +225,19 @@ const COLUMNS = helper.columns([
       const connection = getValue();
 
       const SecurityIcon =
-        connection.smtp.security === "none"
+        connection.provider === "smtp" && connection.smtp.security === "none"
           ? LockSimpleOpenIcon
           : LockSimpleIcon;
+
+      const signIn =
+        connection.provider === "smtp" && connection.signsIn
+          ? "with sign-in"
+          : "without sign-in";
+
+      const security =
+        connection.provider === "ses"
+          ? "HTTPS, with an access key"
+          : `${ENCRYPTION_NAME[connection.smtp.security]}, ${signIn}`;
 
       return (
         <span className="inline-flex items-center gap-1.5">
@@ -223,8 +245,7 @@ const COLUMNS = helper.columns([
             aria-hidden="true"
             className="size-3.5 shrink-0 text-kumo-subtle"
           />
-          {ENCRYPTION_NAME[connection.smtp.security]},{" "}
-          {connection.signsIn ? "with sign-in" : "without sign-in"}
+          {security}
         </span>
       );
     },

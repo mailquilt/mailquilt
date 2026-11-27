@@ -120,6 +120,17 @@ const Credential = (message: string) =>
     )
   );
 
+// WARNING: an AWS access key never has spaces, so a key pasted with one is trimmed rather than failing every request as a bad signature.
+const AccessKeyPart = (message: string) =>
+  Schema.RedactedFromValue(
+    Schema.Trim.check(
+      Schema.isNonEmpty({ message }),
+      Schema.isMaxLength(MAX_CREDENTIAL_LENGTH, {
+        message: `Use at most ${MAX_CREDENTIAL_LENGTH} characters.`,
+      })
+    )
+  );
+
 /**
  * What an SMTP server signs in with. Write-only: the API accepts it and never
  * returns it, and it is held as `Redacted` so it never reaches logs.
@@ -129,20 +140,42 @@ export const SmtpCredentials = Schema.Struct({
   password: Credential("Enter the password."),
 });
 
+const MAX_REGION_LENGTH = 30;
+
+const AWS_REGION = /^[a-z]{2}(?:-[a-z]+)+-\d{1,2}$/u;
+
 /**
- * One Organization's configured SMTP server, as the API shows it: without
- * its credentials, only whether it has saved ones (`signsIn`).
- * `emailsPerMinute` is its sending rate, `null` when it has none.
+ * The AWS Region an SES account sends from, such as `eu-west-1`. Spaces
+ * around it are trimmed. Mailquilt calls only SES's own endpoint for it,
+ * `email.<region>.amazonaws.com`, so it's never a host a member chooses.
  */
-export class ProviderConnection extends Schema.Class<ProviderConnection>(
-  "ProviderConnection"
-)({
+export const SesRegion = Schema.Trim.check(
+  Schema.isNonEmpty({ message: "Enter the AWS Region." }),
+  Schema.isMaxLength(MAX_REGION_LENGTH, {
+    message: `Use at most ${MAX_REGION_LENGTH} characters.`,
+  }),
+  Schema.isPattern(AWS_REGION, {
+    message: "Enter an AWS Region like eu-west-1.",
+  })
+);
+
+/** Which SES account an SES Provider Connection sends through. Holds no credentials. */
+export const SesAccount = Schema.Struct({ region: SesRegion });
+
+/**
+ * The IAM access key an SES Provider Connection signs its requests with.
+ * Write-only, like `SmtpCredentials`, and held as `Redacted`.
+ */
+export const SesCredentials = Schema.Struct({
+  accessKeyId: AccessKeyPart("Enter the access key ID."),
+  secretAccessKey: AccessKeyPart("Enter the secret access key."),
+});
+
+/** What every Provider Connection has, whichever Provider it sends through. */
+export const providerConnectionFields = {
   id: ProviderConnectionIdSchema,
   name: ProviderConnectionName,
-  provider: Schema.Literal("smtp"),
   from: Sender,
-  smtp: SmtpServer,
-  signsIn: Schema.Boolean,
   emailsPerMinute: Schema.NullOr(EmailsPerMinute),
   createdAt: Schema.DateTimeUtc,
-}) {}
+};

@@ -2,9 +2,9 @@
 
 Each Provider has its own port in `core`, such as `SmtpProvider`, and each runtime provides the adapters that run on it (ADR 0002, ADR 0003). A use case that sends through a Provider Connection doesn't call a port itself. It calls `sendThrough(connection, email)` (`packages/core/src/provider.ts`), which picks the adapter for the connection's Provider and passes it that connection's settings and opened credentials. Sending a Campaign's batches and sending a test email both use it.
 
-Today every Provider Connection is SMTP, so `sendThrough` always calls `SmtpProvider`. SES (#18) and Cloudflare Email (#20) are P1. Each adds a kind to the Provider Connection, a port and adapter, and one case in `sendThrough`; the use cases that send don't change. Before this, both use cases read `SmtpProvider` and built its settings themselves, so each new Provider would have changed both, and every later use case that sends.
+A Provider Connection is SMTP or SES (#18), and `sendThrough` calls `SmtpProvider` or `SesProvider` for it. Cloudflare Email (#20) is P1 too. Each adds a kind to the Provider Connection, a port and adapter, and one case in `sendThrough`; the use cases that send don't change. Before this, both use cases read `SmtpProvider` and built its settings themselves, so each new Provider would have changed both, and every later use case that sends.
 
-The port has only `send`. It also had `parseNotifications`, for Provider webhooks, with three types and a stub in every adapter, but nothing called it. Provider events (#19, #21) add notification parsing back, designed with the endpoint that receives them.
+Every Provider port has `send`; SES's also has `maxSendRate`, the account's sending limit, which `sendingRateOf` (`packages/core/src/provider.ts`) reads for an SES connection without a rate of its own. The port also had `parseNotifications`, for Provider webhooks, with three types and a stub in every adapter, but nothing called it. Provider events (#19, #21) add notification parsing back, designed with the endpoint that receives them.
 
 The System Mailer isn't a Provider Connection. It sends Mailquilt's own account emails through `SmtpProvider` directly, with the install's settings (ADR 0002).
 

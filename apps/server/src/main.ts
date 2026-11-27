@@ -13,6 +13,7 @@ import {
   migrateOnBoot,
   PostgresPortsLive,
   QueueWorkersLive,
+  SesProviderLive,
   SmtpProviderLive,
 } from "@repo/runtime-node";
 import { Config, Effect, Layer } from "effect";
@@ -50,6 +51,7 @@ const PortsLive = SystemMailerAfterResponding.pipe(
     Layer.mergeAll(
       EmailLinksFromEnv,
       PostgresPortsLive,
+      SesProviderLive,
       SmtpProviderLive,
       SystemMailerConfigFromEnv
     )

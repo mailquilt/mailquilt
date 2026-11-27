@@ -10,6 +10,7 @@ import {
   forwardOutboxTo,
   postgresPortsLive,
   providePerRequest,
+  SesProviderLive,
   SmtpProviderLive,
   SmtpProviderUnavailable,
 } from "@repo/runtime-cloudflare";
@@ -87,6 +88,7 @@ const makeApp = (env: Env) =>
             Layer.provide(configFromEnv(env))
           ),
           smtpProviderLive(env),
+          SesProviderLive,
           emailLinks(env)
         )
       ),
@@ -108,6 +110,7 @@ const runWithPorts = <A, E>(
     E,
     | Layer.Success<ReturnType<typeof postgresPorts>>
     | Layer.Success<ReturnType<typeof smtpProviderLive>>
+    | Layer.Success<typeof SesProviderLive>
     | Layer.Success<ReturnType<typeof emailLinks>>
   >
 ) =>
@@ -117,6 +120,7 @@ const runWithPorts = <A, E>(
         Layer.mergeAll(
           postgresPorts(env),
           smtpProviderLive(env),
+          SesProviderLive,
           emailLinks(env)
         )
       )

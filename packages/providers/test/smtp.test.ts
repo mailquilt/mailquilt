@@ -196,7 +196,15 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
       const provide = Effect.provideService(Mailpits, yield* Mailpits);
 
       return {
-        received: starttls.received,
+        received: (to: string) =>
+          starttls.received(to).pipe(
+            Effect.map((emails) =>
+              emails.map((email) => ({
+                ...email,
+                messageId: `<${email.messageId}>`,
+              }))
+            )
+          ),
         send: (email: OutgoingEmail) => sendWith(smtp, email).pipe(provide),
       };
     })

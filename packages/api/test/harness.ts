@@ -14,14 +14,20 @@ import type {
   Queue,
   QueueMessage,
   Scheduler,
+  SesProvider,
   SmtpProvider,
   SystemMailer,
   SystemMailerSmtp,
 } from "@repo/core";
-import type { SmtpOutbox, SystemMailerOutbox } from "@repo/core/testing";
+import type {
+  SesOutbox,
+  SmtpOutbox,
+  SystemMailerOutbox,
+} from "@repo/core/testing";
 import {
   InProcessQueueLive,
   QueueInbox,
+  RecordingSesProviderLive,
   RecordingSmtpProviderLive,
   SystemMailerOutboxLive,
 } from "@repo/core/testing";
@@ -73,6 +79,8 @@ type Fakes =
   | SystemMailerOutbox
   | SmtpProvider
   | SmtpOutbox
+  | SesProvider
+  | SesOutbox
   | Queue
   | QueueInbox
   | Scheduler;
@@ -260,7 +268,7 @@ export const AppFetch =
 /**
  * The whole API assembled as the entry apps assemble it, with a migrated,
  * real Postgres from Testcontainers, the System Mailer outbox (or the real
- * System Mailer) and the recording SMTP Provider. Unless `install` is
+ * System Mailer) and the recording SMTP and SES Providers. Unless `install` is
  * `"fresh"`, first-run setup has made `INSTANCE_ADMIN`, whose session cookie
  * is `InstanceAdminCookie`. Its `SqlClient` reaches that Postgres directly,
  * to set up states no endpoint can make yet; tests still check results
@@ -282,6 +290,7 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
         Layer.mergeAll(
           SystemMailerOutboxLive,
           RecordingSmtpProviderLive,
+          RecordingSesProviderLive,
           InProcessQueueLive
         )
       );

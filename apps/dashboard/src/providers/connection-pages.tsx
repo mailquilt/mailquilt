@@ -121,6 +121,24 @@ export const EditPage = ({
       );
     }
 
+    if (connection?.provider === "ses") {
+      return (
+        <div className="mq-capped">
+          <TableRegion label="Connection">
+            <EmptyState
+              actions={
+                <LinkButton href="/providers" variant="primary">
+                  Go to Providers
+                </LinkButton>
+              }
+              description="Change it through the API for now."
+              title="SES connections can’t be edited here yet"
+            />
+          </TableRegion>
+        </div>
+      );
+    }
+
     if (connection === undefined) {
       return (
         <div className="mq-capped">
@@ -167,7 +185,7 @@ export const EditPage = ({
   return (
     <FormPage
       description={
-        connection?.signsIn === true
+        connection?.provider === "smtp" && connection.signsIn
           ? "Changing the host, port or encryption asks for the username and password again."
           : "Change where and how this connection sends."
       }

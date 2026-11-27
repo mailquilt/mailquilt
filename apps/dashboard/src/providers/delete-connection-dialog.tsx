@@ -6,6 +6,19 @@ import { ActionDialog } from "../layout/action-dialog.tsx";
 import { useConfirmationToast } from "../layout/toast.tsx";
 import { useDeleteConnection } from "./providers-api.ts";
 
+const deletedDescription = (
+  organization: string,
+  connection: ProviderConnection
+) => {
+  if (connection.provider === "ses") {
+    return `${organization} can’t send through it any more, and its saved access key is erased. This can’t be undone.`;
+  }
+
+  return connection.signsIn
+    ? `${organization} can’t send through it any more, and its saved username and password are erased. This can’t be undone.`
+    : `${organization} can’t send through it any more. This can’t be undone.`;
+};
+
 /**
  * Asks before deleting a connection, and deletes it. Its card disappears with
  * it, so the page takes focus through `onDeleted`.
@@ -51,11 +64,7 @@ export const DeleteConnectionDialog = ({
     <ActionDialog
       actionLabel="Delete connection"
       busy={remove.isPending}
-      description={
-        connection.signsIn
-          ? `${organization.name} can’t send through it any more, and its saved username and password are erased. This can’t be undone.`
-          : `${organization.name} can’t send through it any more. This can’t be undone.`
-      }
+      description={deletedDescription(organization.name, connection)}
       destructive
       finalFocus={finalFocus}
       formId={formId}

@@ -1,85 +1,88 @@
 import type {
-  ProviderConnection,
-  SendFailed,
-  Sender,
+  SesConnection,
+  SesCredentials,
+  SmtpConnection,
   SmtpCredentials,
-  SmtpServer,
 } from "@repo/domain";
-import { Context, Effect } from "effect";
-import type { Option } from "effect";
+import { Effect, Option } from "effect";
 
-import type { SendDeferred } from "./send-deferred.ts";
-
-/**
- * One email to hand to a Provider: its plain text, its HTML, or both, where
- * replies go when that isn't the sender, and any headers of its own, such as
- * `List-Unsubscribe`.
- */
-export interface OutgoingEmail {
-  readonly from: typeof Sender.Type;
-  readonly to: string;
-  readonly replyTo?: string;
-  readonly subject: string;
-  readonly text?: string;
-  readonly html?: string;
-  readonly headers?: Readonly<Record<string, string>>;
-}
-
-/** An email the Provider accepted, with the ID it gave the message. */
-export interface SentEmail {
-  readonly messageId: string;
-}
+import type { OutgoingEmail } from "./provider-port.ts";
+import { SesProvider } from "./ses-provider.ts";
+import { SmtpProvider } from "./smtp-provider.ts";
 
 /**
- * What every Provider adapter does: send one email with a Provider
- * Connection's settings, failing with `SendDeferred` when it can be tried
- * again later and `SendFailed` when it can't. Each Provider is its own port, such as
- * `SmtpProvider`, so each runtime provides the adapters that run on it. Use
- * cases don't call one directly: they send with `sendThrough` (ADR 0015).
- * Reading the notifications a Provider sends back joins the port with
- * Provider events (#19, #21).
+ * A Provider Connection with its credentials opened, for sending only.
+ * `provider` repeats the connection's, so checking it tells which
+ * credentials these are.
  */
-export interface Provider<Settings> {
-  readonly send: (
-    settings: Settings,
-    email: OutgoingEmail
-  ) => Effect.Effect<SentEmail, SendFailed | SendDeferred>;
-}
-
-/** Where an SMTP Provider Connection sends, and what it signs in with, if anything. */
-export interface SmtpSettings {
-  readonly server: typeof SmtpServer.Type;
-  readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
-}
-
-/**
- * Port: sends through an SMTP server. SMTP has no webhooks; bounces come back
- * to the bounce address instead.
- */
-export class SmtpProvider extends Context.Service<
-  SmtpProvider,
-  Provider<SmtpSettings>
->()("@repo/core/SmtpProvider") {}
-
-/** A Provider Connection with its credentials opened, for sending only. */
-export interface ProviderConnectionWithCredentials {
-  readonly connection: ProviderConnection;
-  readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
-}
+export type ProviderConnectionWithCredentials =
+  | {
+      readonly provider: "smtp";
+      readonly connection: SmtpConnection;
+      readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
+    }
+  | {
+      readonly provider: "ses";
+      readonly connection: SesConnection;
+      readonly credentials: typeof SesCredentials.Type;
+    };
 
 /**
  * Sends one email through a Provider Connection, with the adapter for its
  * Provider. This is the one place that picks an adapter for a connection, so
- * a new Provider, such as SES (#18) or Cloudflare Email (#20), adds its case
- * here and the use cases that send don't change (ADR 0015). Every Provider
- * Connection is SMTP today.
+ * a new Provider, such as Cloudflare Email (#20), adds its case here and the
+ * use cases that send don't change (ADR 0015).
  */
 export const sendThrough = (
-  { connection, credentials }: ProviderConnectionWithCredentials,
+  opened: ProviderConnectionWithCredentials,
   email: OutgoingEmail
 ) =>
-  SmtpProvider.pipe(
-    Effect.flatMap((smtp) =>
-      smtp.send({ credentials, server: connection.smtp }, email)
-    )
-  );
+  Effect.gen(function* sendThroughConnection() {
+    if (opened.provider === "ses") {
+      const ses = yield* SesProvider;
+
+      return yield* ses.send(
+        { account: opened.connection.ses, credentials: opened.credentials },
+        email
+      );
+    }
+
+    const smtp = yield* SmtpProvider;
+
+    return yield* smtp.send(
+      { credentials: opened.credentials, server: opened.connection.smtp },
+      email
+    );
+  });
+
+const SECONDS_PER_MINUTE = 60;
+
+// WARNING: SES gives every account at least 1 email a second, its sandbox's limit, so when the account's limit can't be read this rate never goes over it.
+const LOWEST_SES_RATE_PER_SECOND = 1;
+
+/**
+ * The most emails a minute that go through a Provider Connection: its own
+ * sending rate when it has one; for SES without one, the account's sending
+ * limit, read now, or 1 a second when it can't be read; `None` for SMTP
+ * without one.
+ */
+export const sendingRateOf = (opened: ProviderConnectionWithCredentials) =>
+  Effect.gen(function* sendingRateOfConnection() {
+    const own = Option.fromNullishOr(opened.connection.emailsPerMinute);
+
+    if (Option.isSome(own) || opened.provider === "smtp") {
+      return own;
+    }
+
+    const ses = yield* SesProvider;
+
+    const perSecond = yield* ses.maxSendRate({
+      account: opened.connection.ses,
+      credentials: opened.credentials,
+    });
+
+    return Option.some(
+      Option.getOrElse(perSecond, () => LOWEST_SES_RATE_PER_SECOND) *
+        SECONDS_PER_MINUTE
+    );
+  });

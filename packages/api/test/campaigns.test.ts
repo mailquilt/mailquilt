@@ -2,7 +2,13 @@ import { setTimeout } from "node:timers/promises";
 
 import { assert, layer } from "@effect/vitest";
 import { QUEUE_RETRIES, SendDeferred } from "@repo/core";
-import { QueueInbox, SmtpOutbox } from "@repo/core/testing";
+import type { OutgoingEmail } from "@repo/core";
+import {
+  QueueInbox,
+  RECORDING_SES_MAX_SEND_RATE,
+  SesOutbox,
+  SmtpOutbox,
+} from "@repo/core/testing";
 import {
   CampaignIdSchema,
   ListIdSchema,
@@ -20,7 +26,9 @@ import {
   Effect,
   Exit,
   Fiber,
+  Option,
   pipe,
+  Redacted,
 } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
@@ -60,6 +68,14 @@ const CONNECTION_REFUSED = new SendDeferred({
   failed: new SendFailed({
     detail: "connect ECONNREFUSED 192.0.2.25:587",
     reason: "unreachable",
+  }),
+});
+
+const SENDING_RATE_EXCEEDED = new SendDeferred({
+  everyEmail: true,
+  failed: new SendFailed({
+    detail: "TooManyRequestsException: Maximum sending rate exceeded.",
+    reason: "failed",
   }),
 });
 
@@ -180,9 +196,106 @@ const SIX_SECONDS_MS = 60_000 / TEN_A_MINUTE;
 
 const SIX_EMAILS = 6;
 
+const TWELVE_A_MINUTE_PER_SECOND = 0.2;
+
+const FIVE_SECONDS_MS = 5000;
+
+const ONE_SECOND_MS = 1000;
+
+const THOUSAND_A_SECOND = 1000;
+
+const FORTY_ONE = 41;
+
+const FORTY = 40;
+
 const MAX_CLOCK_TICKS = 120;
 
 const STALL_MS = 30_000;
+
+const sendTimesOf = (
+  sent: Effect.Effect<
+    readonly { readonly email: OutgoingEmail; readonly at: DateTime.Utc }[]
+  >,
+  subject: string,
+  count: number
+) =>
+  Effect.gen(function* sendTimes() {
+    const worker = yield* QueueWorker;
+    const batches = yield* (yield* QueueInbox).takeAll;
+    const start = yield* Clock.currentTimeMillis;
+
+    const sending = yield* Effect.forEach(
+      batches,
+      (batch) => worker.deliver(batch),
+      { concurrency: "unbounded" }
+    ).pipe(Effect.forkChild);
+
+    const sentAt = sent.pipe(
+      Effect.map((sends) =>
+        sends
+          .filter((send) => send.email.subject.startsWith(subject))
+          .map((send) => DateTime.toEpochMillis(send.at) - start)
+          .toSorted((a, b) => a - b)
+      )
+    );
+
+    // WARNING: the batches wait on the test's clock but query a real Postgres, so the clock moves a second at a time with a real pause between, and an email can be recorded after its slot but never before it; tests check only that each is no earlier than its slot.
+    const times = yield* TestClock.adjust(Duration.seconds(1)).pipe(
+      Effect.andThen(Effect.promise(() => setTimeout(REAL_PAUSE_MS))),
+      Effect.andThen(sentAt),
+      Effect.repeat({
+        times: MAX_CLOCK_TICKS,
+        until: (sentSoFar) => sentSoFar.length >= count,
+      })
+    );
+
+    assert.lengthOf(times, count);
+
+    yield* Fiber.join(sending);
+
+    return times;
+  });
+
+const assertNoEarlierThanSlots = (
+  times: readonly number[],
+  intervalMs: number
+) =>
+  assert.isTrue(
+    times.every((time, slot) => time >= slot * intervalMs),
+    `Sent at ${JSON.stringify(times)} ms, slots ${intervalMs} ms apart`
+  );
+
+const SES_ACCOUNT = {
+  credentials: {
+    accessKeyId: Redacted.make("AKIAIOSFODNN7EXAMPLE"),
+    secretAccessKey: Redacted.make("wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"),
+  },
+  provider: "ses",
+  ses: { region: "eu-west-1" },
+} as const;
+
+const sendThroughSes = (
+  { client, connection, params }: Effect.Success<typeof draftCampaign>,
+  maxSendRate: Option.Option<number>,
+  emailsPerMinute: number | null = null
+) =>
+  Effect.gen(function* moveToSes() {
+    const outbox = yield* SesOutbox;
+
+    yield* client.providerConnections.update({
+      params: { ...params, providerConnectionId: connection.id },
+      payload: {
+        ...SES_ACCOUNT,
+        emailsPerMinute,
+        from: connection.from,
+        name: connection.name,
+      },
+    });
+    yield* Effect.addFinalizer(() =>
+      outbox.setMaxSendRate(Option.some(RECORDING_SES_MAX_SEND_RATE))
+    );
+    yield* outbox.setMaxSendRate(maxSendRate);
+  });
 
 layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   test.effect(
@@ -964,6 +1077,65 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "puts off the rest of a batch, untried, when the Provider puts off every email for now, and sends them on its next delivery",
+    () =>
+      Effect.gen(function* everyEmailPutOff() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
+
+        yield* (yield* SmtpOutbox).failNextSend(SENDING_RATE_EXCEEDED);
+
+        const putOff = yield* Effect.exit(worker.deliver(batch));
+        const sentFirst = yield* sentTo(campaign.subject);
+
+        yield* worker.deliver(batch);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.isTrue(Exit.isFailure(putOff));
+        assert.isEmpty(sentFirst);
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 0, sent: 3, total: 3 }
+        );
+      })
+  );
+
+  test.effect(
+    "records the rest of a batch failed, untried, when the Provider puts off every email on the queue's last delivery",
+    () =>
+      Effect.gen(function* everyEmailPutOffLast() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+
+        yield* (yield* SmtpOutbox).failNextSend(SENDING_RATE_EXCEEDED);
+        yield* worker.deliver(message ?? assert.fail(), QUEUE_RETRIES + 1);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.isEmpty(yield* sentTo(campaign.subject));
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 3, sent: 0, total: 3 }
+        );
+      })
+  );
+
+  test.effect(
     "records a batch failed with why once the Provider's server couldn't be connected to on every delivery the queue makes",
     () =>
       Effect.gen(function* serverDownForGood() {
@@ -1259,7 +1431,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
             emailsPerMinute: TEN_A_MINUTE,
             from: connection.from,
             name: connection.name,
-            smtp: connection.smtp,
+            smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
           },
         });
 
@@ -1280,44 +1452,164 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           params: { ...params, campaignId: second.id },
         });
 
-        const worker = yield* QueueWorker;
-        const outbox = yield* SmtpOutbox;
-        const batches = yield* (yield* QueueInbox).takeAll;
-        const start = yield* Clock.currentTimeMillis;
-
-        const sending = yield* Effect.forEach(
-          batches,
-          (batch) => worker.deliver(batch),
-          { concurrency: "unbounded" }
-        ).pipe(Effect.forkChild);
-
-        const sentAt = outbox.sent.pipe(
-          Effect.map((sends) =>
-            sends
-              .filter((sent) => sent.email.subject.startsWith(campaign.subject))
-              .map((sent) => DateTime.toEpochMillis(sent.at) - start)
-              .toSorted((a, b) => a - b)
-          )
+        const times = yield* sendTimesOf(
+          (yield* SmtpOutbox).sent,
+          campaign.subject,
+          SIX_EMAILS
         );
 
-        // WARNING: the batches wait on the test's clock but query a real Postgres, so the clock moves a second at a time with a real pause between, and an email can be recorded after its slot but never before it; the test checks only that each is no earlier than its slot.
-        const times = yield* TestClock.adjust(Duration.seconds(1)).pipe(
-          Effect.andThen(Effect.promise(() => setTimeout(REAL_PAUSE_MS))),
-          Effect.andThen(sentAt),
-          Effect.repeat({
-            times: MAX_CLOCK_TICKS,
-            until: (sent) => sent.length >= SIX_EMAILS,
-          })
-        );
-
-        assert.lengthOf(times, SIX_EMAILS);
-        assert.isTrue(
-          times.every((time, slot) => time >= slot * SIX_SECONDS_MS),
-          `Sent at ${JSON.stringify(times)} ms`
-        );
-
-        yield* Fiber.join(sending);
+        assertNoEarlierThanSlots(times, SIX_SECONDS_MS);
       }).pipe(withOwnClock)
+  );
+
+  test.effect(
+    "keeps an SES account without a sending rate of its own to the account's sending limit",
+    () =>
+      Effect.gen(function* keepsToSesLimit() {
+        const owner = yield* draftCampaign;
+
+        yield* sendThroughSes(owner, Option.some(TWELVE_A_MINUTE_PER_SECOND));
+        yield* addContacts(owner, THREE_CONTACTS, [owner.list.id]);
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+
+        const times = yield* sendTimesOf(
+          (yield* SesOutbox).sent,
+          owner.campaign.subject,
+          THREE_CONTACTS.length
+        );
+
+        assertNoEarlierThanSlots(times, FIVE_SECONDS_MS);
+      }).pipe(withOwnClock, Effect.scoped)
+  );
+
+  test.effect(
+    "keeps an SES account to 1 email a second when its sending limit can't be read",
+    () =>
+      Effect.gen(function* lowestSesLimit() {
+        const owner = yield* draftCampaign;
+
+        yield* sendThroughSes(owner, Option.none());
+        yield* addContacts(owner, THREE_CONTACTS, [owner.list.id]);
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+
+        const times = yield* sendTimesOf(
+          (yield* SesOutbox).sent,
+          owner.campaign.subject,
+          THREE_CONTACTS.length
+        );
+
+        assertNoEarlierThanSlots(times, ONE_SECOND_MS);
+      }).pipe(withOwnClock, Effect.scoped)
+  );
+
+  test.effect(
+    "splits a Campaign through SES into batches of 40, so each fits a Workers Free invocation's 50 requests",
+    () =>
+      Effect.gen(function* sesBatches() {
+        const owner = yield* draftCampaign;
+
+        yield* sendThroughSes(owner, Option.some(THOUSAND_A_SECOND));
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `reader-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+
+        const batches = yield* (yield* QueueInbox).takeAll;
+
+        assert.lengthOf(batches, 2);
+      }).pipe(Effect.scoped)
+  );
+
+  test.effect(
+    "sends a batch at most 40 at a time once its connection moves to SES, queuing the rest of it again",
+    () =>
+      Effect.gen(function* movedToSes() {
+        const owner = yield* draftCampaign;
+
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `moved-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+        yield* sendThroughSes(owner, Option.some(THOUSAND_A_SECOND));
+
+        const times = yield* sendTimesOf(
+          (yield* SesOutbox).sent,
+          owner.campaign.subject,
+          FORTY
+        );
+
+        const rest = yield* (yield* QueueInbox).takeAll;
+
+        const sent = yield* owner.client.campaigns.get({
+          params: owner.campaignParams,
+        });
+
+        assert.lengthOf(times, FORTY);
+        assert.lengthOf(rest, 1);
+        assert.strictEqual(sent.status, "sending");
+      }).pipe(withOwnClock, Effect.scoped)
+  );
+
+  test.effect(
+    "records the rest of a batch moved to SES failed, untried, when SES puts off every email on its last delivery",
+    () =>
+      Effect.gen(function* movedToSesLastDelivery() {
+        const owner = yield* draftCampaign;
+
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `last-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+        yield* sendThroughSes(owner, Option.some(THOUSAND_A_SECOND));
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+
+        yield* (yield* SesOutbox).failNextSend(SENDING_RATE_EXCEEDED);
+        yield* worker.deliver(message ?? assert.fail(), QUEUE_RETRIES + 1);
+
+        const queuedAgain = yield* (yield* QueueInbox).takeAll;
+
+        const done = yield* owner.client.campaigns.get({
+          params: owner.campaignParams,
+        });
+
+        assert.isEmpty(queuedAgain);
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: FORTY_ONE, sent: 0, total: FORTY_ONE }
+        );
+      }).pipe(Effect.scoped)
+  );
+
+  test.effect(
+    "keeps an SES account to its own sending rate rather than the account's limit",
+    () =>
+      Effect.gen(function* ownRateOverSesLimit() {
+        const owner = yield* draftCampaign;
+
+        yield* sendThroughSes(
+          owner,
+          Option.some(THOUSAND_A_SECOND),
+          TEN_A_MINUTE
+        );
+        yield* addContacts(owner, THREE_CONTACTS, [owner.list.id]);
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+
+        const times = yield* sendTimesOf(
+          (yield* SesOutbox).sent,
+          owner.campaign.subject,
+          THREE_CONTACTS.length
+        );
+
+        assertNoEarlierThanSlots(times, SIX_SECONDS_MS);
+      }).pipe(withOwnClock, Effect.scoped)
   );
 
   test.effect(

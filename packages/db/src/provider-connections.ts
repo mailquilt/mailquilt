@@ -3,12 +3,19 @@ import {
   currentOrganizationId,
   ProviderConnections,
 } from "@repo/core";
+import type {
+  NewProviderConnection,
+  ProviderConnectionChanges,
+  ProviderConnectionWithCredentials,
+} from "@repo/core";
 import type { OrganizationId } from "@repo/domain";
 import {
   CredentialsRequired,
   newProviderConnectionId,
-  ProviderConnection,
+  ProviderConnectionSchema,
   ProviderConnectionNotFound,
+  SesAccount,
+  SesCredentials,
   SmtpCredentials,
   SmtpServer,
 } from "@repo/domain";
@@ -27,19 +34,27 @@ import { SecureRandom } from "effect/crypto";
 import { Database } from "./database.ts";
 import { providerConnections, sendSlots } from "./schema.ts";
 
-const decodeConnection = Schema.decodeUnknownEffect(ProviderConnection);
+const decodeConnection = Schema.decodeUnknownEffect(ProviderConnectionSchema);
 
 const decodeConnections = Schema.decodeUnknownEffect(
-  Schema.Array(ProviderConnection)
+  Schema.Array(ProviderConnectionSchema)
 );
 
-const CredentialsJson = Schema.fromJsonString(SmtpCredentials);
+const SmtpCredentialsJson = Schema.fromJsonString(SmtpCredentials);
 
-const encodeCredentials = Schema.encodeEffect(CredentialsJson);
+const SesCredentialsJson = Schema.fromJsonString(SesCredentials);
 
-const decodeCredentials = Schema.decodeEffect(CredentialsJson);
+const encodeSmtpCredentials = Schema.encodeEffect(SmtpCredentialsJson);
+
+const decodeSmtpCredentials = Schema.decodeEffect(SmtpCredentialsJson);
+
+const encodeSesCredentials = Schema.encodeEffect(SesCredentialsJson);
+
+const decodeSesCredentials = Schema.decodeEffect(SesCredentialsJson);
 
 const encodeServer = Schema.encodeEffect(SmtpServer);
+
+const encodeAccount = Schema.encodeEffect(SesAccount);
 
 // WARNING: a Schema error quotes the value it failed on, here the credentials; replace it before it can reach a log.
 const withoutCredentials = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -50,6 +65,63 @@ const withoutCredentials = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     Effect.orDie
   );
 
+type Target = NewProviderConnection | ProviderConnectionChanges;
+
+type NewCredentials =
+  | {
+      readonly provider: "smtp";
+      readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
+    }
+  | {
+      readonly provider: "ses";
+      readonly credentials: typeof SesCredentials.Type;
+    };
+
+const enteredCredentials = (changes: ProviderConnectionChanges) => {
+  if (changes.provider === "ses") {
+    return changes.credentials === "keep"
+      ? Option.none<NewCredentials>()
+      : Option.some<NewCredentials>({
+          credentials: changes.credentials,
+          provider: "ses",
+        });
+  }
+
+  return changes.credentials === "keep"
+    ? Option.none<NewCredentials>()
+    : Option.some<NewCredentials>({
+        credentials: changes.credentials,
+        provider: "smtp",
+      });
+};
+
+const settingsOf = (target: Target) =>
+  Effect.gen(function* settingsOfTarget() {
+    if (target.provider === "ses") {
+      return yield* encodeAccount(target.ses);
+    }
+
+    return yield* encodeServer(target.smtp);
+  }).pipe(Effect.orDie);
+
+// WARNING: credentials are encoded with `withoutCredentials`, since an encoding error would quote them.
+const credentialsJsonOf = (target: NewCredentials) =>
+  withoutCredentials(
+    Effect.gen(function* credentialsJson() {
+      if (target.provider === "ses") {
+        return Option.some(yield* encodeSesCredentials(target.credentials));
+      }
+
+      if (Option.isNone(target.credentials)) {
+        return Option.none<string>();
+      }
+
+      return Option.some(
+        yield* encodeSmtpCredentials(target.credentials.value)
+      );
+    })
+  );
+
 const inOrganization = (organization: OrganizationId, id: string) =>
   and(
     eq(providerConnections.organizationId, organization),
@@ -58,6 +130,11 @@ const inOrganization = (organization: OrganizationId, id: string) =>
 
 const sealedFor = (organization: OrganizationId, id: string) =>
   `provider_connections:${organization}:${id}`;
+
+interface SealedColumns {
+  readonly credentials: string | null;
+  readonly credentialsKeyVersion: number | null;
+}
 
 interface ConnectionRow {
   readonly id: string;
@@ -83,19 +160,23 @@ const connectionColumns = {
   signsIn: sql<boolean>`${providerConnections.credentials} is not null`,
 };
 
-const toConnection = (row: ConnectionRow) => ({
-  createdAt: DateTime.fromDateUnsafe(row.createdAt),
-  emailsPerMinute: row.emailsPerMinute,
-  from:
-    row.fromName === null
-      ? { email: row.fromEmail }
-      : { email: row.fromEmail, name: row.fromName },
-  id: row.id,
-  name: row.name,
-  provider: row.provider,
-  signsIn: row.signsIn,
-  smtp: row.settings,
-});
+const toConnection = (row: ConnectionRow) => {
+  const basics = {
+    createdAt: DateTime.fromDateUnsafe(row.createdAt),
+    emailsPerMinute: row.emailsPerMinute,
+    from:
+      row.fromName === null
+        ? { email: row.fromEmail }
+        : { email: row.fromEmail, name: row.fromName },
+    id: row.id,
+    name: row.name,
+    provider: row.provider,
+  };
+
+  return row.provider === "ses"
+    ? { ...basics, ses: row.settings }
+    : { ...basics, signsIn: row.signsIn, smtp: row.settings };
+};
 
 /**
  * An Organization's Provider Connections in Postgres. Credentials are sealed
@@ -114,21 +195,27 @@ export const ProviderConnectionsLive = Layer.effect(
     const sealedColumns = (
       organization: OrganizationId,
       id: string,
-      credentials: Option.Option<typeof SmtpCredentials.Type>
+      target: NewCredentials
     ) =>
-      Option.match(credentials, {
-        onNone: () =>
-          Effect.succeed({ credentials: null, credentialsKeyVersion: null }),
-        onSome: (opened) =>
-          withoutCredentials(encodeCredentials(opened)).pipe(
-            Effect.flatMap((json) =>
-              cipher.seal(Redacted.make(json), sealedFor(organization, id))
-            ),
-            Effect.map((sealed) => ({
-              credentials: sealed.value,
-              credentialsKeyVersion: sealed.keyVersion,
-            }))
-          ),
+      Effect.gen(function* sealCredentials() {
+        const json = yield* credentialsJsonOf(target);
+
+        if (Option.isNone(json)) {
+          return {
+            credentials: null,
+            credentialsKeyVersion: null,
+          } satisfies SealedColumns;
+        }
+
+        const sealed = yield* cipher.seal(
+          Redacted.make(json.value),
+          sealedFor(organization, id)
+        );
+
+        return {
+          credentials: sealed.value,
+          credentialsKeyVersion: sealed.keyVersion,
+        } satisfies SealedColumns;
       });
 
     return {
@@ -155,11 +242,7 @@ export const ProviderConnectionsLive = Layer.effect(
             Effect.provideService(SecureRandom.SecureRandom, random)
           );
 
-          const sealed = yield* sealedColumns(
-            organization,
-            id,
-            connection.credentials
-          );
+          const sealed = yield* sealedColumns(organization, id, connection);
 
           const [created] = yield* db
             .insert(providerConnections)
@@ -171,8 +254,8 @@ export const ProviderConnectionsLive = Layer.effect(
               id,
               name: connection.name,
               organizationId: organization,
-              provider: "smtp",
-              settings: yield* encodeServer(connection.smtp),
+              provider: connection.provider,
+              settings: yield* settingsOf(connection),
             })
             .returning(connectionColumns);
 
@@ -227,23 +310,32 @@ export const ProviderConnectionsLive = Layer.effect(
         Effect.gen(function* updateConnection() {
           const organization = yield* currentOrganizationId;
 
-          const settings = yield* encodeServer(changes.smtp).pipe(Effect.orDie);
+          const settings = yield* settingsOf(changes);
 
-          const credentials =
-            changes.credentials === "keep"
-              ? {}
-              : yield* sealedColumns(organization, id, changes.credentials);
+          const entered = enteredCredentials(changes);
+
+          const credentials = Option.isSome(entered)
+            ? yield* sealedColumns(organization, id, entered.value)
+            : {};
 
           const emailsPerMinute =
             changes.emailsPerMinute === "keep"
               ? {}
               : { emailsPerMinute: Option.getOrNull(changes.emailsPerMinute) };
 
+          const sameServer = sql`${providerConnections.settings} = ${JSON.stringify(settings)}::jsonb`;
+
+          // WARNING: an SMTP server with no saved sign-in has nothing to keep, so it may move anywhere; anything else keeps its credentials only for the same Provider and the same settings.
+          const sameServerOrNothingToKeep =
+            changes.provider === "smtp"
+              ? or(isNull(providerConnections.credentials), sameServer)
+              : sameServer;
+
           const keptOnlyForTheSameServer =
             changes.credentials === "keep"
-              ? or(
-                  isNull(providerConnections.credentials),
-                  sql`${providerConnections.settings} = ${JSON.stringify(settings)}::jsonb`
+              ? and(
+                  eq(providerConnections.provider, changes.provider),
+                  sameServerOrNothingToKeep
                 )
               : undefined;
 
@@ -255,6 +347,7 @@ export const ProviderConnectionsLive = Layer.effect(
               fromEmail: changes.from.email,
               fromName: changes.from.name ?? null,
               name: changes.name,
+              provider: changes.provider,
               settings,
               updatedAt: sql`now()`,
             })
@@ -308,22 +401,48 @@ export const ProviderConnectionsLive = Layer.effect(
             Effect.orDie
           );
 
-          if (row.credentials === null || row.credentialsKeyVersion === null) {
-            return { connection, credentials: Option.none() };
+          const json =
+            row.credentials === null || row.credentialsKeyVersion === null
+              ? Option.none<string>()
+              : Option.some(
+                  Redacted.value(
+                    yield* cipher
+                      .open(
+                        {
+                          keyVersion: row.credentialsKeyVersion,
+                          value: row.credentials,
+                        },
+                        sealedFor(organization, row.id)
+                      )
+                      .pipe(Effect.orDie)
+                  )
+                );
+
+          if (connection.provider === "ses") {
+            const credentials = yield* withoutCredentials(
+              Effect.flatMap(Effect.fromOption(json), decodeSesCredentials)
+            );
+
+            return {
+              connection,
+              credentials,
+              provider: "ses",
+            } satisfies ProviderConnectionWithCredentials;
           }
 
-          const json = yield* cipher
-            .open(
-              { keyVersion: row.credentialsKeyVersion, value: row.credentials },
-              sealedFor(organization, row.id)
-            )
-            .pipe(Effect.orDie);
-
           const credentials = yield* withoutCredentials(
-            decodeCredentials(Redacted.value(json))
+            Option.match(json, {
+              onNone: () => Effect.succeedNone,
+              onSome: (opened) =>
+                Effect.map(decodeSmtpCredentials(opened), Option.some),
+            })
           );
 
-          return { connection, credentials: Option.some(credentials) };
+          return {
+            connection,
+            credentials,
+            provider: "smtp",
+          } satisfies ProviderConnectionWithCredentials;
         }),
     };
   })

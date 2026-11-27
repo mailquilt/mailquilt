@@ -44,18 +44,26 @@ import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
 import { preferencesUrl } from "./preferences-link.ts";
 import { ProviderConnections } from "./provider-connections.ts";
-import { sendThrough } from "./provider.ts";
-import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
+import type { OutgoingEmail, SentEmail } from "./provider-port.ts";
+import { sendingRateOf, sendThrough } from "./provider.ts";
 import { asQueuedFor, Queue, QUEUE_RETRIES } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
 import { Scheduler } from "./scheduler.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
 import type { SendDeferred } from "./send-deferred.ts";
+import type { SesProvider } from "./ses-provider.ts";
+import type { SmtpProvider } from "./smtp-provider.ts";
 import { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
 import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 
 /** How many of a Campaign's recipients one queue message sends to. */
 export const SEND_BATCH_SIZE = 100;
+
+// WARNING: each email through SES is one `fetch`, and a Workers Free invocation may make 50; a batch of 40, with its `GetAccount` read, leaves room to spare, where 100 would run out partway and fail the rest.
+const SES_SEND_BATCH_SIZE = 40;
+
+const sendBatchSizeFor = (provider: "smtp" | "ses") =>
+  provider === "ses" ? SES_SEND_BATCH_SIZE : SEND_BATCH_SIZE;
 
 /** Which page of Campaigns to list (ADR 0008). */
 export interface CampaignFilter {
@@ -138,7 +146,7 @@ export class Campaigns extends Context.Service<
      * goes to: every Contact with a subscribed Subscription to any of its
      * Lists, none to a List it leaves out, no Opt-out and an address that
      * isn't Suppressed, once each, in one query, split into batches of
-     * `batchSize`. `enqueue` is given the
+     * `batchSize` for the Provider of its connection. `enqueue` is given the
      * number of batches and runs inside that transaction, so if it fails
      * nothing changes. Fails, changing nothing, if the Campaign isn't a
      * draft (or isn't scheduled for `scheduledAt`), has no Provider
@@ -149,7 +157,7 @@ export class Campaigns extends Context.Service<
      */
     readonly startSending: (
       id: CampaignId,
-      batchSize: number,
+      batchSize: (provider: "smtp" | "ses") => number,
       enqueue: (batches: number) => Effect.Effect<void>,
       scheduledAt?: DateTime.Utc
     ) => Effect.Effect<
@@ -396,7 +404,7 @@ export const sendCampaign = (id: CampaignId) =>
     const queue = yield* Queue;
     const organization = yield* CurrentOrganization;
 
-    return yield* campaigns.startSending(id, SEND_BATCH_SIZE, (batches) =>
+    return yield* campaigns.startSending(id, sendBatchSizeFor, (batches) =>
       queue.enqueue(batchMessages(organization.id, id, batches))
     );
   });
@@ -457,7 +465,7 @@ const startScheduledCampaign = (message: StartScheduledCampaign) =>
     yield* campaigns
       .startSending(
         message.campaignId,
-        SEND_BATCH_SIZE,
+        sendBatchSizeFor,
         (batches) =>
           queue.enqueue(
             batchMessages(message.organizationId, message.campaignId, batches)
@@ -558,10 +566,11 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
             .withCredentials(batch.providerConnectionId)
             .pipe(Effect.option);
 
-    const interval = connection.pipe(
-      Option.flatMap((opened) =>
-        Option.fromNullishOr(opened.connection.emailsPerMinute)
-      ),
+    const rate = Option.isSome(connection)
+      ? yield* sendingRateOf(connection.value)
+      : Option.none<number>();
+
+    const interval = rate.pipe(
       Option.map((perMinute) => Duration.millis(MINUTE_MS / perMinute))
     );
 
@@ -621,7 +630,7 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         const sent: Effect.Effect<
           SentEmail,
           SendFailed | SendDeferred,
-          SmtpProvider
+          SmtpProvider | SesProvider
         > = Option.match(connection, {
           onNone: () => Effect.fail(NO_CONNECTION),
           onSome: (opened) => sendThrough(opened, email),
@@ -643,11 +652,25 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
           onNone: () =>
             sendTo(recipient).pipe(
               Effect.catchTag("SendDeferred", (deferred) =>
-                Effect.fail(lastDelivery ? deferred.failed : deferred)
+                Effect.gen(function* putOffOrFail() {
+                  if (!lastDelivery) {
+                    return yield* deferred;
+                  }
+
+                  if (deferred.everyEmail) {
+                    yield* Ref.set(serverFailure, Option.some(deferred.failed));
+                  }
+
+                  return yield* deferred.failed;
+                })
               ),
               Effect.tapError((notSent) => {
                 const failed =
                   notSent._tag === "SendDeferred" ? notSent.failed : notSent;
+
+                if (notSent._tag === "SendDeferred" && notSent.everyEmail) {
+                  return Ref.set(serverPutOff, true);
+                }
 
                 if (!SERVER_FAILURES.has(failed.reason)) {
                   return Effect.void;
@@ -719,7 +742,25 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         );
       });
 
-    yield* Effect.forEach(batch.recipients, sendOnce, { discard: true });
+    // WARNING: a batch was sized for the Provider its connection had when the Campaign started; one moved to SES since would make more requests in a Workers Free invocation than it allows, so a delivery sends at most a batch for its Provider now and queues the rest of the batch again.
+    const limit = Option.match(connection, {
+      onNone: () => batch.recipients.length,
+      onSome: (opened) => sendBatchSizeFor(opened.provider),
+    });
+
+    const now = batch.recipients.slice(0, limit);
+    const rest = batch.recipients.slice(limit);
+
+    yield* Effect.forEach(now, sendOnce, { discard: true });
+
+    // WARNING: once the server has failed for good, the rest of the batch is recorded with that failure here, without a request each, as decisions.md requires; queuing it again would give it fresh retries.
+    const failedForGood = Option.isSome(yield* Ref.get(serverFailure));
+
+    if (failedForGood) {
+      yield* Effect.forEach(rest, sendOnce, { discard: true });
+    }
+
+    const later = rest.length > 0 && !failedForGood;
 
     const unsettled = yield* settle;
 
@@ -730,6 +771,18 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
 
     if (yield* Ref.get(anyPutOff)) {
       return yield* new BatchDeferred();
+    }
+
+    if (later) {
+      const queue = yield* Queue;
+
+      return yield* queue.enqueue([
+        new SendCampaignBatch({
+          batch: message.batch,
+          campaignId: message.campaignId,
+          organizationId: message.organizationId,
+        }),
+      ]);
     }
 
     if (unsettled) {

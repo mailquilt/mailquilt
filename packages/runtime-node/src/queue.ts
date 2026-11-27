@@ -4,6 +4,7 @@ import type {
   ProviderConnections,
   PublicUrl,
   QueueMessage,
+  SesProvider,
   SignedTokens,
   SmtpProvider,
 } from "@repo/core";
@@ -165,6 +166,7 @@ type WorkerPorts =
   | ProviderConnections
   | PublicUrl
   | Queue
+  | SesProvider
   | SignedTokens
   | SmtpProvider;
 

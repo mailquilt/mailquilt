@@ -779,6 +779,25 @@ export const CampaignsLive = Layer.effect(
                 return yield* new ProviderConnectionNotFound();
               }
 
+              const [connection] = yield* db
+                .select({ provider: providerConnections.provider })
+                .from(providerConnections)
+                .where(
+                  and(
+                    eq(providerConnections.organizationId, organization),
+                    eq(providerConnections.id, started.providerConnectionId)
+                  )
+                )
+                .pipe(Effect.orDie);
+
+              if (connection === undefined) {
+                return yield* new ProviderConnectionNotFound();
+              }
+
+              const size = batchSize(
+                connection.provider === "ses" ? "ses" : "smtp"
+              );
+
               yield* requirePostalAddress(db, organization);
 
               const snapshot = yield* db
@@ -786,7 +805,7 @@ export const CampaignsLive = Layer.effect(
                   with snapshot as (
                     insert into ${campaignRecipients} (organization_id, campaign_id, contact_id, email, batch)
                     select ${organization}, ${id}, r.id, r.email,
-                      (row_number() over (order by r.id) - 1) / ${batchSize}
+                      (row_number() over (order by r.id) - 1) / ${size}
                     from (${recipientsOf(organization, listsOfCampaign(organization, id))}) as r
                     returning 1
                   )
@@ -806,7 +825,7 @@ export const CampaignsLive = Layer.effect(
                 .where(inOrganization(organization, id))
                 .pipe(Effect.orDie);
 
-              yield* enqueue(Math.ceil(recipients / batchSize));
+              yield* enqueue(Math.ceil(recipients / size));
 
               return yield* one(organization, id).pipe(Effect.orDie);
             })

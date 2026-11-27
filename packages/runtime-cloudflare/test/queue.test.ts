@@ -6,6 +6,7 @@ import {
   Queue,
   SendCampaignBatch,
   SignedTokens,
+  SesProvider,
   SmtpProvider,
 } from "@repo/core";
 import { CampaignIdSchema, OrganizationIdSchema } from "@repo/domain";
@@ -45,6 +46,7 @@ const ports = (campaigns: Layer.Layer<Campaigns>) =>
     Layer.mock(ProviderConnections, {}),
     Layer.succeed(PublicUrl, { origin: "https://mail.example.com" }),
     Layer.mock(Queue, {}),
+    Layer.mock(SesProvider, {}),
     Layer.mock(SignedTokens, {}),
     Layer.mock(SmtpProvider, {})
   );

@@ -132,15 +132,19 @@ export {
 
 export type { AddressClass } from "./outbound-guard.ts";
 
-export { sendThrough, SmtpProvider } from "./provider.ts";
+export type { OutgoingEmail, Provider, SentEmail } from "./provider-port.ts";
 
-export type {
-  OutgoingEmail,
-  Provider,
-  ProviderConnectionWithCredentials,
-  SentEmail,
-  SmtpSettings,
-} from "./provider.ts";
+export { sendingRateOf, sendThrough } from "./provider.ts";
+
+export type { ProviderConnectionWithCredentials } from "./provider.ts";
+
+export { SesProvider } from "./ses-provider.ts";
+
+export type { SesSettings } from "./ses-provider.ts";
+
+export { SmtpProvider } from "./smtp-provider.ts";
+
+export type { SmtpSettings } from "./smtp-provider.ts";
 
 export {
   createProviderConnection,

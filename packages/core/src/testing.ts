@@ -24,4 +24,12 @@ export { RecordingSmtpProviderLive, SmtpOutbox } from "./smtp-outbox.ts";
 
 export type { RecordedSend } from "./smtp-outbox.ts";
 
+export {
+  RECORDING_SES_MAX_SEND_RATE,
+  RecordingSesProviderLive,
+  SesOutbox,
+} from "./ses-outbox.ts";
+
+export type { RecordedSesSend } from "./ses-outbox.ts";
+
 export { InProcessQueueLive, QueueInbox } from "./in-process-queue.ts";

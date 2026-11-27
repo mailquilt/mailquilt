@@ -111,6 +111,8 @@ All of these go through one outbound guard:
 - SMTP hosts
 - planned, as each is built: outgoing webhooks, RSS fetches, image import from a URL (#25), SNS certificate fetches (#19)
 
+SES requests don't need it: they go only to SES's own endpoint for the connection's Region, `https://email.<region>.amazonaws.com`, and a Region is checked to be letters, hyphens and a number before it's saved, so a member can't point one at another host (#18).
+
 The guard blocks private, link-local, loopback and cloud metadata addresses. It checks every address after DNS resolution, and the connection goes to the address it checked, so a second DNS answer can't redirect it ([ADR 0010](adr/0010-outbound-connections-go-to-the-address-the-guard-checked.md)). On Workers, SMTP connects by name after the check, because Cloudflare starts TLS only on a socket opened by name; a deployed Worker reaches only the public internet (`wrangler dev` can reach the local network), so a second answer can't lead anywhere the check would have refused. It limits how long a connection may take; HTTP fetches, once there are any, also get limits on redirects and response size.
 
 - **Hosted** (planned, #38): always on.
