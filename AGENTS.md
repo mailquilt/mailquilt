@@ -35,6 +35,8 @@ Before writing or changing tests, read `docs/agents/testing.md`.
 
 Before reviewing code, or acting on a review, read `docs/agents/review.md`. It says which kind of review to run, the bar a finding must meet, and when to stop. Decisions already taken are in `docs/agents/decisions.md`. Don't raise them again unless something has changed since.
 
+On a pull request, CodeRabbit reviews once, and its findings are fixed in one push. `docs/agents/review.md` has the steps. These project rules come before an installed skill's own steps, such as `implement`'s, as a skill can be updated from upstream.
+
 ### Design and UI
 
 Before designing or changing any screen, read `docs/agents/design.md`. It sets the quality bar, the process, the brand rules, and the checklist every UI change passes. Design with the `frontend-design` skill, and build and review with the `kumo-design` skill. The dashboard's tokens and building blocks are described in `apps/dashboard/README.md`.

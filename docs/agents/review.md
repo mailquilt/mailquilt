@@ -59,6 +59,21 @@ Anything else goes in one backlog issue, unless the maintainer asks for it.
 - A pull request that reverses anything in `docs/agents/decisions.md` says so, with the reason, and updates that page.
 - Change a test only when the code it checks changes, or when the test is wrong.
 
+## Before the pull request
+
+- Run `/code-review` once, when the work is finished. For a change to the dashboard, run the fresh design review (`docs/agents/design.md`, step 7) at the same time. Run either again only when the fixes changed more than the findings asked.
+- Run the full test suite once before opening the pull request. It takes about a minute here, and a failure caught on your machine costs less than a failed CI run and another push.
+
+## On a pull request
+
+CodeRabbit reviews a pull request once, when it opens, and a later push isn't reviewed again unless someone asks with `@coderabbitai review`. Each extra round took 3 to 6 minutes, plus a fix and a push, and the last round on #180 found nothing. Fixes pushed a few minutes apart also cancelled CI runs before they finished.
+
+- Open the pull request ready for review, not as a draft, as CodeRabbit doesn't review a draft.
+- Wait for CodeRabbit's review and CI, then check each finding against the code, as for any review.
+- Fix the findings worth doing in one commit and one push. A finding below the release bar goes in that commit if it's quick, or in the backlog issue. It never starts another round.
+- Answer a pre-merge check's warning in a comment on the pull request. Push a change for it only when the code or a doc is wrong.
+- Merge once the required checks pass. Don't wait for CodeRabbit to review the fix, or ask it to, unless the fix changed more than the findings asked.
+
 ## Stopping
 
 Stop when a review finds nothing at the bar. Don't start another broad review because of what the last one found below it.

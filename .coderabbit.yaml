@@ -75,7 +75,10 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
-    auto_incremental_review: true
+    # One review, when the pull request opens. Its findings are fixed in one push,
+    # which isn't reviewed again unless someone asks with `@coderabbitai review`,
+    # as docs/agents/review.md sets out.
+    auto_incremental_review: false
     base_branches:
       - "^main$"
 
