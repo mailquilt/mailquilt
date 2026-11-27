@@ -10,3 +10,13 @@ services:
       MP_SMTP_AUTH_ALLOW_INSECURE: "true"
     ports:
       - "${MAILPIT_PORT:-8025}:8025"
+
+  # Checked every second, not every 5 or 10, so the smoke test starts as soon
+  # as both are up. As many retries cover as long a start as before.
+  app:
+    healthcheck:
+      interval: 1s
+  postgres:
+    healthcheck:
+      interval: 1s
+      retries: 50

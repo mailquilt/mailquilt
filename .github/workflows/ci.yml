@@ -58,9 +58,23 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Testcontainers starts Postgres through the runner's Docker.
       - run: pnpm exec turbo run test --ui=stream --filter='!dashboard'
+
+  test-dashboard:
+    name: Dashboard tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       # The dashboard's tests wait on rendering with real-time timeouts, so
-      # they run after the others rather than competing with Postgres and the
-      # API tests for the runner's CPUs (#99).
+      # they run on their own runner rather than competing with Postgres and
+      # the API tests for its CPUs (#99).
       - run: pnpm exec turbo run test --ui=stream --filter=dashboard
 
   smoke:
@@ -78,11 +92,16 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter e2e
       # The image built from this commit, its Postgres, and Mailpit, as a
       # self-hoster runs them (e2e/smoke.env holds the throwaway settings).
-      - run: docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml up -d --build --wait
+      # Chromium installs while the image builds.
+      - name: Start the app, and install Chromium
+        run: |
+          pnpm --filter e2e exec playwright install --with-deps chromium &
+          chromium=$!
+          docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml up -d --build --wait
+          wait "$chromium"
       # compose.yaml passes on only the settings it names, so check that an
       # optional one from the env file reaches the app (#148).
       - run: test "$(docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml exec -T app printenv BLOCK_PRIVATE_NETWORKS)" = false
-      - run: pnpm --filter e2e exec playwright install --with-deps chromium
       - run: pnpm --filter e2e smoke
       - if: failure()
         run: docker compose -p mailquilt-smoke --env-file e2e/smoke.env -f compose.yaml -f compose.test.yaml logs
