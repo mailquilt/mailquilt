@@ -64,7 +64,9 @@ const connectMailpit = async (page: Page) => {
 // WARNING: acme.example has no real DNS; its records come from DEV_DNS_RECORDS in e2e/smoke.env, which the selector must match.
 const addSendingDomain = async (page: Page) => {
   await page.goto("/domains/new");
-  await page.getByRole("textbox", { exact: true, name: "Domain" }).fill("acme.example");
+  await page
+    .getByRole("textbox", { exact: true, name: "Domain" })
+    .fill("acme.example");
   await page.getByLabel("Selector 1").fill("mailquilt");
   await page.getByRole("button", { name: "Add domain" }).click();
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
