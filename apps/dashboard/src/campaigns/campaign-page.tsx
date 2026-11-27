@@ -998,6 +998,14 @@ export const CampaignPage = ({
   const refreshPages = useRefreshCampaignPages(organization.id);
   const seenStatus = useRef(campaign.data?.status);
   const status = campaign.data?.status;
+  const { refetch: countAgain } = count;
+
+  // WARNING: a scheduled Campaign that couldn't start at its time comes back as a draft; the count kept from while it waited would say who'd get it now, so it's asked for again. Declared before the effect below, which moves seenStatus on.
+  useEffect(() => {
+    if (seenStatus.current === "scheduled" && status === "draft") {
+      countAgain();
+    }
+  }, [countAgain, status]);
 
   // WARNING: only a send this page watched finish gets a toast; a Campaign opened already sent doesn't.
   useEffect(() => {

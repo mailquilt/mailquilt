@@ -513,6 +513,22 @@ export const ScheduleCampaignDialog = ({
   const [now, setNow] = useState(DateTime.nowUnsafe);
   const [attempt, setAttempt] = useState(0);
   const [refusedAsPast, setRefusedAsPast] = useState(false);
+  const [openedAt, setOpenedAt] = useState(open);
+
+  // WARNING: the dialog is mounted, closed, long before it opens, and the Campaign can change in the meantime (another member moves its time), so each opening starts from the Campaign as it is then, not as it was when the page loaded.
+  if (open !== openedAt) {
+    setOpenedAt(open);
+
+    if (open) {
+      const fields = startingFields(campaign);
+
+      setDay(fields.day);
+      setTime(fields.time);
+      setZone(fields.zone);
+      setNow(() => DateTime.nowUnsafe());
+    }
+  }
+
   const dayButton = useRef<HTMLButtonElement>(null);
   const timeInput = useRef<HTMLInputElement>(null);
   const formId = useId();

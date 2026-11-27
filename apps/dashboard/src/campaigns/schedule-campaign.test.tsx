@@ -1,5 +1,12 @@
 import { CampaignIdSchema, Organization } from "@repo/domain";
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { focusManager } from "@tanstack/react-query";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  screen,
+  within,
+} from "@testing-library/react";
 import { Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -19,7 +26,7 @@ import {
   renderWithOrganizations,
 } from "../organizations/test-organizations.tsx";
 import { CampaignPage } from "./campaign-page.tsx";
-import { CAMPAIGN, DRAFT, ready } from "./test-campaigns.ts";
+import { CAMPAIGN, DRAFT, ready, RECIPIENT_COUNT } from "./test-campaigns.ts";
 
 const api = setupServer();
 
@@ -426,6 +433,89 @@ describe("scheduling a campaign", () => {
     expect(
       screen.getByRole("button", { name: "Cancel schedule" })
     ).toBeDefined();
+  });
+
+  it("starts Change time from the schedule as it is now, after someone else moved it", async () => {
+    let asked = 0;
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => {
+        asked += 1;
+
+        return HttpResponse.json(
+          asked === 1
+            ? SCHEDULED
+            : {
+                ...SCHEDULED,
+                schedule: {
+                  ...NINE_IN_NEW_YORK,
+                  at: "2026-11-30T15:00:00.000Z",
+                },
+              }
+        );
+      })
+    );
+    renderPage();
+
+    await expect.poll(statusLine).toContain("at 9:00 in New York");
+
+    act(() => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+    });
+
+    await expect.poll(statusLine).toContain("at 10:00 in New York");
+
+    fireEvent.click(screen.getByRole("button", { name: "Change time" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Change when it sends",
+    });
+
+    expect(within(dialog).getByLabelText("Time (24-hour)")).toHaveProperty(
+      "value",
+      "10:00"
+    );
+  });
+
+  it("counts again when a scheduled campaign comes back as a draft that missed its time", async () => {
+    let asked = 0;
+    let counted = 0;
+    api.use(
+      http.get(RECIPIENT_COUNT, () => {
+        counted += 1;
+
+        return HttpResponse.json({ recipients: counted === 1 ? 3 : 0 });
+      }),
+      ...ready(),
+      http.get(CAMPAIGN, () => {
+        asked += 1;
+
+        return HttpResponse.json(
+          asked === 1
+            ? SCHEDULED
+            : {
+                ...DRAFT,
+                schedule: {
+                  ...NINE_IN_NEW_YORK,
+                  missed: "no-subscribed-contacts",
+                },
+              }
+        );
+      })
+    );
+    renderPage();
+
+    await expect.poll(statusLine).toContain("Scheduled for");
+
+    await act(() => vi.advanceTimersByTimeAsync(60 * 60 * 1000));
+
+    await expect(
+      screen.findByText(
+        /Everyone subscribed to Roast of the month is or was on a list/u
+      )
+    ).resolves.toBeDefined();
+    expect(screen.queryByText(/would get it now/u)).toBeNull();
   });
 
   it("says why a draft missed its time, with what to do while that still holds", async () => {

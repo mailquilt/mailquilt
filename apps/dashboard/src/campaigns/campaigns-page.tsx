@@ -195,7 +195,7 @@ const COLUMNS = helper.columns([
 ]);
 
 const COLUMN_CLASSES = {
-  date: "w-40 whitespace-nowrap max-md:hidden",
+  date: "w-40 whitespace-nowrap max-sm:hidden",
   list: "w-64 max-w-64 whitespace-nowrap text-kumo-default max-lg:hidden",
   sentTo: "text-right whitespace-nowrap tabular-nums max-xl:hidden",
   status: "w-32 whitespace-nowrap max-sm:w-auto",

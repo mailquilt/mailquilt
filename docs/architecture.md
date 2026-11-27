@@ -49,7 +49,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 Today a Campaign is sent now, or at a time a member schedules in a time zone they choose, once each, to the Contacts subscribed to any of its Lists, except anyone on a List it leaves out, with an Opt-out or with a Suppressed address, in batches through its Provider Connection. Members see how many it reaches before sending. Members add and remove Suppressions by hand; bounces and complaints will add them (#19, #21). Segments, throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
 
-1. **Start:** a Campaign starts now, or when the message the Scheduler holds for it comes due; one that can't start then becomes a draft again, saying why (ADR 0017).
+1. **Start:** a Campaign starts now, or when the message the Scheduler holds for it comes due; one that can't start then, because its connection was deleted or no one would get it, becomes a draft again, saying why. A start that fails for another reason, such as Postgres being unreachable, through every retry leaves it scheduled at a time that has passed until a member cancels or moves it (ADR 0017).
 2. **Resolve recipients in one set-based query:**
    - Include Contacts subscribed to any targeted List or matching a targeted Segment.
    - Drop excluded Lists and Segments, pending or unsubscribed Subscriptions, Contacts with an Opt-out, and Suppressed addresses.
