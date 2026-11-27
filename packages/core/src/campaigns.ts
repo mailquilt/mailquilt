@@ -5,6 +5,7 @@ import type {
   CampaignId,
   CampaignNotDraft,
   CampaignNotFound,
+  CampaignNotSending,
   CampaignPage,
   ContactId,
   ListNotFound,
@@ -82,7 +83,7 @@ export interface CampaignBatch {
 }
 
 /** Whether a delivery of a batch claimed a recipient, and whether they still consent (see `Campaigns.claim`). */
-export type RecipientClaim = "consents" | "left" | "taken";
+export type RecipientClaim = "consents" | "left" | "stopped" | "taken";
 
 /** What the Provider did with the Campaign for one recipient. */
 export type RecipientOutcome =
@@ -196,6 +197,36 @@ export class Campaigns extends Context.Service<
       at: DateTime.Utc,
       reason: MissedScheduleReason
     ) => Effect.Effect<void, never, CurrentOrganization>;
+    /** Makes a sending Campaign `paused`; one already paused stays so. */
+    readonly pause: (
+      id: CampaignId
+    ) => Effect.Effect<
+      Campaign,
+      CampaignNotFound | CampaignNotSending,
+      CurrentOrganization
+    >;
+    /**
+     * Makes a paused Campaign `sending` again, and in the same transaction
+     * gives `enqueue` every batch with a recipient still queued or claimed,
+     * so if it fails nothing changes; with none, the Campaign is `sent`. One
+     * already sending stays so, and nothing is queued.
+     */
+    readonly resume: (
+      id: CampaignId,
+      enqueue: (batches: readonly number[]) => Effect.Effect<void>
+    ) => Effect.Effect<
+      Campaign,
+      CampaignNotFound | CampaignNotSending,
+      CurrentOrganization
+    >;
+    /** Makes a sending or paused Campaign `cancelled`; one already cancelled stays so. */
+    readonly cancel: (
+      id: CampaignId
+    ) => Effect.Effect<
+      Campaign,
+      CampaignNotFound | CampaignNotSending,
+      CurrentOrganization
+    >;
     /** The Campaign's content and the recipients in `batch` still queued, or none if it doesn't exist. */
     readonly queuedBatch: (
       id: CampaignId,
@@ -207,8 +238,10 @@ export class Campaigns extends Context.Service<
     >;
     /**
      * Claims a recipient still queued for one delivery of its batch, at `at`,
-     * so no other delivery sends to them: `"taken"` if they aren't queued,
-     * because another delivery claimed them or they were already recorded.
+     * so no other delivery sends to them: `"stopped"` if the Campaign isn't
+     * sending, because it was paused or cancelled, and `"taken"` if they
+     * aren't queued, because another delivery claimed them or they were
+     * already recorded.
      * A claimed recipient `"consents"` while they're still subscribed to one
      * of the Lists the Campaign goes to, have no Opt-out and their address
      * isn't Suppressed, and has `"left"` otherwise. The Lists it leaves out
@@ -240,10 +273,11 @@ export class Campaigns extends Context.Service<
      * Once a delivery of `batch` has tried everyone it could claim: records
      * as `cutOff` every recipient in it claimed before `claimedBefore` and
      * never recorded, whose delivery must have stopped, then, in a statement
-     * of its own, marks the Campaign `sent` once none of its recipients are
-     * queued or claimed. Says whether any in the batch are still unsettled:
-     * claimed by a delivery that may still be sending to them, or queued,
-     * such as put back by another delivery after this one read the batch.
+     * of its own, marks the Campaign, sending or paused, `sent` once none of
+     * its recipients are queued or claimed. Says whether any in the batch are
+     * still unsettled: claimed by a delivery that may still be sending to
+     * them, or queued, such as put back by another delivery after this one
+     * read the batch.
      */
     readonly settleBatch: (
       id: CampaignId,
@@ -373,6 +407,43 @@ export const cancelCampaignSchedule = (id: CampaignId) =>
     const campaigns = yield* Campaigns;
 
     return yield* campaigns.cancelSchedule(id);
+  });
+
+/** Holds a sending Campaign's emails not yet sent, until it's resumed. */
+export const pauseCampaign = (id: CampaignId) =>
+  Effect.gen(function* pauseOrganizationCampaign() {
+    const campaigns = yield* Campaigns;
+
+    return yield* campaigns.pause(id);
+  });
+
+/** Sends a paused Campaign's emails not yet sent, queuing again each batch that has any. */
+export const resumeCampaign = (id: CampaignId) =>
+  Effect.gen(function* resumeOrganizationCampaign() {
+    const campaigns = yield* Campaigns;
+    const queue = yield* Queue;
+    const organization = yield* CurrentOrganization;
+
+    return yield* campaigns.resume(id, (batches) =>
+      queue.enqueue(
+        batches.map(
+          (batch) =>
+            new SendCampaignBatch({
+              batch,
+              campaignId: id,
+              organizationId: organization.id,
+            })
+        )
+      )
+    );
+  });
+
+/** Stops a sending or paused Campaign for good: the emails it hadn't sent never are. */
+export const cancelCampaign = (id: CampaignId) =>
+  Effect.gen(function* cancelOrganizationCampaign() {
+    const campaigns = yield* Campaigns;
+
+    return yield* campaigns.cancel(id);
   });
 
 const startScheduledCampaign = (message: StartScheduledCampaign) =>
@@ -534,6 +605,7 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
     const serverFailure = yield* Ref.make(Option.none<SendFailed>());
     const serverPutOff = yield* Ref.make(false);
     const anyPutOff = yield* Ref.make(false);
+    const stopped = yield* Ref.make(false);
 
     const sendUnlessServerFailed = (recipient: QueuedRecipient) =>
       Effect.flatMap(Ref.get(serverFailure), (earlier) =>
@@ -580,7 +652,7 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
     // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes, opts out or is Suppressed partway through still gets it. Each outcome is recorded as soon as it's known, so a delivery cut off later never sends it again.
     const sendOnce = (recipient: QueuedRecipient) =>
       Effect.gen(function* sendOnceTo() {
-        if (yield* Ref.get(serverPutOff)) {
+        if ((yield* Ref.get(serverPutOff)) || (yield* Ref.get(stopped))) {
           return;
         }
 
@@ -589,6 +661,10 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
           recipient.contactId,
           yield* DateTime.now
         );
+
+        if (claim === "stopped") {
+          return yield* Ref.set(stopped, true);
+        }
 
         if (claim === "taken") {
           return;
@@ -613,6 +689,11 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
 
     const unsettled = yield* settle;
 
+    // WARNING: a paused or cancelled Campaign's batch is done for now; resuming queues again every batch with anyone left, so asking the queue to deliver it again would only spend its retries.
+    if (yield* Ref.get(stopped)) {
+      return;
+    }
+
     if (yield* Ref.get(anyPutOff)) {
       return yield* new BatchDeferred();
     }
@@ -625,7 +706,8 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
 /**
  * Does the work one queue message asks for. For a Campaign batch: sends to
  * the recipients in it that are still queued, one email each, through the
- * Campaign's Provider Connection, and records what happened to each. A
+ * Campaign's Provider Connection, and records what happened to each, until
+ * the Campaign is paused or cancelled. A
  * Provider refusing one recipient doesn't stop the others; once its server
  * can't be reached or refuses the connection, the rest of the batch is
  * recorded with that failure without trying them. Each recipient is claimed

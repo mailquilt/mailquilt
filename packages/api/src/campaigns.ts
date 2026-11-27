@@ -1,11 +1,14 @@
 import { MailquiltApi } from "@repo/contract";
 import {
   asMemberOf,
+  cancelCampaign,
   cancelCampaignSchedule,
   countRecipients,
   createCampaign,
   getCampaign,
   listCampaigns,
+  pauseCampaign,
+  resumeCampaign,
   scheduleCampaign,
   sendCampaign,
   updateCampaign,
@@ -58,6 +61,24 @@ export const CampaignsHandlers = HttpApiBuilder.group(
       )
       .handle("cancelSchedule", ({ params }) =>
         cancelCampaignSchedule(params.campaignId).pipe(
+          asMemberOf(params.organizationId),
+          signedIn
+        )
+      )
+      .handle("pause", ({ params }) =>
+        pauseCampaign(params.campaignId).pipe(
+          asMemberOf(params.organizationId),
+          signedIn
+        )
+      )
+      .handle("resume", ({ params }) =>
+        resumeCampaign(params.campaignId).pipe(
+          asMemberOf(params.organizationId),
+          signedIn
+        )
+      )
+      .handle("cancel", ({ params }) =>
+        cancelCampaign(params.campaignId).pipe(
           asMemberOf(params.organizationId),
           signedIn
         )

@@ -5,7 +5,9 @@ export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
   draft: "Draft",
   scheduled: "Scheduled",
   sending: "Sending",
+  paused: "Paused",
   sent: "Sent",
+  cancelled: "Cancelled",
 };
 
 const Slot = () => (

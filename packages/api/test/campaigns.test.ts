@@ -994,6 +994,173 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "pauses a Campaign partway through a batch, holding its unsent emails, and resuming sends them",
+    () =>
+      Effect.gen(function* pauseAndResume() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* (yield* SmtpOutbox).afterNextSend(
+          Effect.orDie(client.campaigns.pause({ params: campaignParams }))
+        );
+
+        const worker = yield* QueueWorker;
+        const inbox = yield* QueueInbox;
+
+        yield* worker.deliverAll;
+
+        const paused = yield* client.campaigns.get({ params: campaignParams });
+
+        const pausedAgain = yield* client.campaigns.pause({
+          params: campaignParams,
+        });
+
+        const sentWhilePaused = yield* sentTo(campaign.subject);
+        const queuedWhilePaused = yield* inbox.takeAll;
+
+        const resumed = yield* client.campaigns.resume({
+          params: campaignParams,
+        });
+
+        yield* worker.deliverAll;
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(paused.status, "paused");
+        assert.deepStrictEqual(
+          { ...paused.recipients },
+          { failed: 0, sent: 1, total: 3 }
+        );
+        assert.strictEqual(pausedAgain.status, "paused");
+        assert.deepStrictEqual(sentWhilePaused, ["ada@example.com"]);
+        assert.isEmpty(queuedWhilePaused);
+        assert.strictEqual(resumed.status, "sending");
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 0, sent: 3, total: 3 }
+        );
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), THREE_CONTACTS);
+      })
+  );
+
+  test.effect(
+    "resuming a paused Campaign queues every batch it hasn't finished, so one whose batch the queue dropped still finishes",
+    () =>
+      Effect.gen(function* resumeAfterDroppedBatch() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* (yield* QueueInbox).takeAll;
+
+        yield* client.campaigns.pause({ params: campaignParams });
+        yield* client.campaigns.resume({ params: campaignParams });
+        yield* (yield* QueueWorker).deliverAll;
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "ada@example.com",
+        ]);
+      })
+  );
+
+  test.effect(
+    "cancels a Campaign partway through, and never sends the emails it hadn't sent",
+    () =>
+      Effect.gen(function* cancelMidSend() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* (yield* SmtpOutbox).afterNextSend(
+          Effect.orDie(client.campaigns.cancel({ params: campaignParams }))
+        );
+
+        const worker = yield* QueueWorker;
+        const delivered = yield* worker.deliverAll;
+
+        yield* pipe(delivered, Effect.forEach(worker.deliver));
+
+        const cancelled = yield* client.campaigns.get({
+          params: campaignParams,
+        });
+
+        const resumed = yield* client.campaigns
+          .resume({ params: campaignParams })
+          .pipe(Effect.flip);
+
+        const paused = yield* client.campaigns
+          .pause({ params: campaignParams })
+          .pipe(Effect.flip);
+
+        const cancelledAgain = yield* client.campaigns.cancel({
+          params: campaignParams,
+        });
+
+        assert.strictEqual(cancelled.status, "cancelled");
+        assert.deepStrictEqual(
+          { ...cancelled.recipients },
+          { failed: 0, sent: 1, total: 3 }
+        );
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "ada@example.com",
+        ]);
+        assert.strictEqual(resumed._tag, "CampaignNotSending");
+        assert.strictEqual(paused._tag, "CampaignNotSending");
+        assert.strictEqual(cancelledAgain.status, "cancelled");
+      })
+  );
+
+  test.effect(
+    "refuses to pause, resume or cancel a Campaign that hasn't started sending or has been sent",
+    () =>
+      Effect.gen(function* notSending() {
+        const owner = yield* draftCampaign;
+        const { campaignParams, client, list } = owner;
+
+        const refusals = (params: typeof campaignParams) =>
+          Effect.all([
+            client.campaigns.pause({ params }).pipe(Effect.flip),
+            client.campaigns.resume({ params }).pipe(Effect.flip),
+            client.campaigns.cancel({ params }).pipe(Effect.flip),
+          ]);
+
+        const ofDraft = yield* refusals(campaignParams);
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+        yield* (yield* QueueWorker).deliverAll;
+
+        const ofSent = yield* refusals(campaignParams);
+
+        const ofMissing = yield* refusals({
+          ...campaignParams,
+          campaignId: NO_SUCH_CAMPAIGN,
+        });
+
+        assert.deepStrictEqual(
+          [...ofDraft, ...ofSent].map((error) => error._tag),
+          Arr.makeBy(6, () => "CampaignNotSending" as const)
+        );
+        assert.deepStrictEqual(
+          ofMissing.map((error) => error._tag),
+          Arr.makeBy(3, () => "CampaignNotFound" as const)
+        );
+        assert.strictEqual(
+          (yield* client.campaigns.get({ params: campaignParams })).status,
+          "sent"
+        );
+      })
+  );
+
+  test.effect(
     "finishes a Campaign whose last batch was recorded but not yet marked sent when its message comes again",
     () =>
       Effect.gen(function* recordedButNotFinished() {

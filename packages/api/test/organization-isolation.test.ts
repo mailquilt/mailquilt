@@ -115,6 +115,18 @@ const TENANT_ENDPOINTS = {
     { campaignId, organizationId }: Target
   ) =>
     client.campaigns.cancelSchedule({ params: { campaignId, organizationId } }),
+  "POST /api/organizations/:organizationId/campaigns/:campaignId/pause": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) => client.campaigns.pause({ params: { campaignId, organizationId } }),
+  "POST /api/organizations/:organizationId/campaigns/:campaignId/resume": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) => client.campaigns.resume({ params: { campaignId, organizationId } }),
+  "POST /api/organizations/:organizationId/campaigns/:campaignId/cancel": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) => client.campaigns.cancel({ params: { campaignId, organizationId } }),
   "GET /api/organizations/:organizationId": (
     client: Client,
     { organizationId }: Target
@@ -744,6 +756,12 @@ layer(TestApp, { timeout: "2 minutes" })(
             .cancelSchedule({ params: foreign })
             .pipe(Effect.flip);
 
+          const stoppedOrResumed = yield* Effect.all([
+            outsider.campaigns.pause({ params: foreign }).pipe(Effect.flip),
+            outsider.campaigns.resume({ params: foreign }).pipe(Effect.flip),
+            outsider.campaigns.cancel({ params: foreign }).pipe(Effect.flip),
+          ]);
+
           assert.strictEqual(toForeignList._tag, "ListNotFound");
           assert.strictEqual(leavingOutForeignList._tag, "ListNotFound");
           assert.strictEqual(countingForeignList._tag, "ListNotFound");
@@ -756,6 +774,10 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.strictEqual(sent._tag, "CampaignNotFound");
           assert.strictEqual(scheduled._tag, "CampaignNotFound");
           assert.strictEqual(cancelled._tag, "CampaignNotFound");
+          assert.deepStrictEqual(
+            stoppedOrResumed.map((error) => error._tag),
+            ["CampaignNotFound", "CampaignNotFound", "CampaignNotFound"]
+          );
           assert.deepStrictEqual(
             (yield* outsider.campaigns.list({
               params,

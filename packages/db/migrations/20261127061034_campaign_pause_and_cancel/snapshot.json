@@ -1,0 +1,30 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "1804efbb-a93b-4093-8660-5b7710b86970",
+  "prevIds": ["cedab4ad-8078-4ddc-b970-a1b51383e2b0"],
+  "footprints": [
+    {
+      "statementType": "alter_check",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": ["s|ck|public.campaigns.campaigns_status_check"],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaigns.status",
+        "e|col|public.campaigns.status"
+      ],
+      "sqlHash": "3896cfbb63be1f0b"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"campaigns\",\"campaigns_status_check\"]",
+      "set": {
+        "value": "\"status\" in ('draft', 'scheduled', 'sending', 'paused', 'sent', 'cancelled')"
+      }
+    }
+  ]
+}

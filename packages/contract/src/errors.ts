@@ -1,6 +1,7 @@
 import {
   CampaignNotDraft,
   CampaignNotFound,
+  CampaignNotSending,
   ContactAlreadyExists,
   ContactNotFound,
   CredentialsRequired,
@@ -68,6 +69,11 @@ export const CampaignNotFoundError = CampaignNotFound.pipe(
 );
 
 export const CampaignNotDraftError = CampaignNotDraft.pipe(
+  HttpApiSchema.status(409)
+);
+
+/** The Campaign isn't sending, so it can't be paused, resumed or cancelled. */
+export const CampaignNotSendingError = CampaignNotSending.pipe(
   HttpApiSchema.status(409)
 );
 

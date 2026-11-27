@@ -13,6 +13,7 @@ import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import {
   CampaignNotDraftError,
   CampaignNotFoundError,
+  CampaignNotSendingError,
   ListNotFoundError,
   NoSubscribedContactsError,
   PostalAddressRequiredError,
@@ -60,7 +61,15 @@ export const RecipientCount = Schema.Struct({ recipients: Count });
  * `schedule.missed` says why. A scheduled Campaign can't be changed or
  * sent. `cancelSchedule` makes it a draft again, with no schedule, which
  * also clears a draft's missed schedule; one that started sending can't be
- * stopped (`CampaignNotDraft`).
+ * unscheduled (`CampaignNotDraft`).
+ *
+ * `pause` holds a sending Campaign's emails not yet sent: an email already
+ * being handed to the Provider still goes, and the rest wait. `resume`
+ * sends them, as many as are left. `cancel` stops a sending or paused
+ * Campaign for good: the emails it hadn't sent never are. Each answers with
+ * the Campaign as it is then, also when it was already so, and each is
+ * refused for a Campaign that isn't sending (`CampaignNotSending`): one that
+ * hasn't started, was sent, or, to pause or resume, was cancelled.
  */
 export class CampaignsApi extends HttpApiGroup.make("campaigns")
   .add(
@@ -184,6 +193,54 @@ export class CampaignsApi extends HttpApiGroup.make("campaigns")
           OrganizationNotFoundError,
           CampaignNotFoundError,
           CampaignNotDraftError,
+        ],
+        params: campaignParams,
+        success: Campaign,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "pause",
+      "/organizations/:organizationId/campaigns/:campaignId/pause",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          CampaignNotFoundError,
+          CampaignNotSendingError,
+        ],
+        params: campaignParams,
+        success: Campaign,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "resume",
+      "/organizations/:organizationId/campaigns/:campaignId/resume",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          CampaignNotFoundError,
+          CampaignNotSendingError,
+        ],
+        params: campaignParams,
+        success: Campaign,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.post(
+      "cancel",
+      "/organizations/:organizationId/campaigns/:campaignId/cancel",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          CampaignNotFoundError,
+          CampaignNotSendingError,
         ],
         params: campaignParams,
         success: Campaign,

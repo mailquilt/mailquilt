@@ -69,6 +69,9 @@ const sentTo = ({ recipients }: Campaign) =>
     ? contacts(recipients.total)
     : `${formatCount(recipients.sent)} of ${contacts(recipients.total)}`;
 
+const sentSoFar = ({ recipients }: Campaign) =>
+  `${formatCount(recipients.sent)} of ${contacts(recipients.total)}`;
+
 type Schedule = NonNullable<Campaign["schedule"]>;
 
 const scheduledDay = ({ at, timeZone }: Schedule) =>
@@ -128,6 +131,24 @@ const statusWords = (campaign: Campaign, connectionName: string) => {
       <>
         <Strong>Sending</Strong> to {contacts(campaign.recipients.total)}
         {since}. It carries on if you close this page.
+      </>
+    );
+  }
+
+  if (campaign.status === "paused") {
+    return (
+      <>
+        <Strong>Paused</Strong> after sending to {sentSoFar(campaign)}. The rest
+        wait until it’s resumed.
+      </>
+    );
+  }
+
+  if (campaign.status === "cancelled") {
+    return (
+      <>
+        <Strong>Cancelled</Strong> after sending to {sentSoFar(campaign)}. The
+        rest won’t be sent it.
       </>
     );
   }
@@ -275,7 +296,9 @@ const audienceFacts = (
         draft: "Sends to",
         scheduled: "Sends to",
         sending: "Sending to lists",
+        paused: "Sending to lists",
         sent: "Sent to lists",
+        cancelled: "Sent to lists",
       }[campaign.status],
       <ListLines ids={campaign.listIds} key="to" lists={lists} />,
     ],
@@ -292,6 +315,8 @@ const audienceFacts = (
     rows.push(["Goes to now", <GoesToNow count={count} key="now" />]);
   } else if (campaign.status === "sending") {
     rows.push(["Sending to", contacts(campaign.recipients.total)]);
+  } else if (campaign.status === "paused" || campaign.status === "cancelled") {
+    rows.push(["Sent to", sentSoFar(campaign)]);
   } else {
     rows.push(["Sent to", sentTo(campaign)]);
   }

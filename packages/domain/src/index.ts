@@ -50,6 +50,8 @@ export { CampaignSummary } from "./campaign-summary.ts";
 
 export { CampaignNotDraft } from "./campaign-not-draft.ts";
 
+export { CampaignNotSending } from "./campaign-not-sending.ts";
+
 export { CampaignNotFound } from "./campaign-not-found.ts";
 
 export { CampaignPage } from "./campaign-page.ts";
