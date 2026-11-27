@@ -19,6 +19,7 @@ import type { StackedArea } from "../audience/data-table.tsx";
 import { formatCount, formatDay } from "../audience/format.ts";
 import {
   DotsThreeIcon,
+  EnvelopeBlockIcon,
   EnvelopeSimpleIcon,
   LockSimpleIcon,
   LockSimpleOpenIcon,
@@ -168,6 +169,14 @@ const ConnectionActions = ({
           {canMakeDefault ? (
             <DropdownMenu.Item icon={MegaphoneIcon} onClick={makeItDefault}>
               Make default for new Campaigns
+            </DropdownMenu.Item>
+          ) : null}
+          {connection.provider === "ses" ? (
+            <DropdownMenu.Item
+              href={`/providers/${connection.id}/bounces`}
+              icon={EnvelopeBlockIcon}
+            >
+              Bounces and complaints
             </DropdownMenu.Item>
           ) : null}
           <DropdownMenu.Item
@@ -361,7 +370,8 @@ const ConnectionsTable = ({ rows }: { rows: readonly ConnectionRow[] }) => {
 /**
  * The Organization's Provider Connections, in a bordered table like Contacts
  * and Lists: who each sends as, its server and security, Send test, and its
- * Edit and Delete. A connection that was just connected or saved opens its test by
+ * Edit and Delete, and for SES the steps that bring its bounces and
+ * complaints to Mailquilt. A connection that was just connected or saved opens its test by
  * itself, as the next step.
  */
 export const ProvidersPage = ({

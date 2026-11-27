@@ -28,6 +28,7 @@ import { Route as AppProvidersIndexRouteImport } from './routes/_app/providers/i
 import { Route as AppProvidersNewRouteImport } from './routes/_app/providers/new'
 import { Route as AppCampaignsCampaignIdIndexRouteImport } from './routes/_app/campaigns/$campaignId/index'
 import { Route as AppCampaignsCampaignIdEditRouteImport } from './routes/_app/campaigns/$campaignId/edit'
+import { Route as AppProvidersProviderConnectionIdBouncesRouteImport } from './routes/_app/providers/$providerConnectionId/bounces'
 import { Route as AppProvidersProviderConnectionIdEditRouteImport } from './routes/_app/providers/$providerConnectionId/edit'
 
 const AppRoute = AppRouteImport.update({
@@ -125,6 +126,12 @@ const AppCampaignsCampaignIdEditRoute =
     path: '/campaigns/$campaignId/edit',
     getParentRoute: () => AppRoute,
   } as any)
+const AppProvidersProviderConnectionIdBouncesRoute =
+  AppProvidersProviderConnectionIdBouncesRouteImport.update({
+    id: '/providers/$providerConnectionId/bounces',
+    path: '/providers/$providerConnectionId/bounces',
+    getParentRoute: () => AppRoute,
+  } as any)
 const AppProvidersProviderConnectionIdEditRoute =
   AppProvidersProviderConnectionIdEditRouteImport.update({
     id: '/providers/$providerConnectionId/edit',
@@ -149,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/campaigns/': typeof AppCampaignsIndexRoute
   '/providers/': typeof AppProvidersIndexRoute
   '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
+  '/providers/$providerConnectionId/bounces': typeof AppProvidersProviderConnectionIdBouncesRoute
   '/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
   '/campaigns/$campaignId/': typeof AppCampaignsCampaignIdIndexRoute
 }
@@ -169,6 +177,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof AppCampaignsIndexRoute
   '/providers': typeof AppProvidersIndexRoute
   '/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
+  '/providers/$providerConnectionId/bounces': typeof AppProvidersProviderConnectionIdBouncesRoute
   '/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
   '/campaigns/$campaignId': typeof AppCampaignsCampaignIdIndexRoute
 }
@@ -192,6 +201,7 @@ export interface FileRoutesById {
   '/_app/campaigns/': typeof AppCampaignsIndexRoute
   '/_app/providers/': typeof AppProvidersIndexRoute
   '/_app/campaigns/$campaignId/edit': typeof AppCampaignsCampaignIdEditRoute
+  '/_app/providers/$providerConnectionId/bounces': typeof AppProvidersProviderConnectionIdBouncesRoute
   '/_app/providers/$providerConnectionId/edit': typeof AppProvidersProviderConnectionIdEditRoute
   '/_app/campaigns/$campaignId/': typeof AppCampaignsCampaignIdIndexRoute
 }
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/campaigns/'
     | '/providers/'
     | '/campaigns/$campaignId/edit'
+    | '/providers/$providerConnectionId/bounces'
     | '/providers/$providerConnectionId/edit'
     | '/campaigns/$campaignId/'
   fileRoutesByTo: FileRoutesByTo
@@ -234,6 +245,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/providers'
     | '/campaigns/$campaignId/edit'
+    | '/providers/$providerConnectionId/bounces'
     | '/providers/$providerConnectionId/edit'
     | '/campaigns/$campaignId'
   id:
@@ -256,6 +268,7 @@ export interface FileRouteTypes {
     | '/_app/campaigns/'
     | '/_app/providers/'
     | '/_app/campaigns/$campaignId/edit'
+    | '/_app/providers/$providerConnectionId/bounces'
     | '/_app/providers/$providerConnectionId/edit'
     | '/_app/campaigns/$campaignId/'
   fileRoutesById: FileRoutesById
@@ -400,6 +413,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCampaignsCampaignIdEditRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/providers/$providerConnectionId/bounces': {
+      id: '/_app/providers/$providerConnectionId/bounces'
+      path: '/providers/$providerConnectionId/bounces'
+      fullPath: '/providers/$providerConnectionId/bounces'
+      preLoaderRoute: typeof AppProvidersProviderConnectionIdBouncesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/providers/$providerConnectionId/edit': {
       id: '/_app/providers/$providerConnectionId/edit'
       path: '/providers/$providerConnectionId/edit'
@@ -422,6 +442,7 @@ interface AppRouteChildren {
   AppCampaignsIndexRoute: typeof AppCampaignsIndexRoute
   AppProvidersIndexRoute: typeof AppProvidersIndexRoute
   AppCampaignsCampaignIdEditRoute: typeof AppCampaignsCampaignIdEditRoute
+  AppProvidersProviderConnectionIdBouncesRoute: typeof AppProvidersProviderConnectionIdBouncesRoute
   AppProvidersProviderConnectionIdEditRoute: typeof AppProvidersProviderConnectionIdEditRoute
   AppCampaignsCampaignIdIndexRoute: typeof AppCampaignsCampaignIdIndexRoute
 }
@@ -438,6 +459,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppCampaignsIndexRoute: AppCampaignsIndexRoute,
   AppProvidersIndexRoute: AppProvidersIndexRoute,
   AppCampaignsCampaignIdEditRoute: AppCampaignsCampaignIdEditRoute,
+  AppProvidersProviderConnectionIdBouncesRoute:
+    AppProvidersProviderConnectionIdBouncesRoute,
   AppProvidersProviderConnectionIdEditRoute:
     AppProvidersProviderConnectionIdEditRoute,
   AppCampaignsCampaignIdIndexRoute: AppCampaignsCampaignIdIndexRoute,
