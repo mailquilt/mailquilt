@@ -241,8 +241,9 @@ export class Campaigns extends Context.Service<
      * as `cutOff` every recipient in it claimed before `claimedBefore` and
      * never recorded, whose delivery must have stopped, then, in a statement
      * of its own, marks the Campaign `sent` once none of its recipients are
-     * queued or claimed. Says whether any in the batch are still claimed by
-     * a delivery that may still be sending to them.
+     * queued or claimed. Says whether any in the batch are still unsettled:
+     * claimed by a delivery that may still be sending to them, or queued,
+     * such as put back by another delivery after this one read the batch.
      */
     readonly settleBatch: (
       id: CampaignId,
@@ -250,7 +251,7 @@ export class Campaigns extends Context.Service<
       claimedBefore: DateTime.Utc,
       cutOff: SendFailed
     ) => Effect.Effect<
-      { readonly stillSending: boolean },
+      { readonly unsettled: boolean },
       never,
       CurrentOrganization
     >;
@@ -451,20 +452,22 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
     const settle = Effect.gen(function* settleBatch() {
       const now = yield* DateTime.now;
 
-      const { stillSending } = yield* campaigns.settleBatch(
+      const { unsettled } = yield* campaigns.settleBatch(
         message.campaignId,
         message.batch,
         DateTime.subtractDuration(now, CLAIM_EXPIRES_AFTER),
         CUT_OFF
       );
 
-      if (stillSending) {
-        return yield* new BatchStillSending();
-      }
+      return unsettled;
     });
 
     if (found.value.recipients.length === 0) {
-      return yield* settle;
+      if (yield* settle) {
+        return yield* new BatchStillSending();
+      }
+
+      return;
     }
 
     const batch = found.value;
@@ -607,10 +610,15 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
       });
 
     yield* Effect.forEach(batch.recipients, sendOnce, { discard: true });
-    yield* settle;
+
+    const unsettled = yield* settle;
 
     if (yield* Ref.get(anyPutOff)) {
       return yield* new BatchDeferred();
+    }
+
+    if (unsettled) {
+      return yield* new BatchStillSending();
     }
   }).pipe(asQueuedFor(message));
 

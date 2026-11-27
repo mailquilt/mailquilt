@@ -585,19 +585,20 @@ export const CampaignsLive = Layer.effect(
               )
             );
 
+          // WARNING: a recipient another delivery put back in the queue after this one read the batch is unfinished too; counting only claims would let this delivery succeed and leave them queued with no delivery left to send them.
           const { rows } = yield* db.execute<{
-            readonly stillSending: boolean;
+            readonly unsettled: boolean;
           }>(sql`
             select exists (
               select 1 from ${campaignRecipients}
               where organization_id = ${organization}
                 and campaign_id = ${id}
                 and batch = ${batch}
-                and status = 'sending'
-            ) as "stillSending"
+                and status in ('queued', 'sending')
+            ) as "unsettled"
           `);
 
-          return { stillSending: rows[0]?.stillSending === true };
+          return { unsettled: rows[0]?.unsettled === true };
         }).pipe(Effect.orDie),
 
       startSending: (id, batchSize, enqueue, scheduledAt) =>

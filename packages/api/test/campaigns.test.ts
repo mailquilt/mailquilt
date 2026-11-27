@@ -864,6 +864,49 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "delivers a batch again when another delivery put one of its Contacts back while it was sending, rather than leave them unsent",
+    () =>
+      Effect.gen(function* putBackElsewhere() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(
+          owner,
+          ["ada@example.com", "grace@example.com"],
+          [list.id]
+        );
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
+        const sql = yield* SqlClient.SqlClient;
+
+        yield* sql`
+          update campaign_recipients set status = 'sending', claimed_at = now()
+          where campaign_id = ${campaign.id} and email = 'grace@example.com'`;
+        yield* (yield* SmtpOutbox).afterNextSend(
+          Effect.orDie(sql`
+            update campaign_recipients set status = 'queued', claimed_at = null
+            where campaign_id = ${campaign.id} and email = 'grace@example.com'`)
+        );
+
+        const first = yield* Effect.exit(worker.deliver(batch));
+
+        yield* worker.deliver(batch);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.isTrue(Exit.isFailure(first));
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "ada@example.com",
+          "grace@example.com",
+        ]);
+      })
+  );
+
+  test.effect(
     "stops trying a batch while the Provider's server can't be connected to, and sends the rest on its next delivery",
     () =>
       Effect.gen(function* serverDown() {
