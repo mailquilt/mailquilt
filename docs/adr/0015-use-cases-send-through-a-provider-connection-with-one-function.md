@@ -4,7 +4,7 @@ Each Provider has its own port in `core`, such as `SmtpProvider`, and each runti
 
 A Provider Connection is SMTP or SES (#18), and `sendThrough` calls `SmtpProvider` or `SesProvider` for it. Cloudflare Email (#20) is P1 too. Each adds a kind to the Provider Connection, a port and adapter, and one case in `sendThrough`; the use cases that send don't change. Before this, both use cases read `SmtpProvider` and built its settings themselves, so each new Provider would have changed both, and every later use case that sends.
 
-The port has only `send`. It also had `parseNotifications`, for Provider webhooks, with three types and a stub in every adapter, but nothing called it. Provider events (#19, #21) add notification parsing back, designed with the endpoint that receives them.
+Every Provider port has `send`; SES's also has `maxSendRate`, the account's sending limit, which `sendingRateOf` (`packages/core/src/provider.ts`) reads for an SES connection without a rate of its own. The port also had `parseNotifications`, for Provider webhooks, with three types and a stub in every adapter, but nothing called it. Provider events (#19, #21) add notification parsing back, designed with the endpoint that receives them.
 
 The System Mailer isn't a Provider Connection. It sends Mailquilt's own account emails through `SmtpProvider` directly, with the install's settings (ADR 0002).
 

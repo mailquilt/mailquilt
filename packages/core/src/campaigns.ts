@@ -59,6 +59,12 @@ import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 /** How many of a Campaign's recipients one queue message sends to. */
 export const SEND_BATCH_SIZE = 100;
 
+// WARNING: each email through SES is one `fetch`, and a Workers Free invocation may make 50; a batch of 40, with its `GetAccount` read, leaves room to spare, where 100 would run out partway and fail the rest.
+const SES_SEND_BATCH_SIZE = 40;
+
+const sendBatchSizeFor = (provider: "smtp" | "ses") =>
+  provider === "ses" ? SES_SEND_BATCH_SIZE : SEND_BATCH_SIZE;
+
 /** Which page of Campaigns to list (ADR 0008). */
 export interface CampaignFilter {
   readonly after?: CampaignId;
@@ -140,7 +146,7 @@ export class Campaigns extends Context.Service<
      * goes to: every Contact with a subscribed Subscription to any of its
      * Lists, none to a List it leaves out, no Opt-out and an address that
      * isn't Suppressed, once each, in one query, split into batches of
-     * `batchSize`. `enqueue` is given the
+     * `batchSize` for the Provider of its connection. `enqueue` is given the
      * number of batches and runs inside that transaction, so if it fails
      * nothing changes. Fails, changing nothing, if the Campaign isn't a
      * draft (or isn't scheduled for `scheduledAt`), has no Provider
@@ -151,7 +157,7 @@ export class Campaigns extends Context.Service<
      */
     readonly startSending: (
       id: CampaignId,
-      batchSize: number,
+      batchSize: (provider: "smtp" | "ses") => number,
       enqueue: (batches: number) => Effect.Effect<void>,
       scheduledAt?: DateTime.Utc
     ) => Effect.Effect<
@@ -398,7 +404,7 @@ export const sendCampaign = (id: CampaignId) =>
     const queue = yield* Queue;
     const organization = yield* CurrentOrganization;
 
-    return yield* campaigns.startSending(id, SEND_BATCH_SIZE, (batches) =>
+    return yield* campaigns.startSending(id, sendBatchSizeFor, (batches) =>
       queue.enqueue(batchMessages(organization.id, id, batches))
     );
   });
@@ -459,7 +465,7 @@ const startScheduledCampaign = (message: StartScheduledCampaign) =>
     yield* campaigns
       .startSending(
         message.campaignId,
-        SEND_BATCH_SIZE,
+        sendBatchSizeFor,
         (batches) =>
           queue.enqueue(
             batchMessages(message.organizationId, message.campaignId, batches)

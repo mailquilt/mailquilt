@@ -204,6 +204,8 @@ const ONE_SECOND_MS = 1000;
 
 const THOUSAND_A_SECOND = 1000;
 
+const FORTY_ONE = 41;
+
 const MAX_CLOCK_TICKS = 120;
 
 const STALL_MS = 30_000;
@@ -1496,6 +1498,26 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
 
         assertNoEarlierThanSlots(times, ONE_SECOND_MS);
       }).pipe(withOwnClock, Effect.scoped)
+  );
+
+  test.effect(
+    "splits a Campaign through SES into batches of 40, so each fits a Workers Free invocation's 50 requests",
+    () =>
+      Effect.gen(function* sesBatches() {
+        const owner = yield* draftCampaign;
+
+        yield* sendThroughSes(owner, Option.some(THOUSAND_A_SECOND));
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `reader-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+
+        const batches = yield* (yield* QueueInbox).takeAll;
+
+        assert.lengthOf(batches, 2);
+      }).pipe(Effect.scoped)
   );
 
   test.effect(
