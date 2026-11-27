@@ -14,7 +14,7 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
 ## Process
 
 1. **UX first.** Write down the screen's job, who arrives and in what state, every state it has (loading, empty, error, success, disabled), and its copy, before any styling.
-2. **Mock up anything new, then stop.** Every new screen, component, menu, dialog or sheet is shown as rendered mockups before it is built: desktop and phone, light and dark, every state from step 1. Show two or three directions with a recommendation, and wait for the maintainer's pick. This holds on a `ready-for-agent` ticket too. Only copy, spacing and token changes inside an existing component skip this step.
+2. **Mock up anything new, then stop.** Every new screen, component, menu, dialog or sheet is shown as rendered mockups before it is built: desktop and phone (1440 and 390 px), light and dark, every state from step 1. The full set of widths in step 6 is for the build, not the mockups. Show two or three directions with a recommendation, and wait for the maintainer's pick. This holds on a `ready-for-agent` ticket too. Only copy, spacing and token changes inside an existing component skip this step.
 3. **Question every default.** For each Kumo component the design uses, check how it renders on a phone, where it sits, its type sizes, its focus and its motion. Keep a default only when it is right for this screen, and say which ones you kept. Defaults that cost a round on #6 and the redesign (#69):
    - Kumo pins `Dialog` near the top of the window, and `LayerDialog` puts its desktop card inside the phone drawer.
    - `LayerDialog` focuses its own frame when it opens, not its field, and takes no `initialFocus` or `finalFocus`, nor does Kumo's `Dialog`.
@@ -36,6 +36,8 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
    - a frame-by-frame recording of the screen loading with 120 ms of network latency, in which nothing already drawn moves or changes;
    - focus and keyboard paths checked in a real browser with real clicks and keys. Component tests run in happy-dom, where a scripted click doesn't move focus as a person's does;
    - motion, such as every open and close animation and scrim fade, checked frame by frame in the working build.
+
+   While you iterate, shoot only the state you changed, at 390 and 1440 px. Shoot the full set once, when the build is finished, before the design review in step 7.
 
    The `dashboard-screens` skill makes all of these. Tests passing is not evidence of design, and neither are screenshots alone: on the redesign (#69) several bugs passed in screenshots and showed only in the working build.
 

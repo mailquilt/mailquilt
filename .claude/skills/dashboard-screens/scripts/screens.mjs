@@ -1,4 +1,4 @@
-// oxlint-disable no-await-in-loop -- each screenshot runs in its own Chrome, one at a time.
+// oxlint-disable no-await-in-loop -- steps on a page run in order, and each worker takes one screenshot at a time.
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -15,7 +15,7 @@ import {
 } from "./chrome.mjs";
 
 const USAGE =
-  "Usage: node screens.mjs --out <dir> [--path /] [--name screen] [--widths 320,390,768,1024,1440,1920,2560] [--themes light,dark] [--step click=<selector or text=Label> | type=<text> | press=<Enter|Escape|Tab>]... [--block <url pattern>]... [--wait 2500]";
+  "Usage: node screens.mjs --out <dir> [--path /] [--name screen] [--widths 320,390,768,1024,1440,1920,2560] [--themes light,dark] [--step click=<selector or text=Label> | type=<text> | press=<Enter|Escape|Tab>]... [--block <url pattern>]... [--wait <ms>] [--parallel 4]";
 
 const args = readArgs(process.argv.slice(2));
 
@@ -34,7 +34,9 @@ const widths = (args.widths ?? "320,390,768,1024,1440,1920,2560")
 const themes = (args.themes ?? "light,dark").split(",");
 const steps = [args.step ?? []].flat();
 const blocked = [args.block ?? []].flat();
-const wait = Number(args.wait ?? 2500);
+
+const wait = args.wait === undefined ? undefined : Number(args.wait);
+const parallel = Number(args.parallel ?? 4);
 const SHEET_ROW_HEIGHT = 420;
 const shots = [];
 
@@ -49,7 +51,7 @@ const shoot = async (theme, width) => {
     }
 
     await navigate(page, `${BASE_URL}${args.path ?? "/"}`);
-    await sleep(wait);
+    await (wait === undefined ? page.settle() : sleep(wait));
 
     for (const step of steps) {
       const [kind, ...rest] = step.split("=");
@@ -69,7 +71,7 @@ const shoot = async (theme, width) => {
         await pressKey(page, value);
       }
 
-      await sleep(800);
+      await page.settle({ quiet: 300 });
     }
 
     const focus = await page.evaluate(
@@ -87,16 +89,36 @@ const shoot = async (theme, width) => {
   }
 };
 
-try {
-  for (const theme of themes) {
-    for (const width of widths) {
-      await shoot(theme, width);
+const queue = themes.flatMap((theme) =>
+  widths.map((width) => ({ theme, width }))
+);
+
+// WARNING: on a failure, let the other workers finish their shot so every Chrome is closed.
+let failure;
+
+const worker = async () => {
+  for (let next = queue.shift(); next; next = queue.shift()) {
+    try {
+      await shoot(next.theme, next.width);
+    } catch (error) {
+      failure ??= error;
+      queue.length = 0;
     }
   }
-} catch (error) {
-  console.error(error.message);
+};
+
+await Promise.all(Array.from({ length: parallel }, worker));
+
+if (failure) {
+  console.error(failure.message);
   process.exit(1);
 }
+
+shots.sort(
+  (a, b) =>
+    themes.indexOf(a.theme) - themes.indexOf(b.theme) ||
+    widths.indexOf(a.width) - widths.indexOf(b.width)
+);
 
 const cells = shots
   .map(
