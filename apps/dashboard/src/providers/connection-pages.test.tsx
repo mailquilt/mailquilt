@@ -135,17 +135,11 @@ describe("connecting and editing an SMTP server", () => {
   });
 
   it("keeps connecting when the Provider is changed while the request is on its way", async () => {
-    let answer: (response: Response) => void = () => {};
+    const reply = Deferred.makeUnsafe<Response>();
 
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),
-      http.post(
-        CONNECTIONS,
-        () =>
-          new Promise<Response>((resolve) => {
-            answer = resolve;
-          })
-      )
+      http.post(CONNECTIONS, () => Effect.runPromise(Deferred.await(reply)))
     );
 
     const router = renderWithOrganizations(
@@ -162,7 +156,10 @@ describe("connecting and editing an SMTP server", () => {
 
     await screen.findByRole("button", { name: "Connecting…" });
     fireEvent.click(screen.getByRole("radio", { name: /Amazon SES/u }));
-    answer(HttpResponse.json(POSTMARK, { status: 201 }));
+    Deferred.doneUnsafe(
+      reply,
+      Effect.succeed(HttpResponse.json(POSTMARK, { status: 201 }))
+    );
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/providers")
