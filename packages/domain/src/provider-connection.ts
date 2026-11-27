@@ -19,8 +19,11 @@ export const MIN_EMAILS_PER_MINUTE = 10;
 export const MAX_EMAILS_PER_MINUTE = 60_000;
 
 /**
- * How many emails a minute a Provider Connection sends at most, across
- * every Campaign sending through it.
+ * A Provider Connection's sending rate, in emails a minute, across every
+ * Campaign sending through it: each email's send slot starts one interval
+ * (a minute divided by the rate) after the last one's. Emails leave just
+ * after their slots, and after a stall a few can leave close together
+ * (ADR 0018), so it's a pace, not a hard maximum.
  */
 export const EmailsPerMinute = Schema.Int.check(
   Schema.isBetween(
