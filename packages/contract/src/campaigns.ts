@@ -5,6 +5,7 @@ import {
   CampaignLists,
   CampaignPage,
   Count,
+  ScheduleRequest,
 } from "@repo/domain";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
@@ -17,6 +18,7 @@ import {
   PostalAddressRequiredError,
   OrganizationNotFoundError,
   ProviderConnectionNotFoundError,
+  ScheduleInPastError,
   SignInRequiredError,
 } from "./errors.ts";
 import { organizationParams } from "./params.ts";
@@ -50,6 +52,15 @@ export const RecipientCount = Schema.Struct({ recipients: Count });
  * `ProviderConnectionNotFound` when its Provider Connection was deleted.
  * `countRecipients` counts who a Campaign to some Lists would go to now,
  * the same way `send` fixes them.
+ *
+ * `schedule` makes a draft `scheduled`, to start sending at a time still to
+ * come (`ScheduleInPast`), or moves a scheduled one to another time. It's
+ * refused for the same reasons as `send`, checked now, and checked again
+ * when it's due: if it can't start then, it becomes a draft, and its
+ * `schedule.missed` says why. A scheduled Campaign can't be changed or
+ * sent. `cancelSchedule` makes it a draft again, with no schedule, which
+ * also clears a draft's missed schedule; one that started sending can't be
+ * stopped (`CampaignNotDraft`).
  */
 export class CampaignsApi extends HttpApiGroup.make("campaigns")
   .add(
@@ -136,6 +147,43 @@ export class CampaignsApi extends HttpApiGroup.make("campaigns")
           ProviderConnectionNotFoundError,
           NoSubscribedContactsError,
           PostalAddressRequiredError,
+        ],
+        params: campaignParams,
+        success: Campaign,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.put(
+      "schedule",
+      "/organizations/:organizationId/campaigns/:campaignId/schedule",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          CampaignNotFoundError,
+          CampaignNotDraftError,
+          ProviderConnectionNotFoundError,
+          NoSubscribedContactsError,
+          PostalAddressRequiredError,
+          ScheduleInPastError,
+        ],
+        params: campaignParams,
+        payload: ScheduleRequest,
+        success: Campaign,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.delete(
+      "cancelSchedule",
+      "/organizations/:organizationId/campaigns/:campaignId/schedule",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          CampaignNotFoundError,
+          CampaignNotDraftError,
         ],
         params: campaignParams,
         success: Campaign,

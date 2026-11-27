@@ -54,6 +54,9 @@ const summaryColumns = {
   >`array(select list_id from ${campaignLists} where campaign_id = ${campaigns.id} and not excluded order by list_id)`,
   providerConnectionId: campaigns.providerConnectionId,
   replyTo: campaigns.replyTo,
+  scheduledAt: campaigns.scheduledAt,
+  scheduleMissed: campaigns.scheduleMissed,
+  scheduleTimeZone: campaigns.scheduleTimeZone,
   sendingStartedAt: campaigns.sendingStartedAt,
   sent: campaigns.recipientsSent,
   sentAt: campaigns.sentAt,
@@ -78,6 +81,9 @@ interface SummaryRow {
   readonly sent: number;
   readonly failed: number;
   readonly createdAt: Date;
+  readonly scheduledAt: Date | null;
+  readonly scheduleTimeZone: string | null;
+  readonly scheduleMissed: string | null;
   readonly sendingStartedAt: Date | null;
   readonly sentAt: Date | null;
 }
@@ -97,6 +103,14 @@ const toSummary = (row: SummaryRow) => ({
   providerConnectionId: row.providerConnectionId,
   recipients: { failed: row.failed, sent: row.sent, total: row.total },
   replyTo: row.replyTo,
+  schedule:
+    row.scheduledAt === null
+      ? null
+      : {
+          at: DateTime.fromDateUnsafe(row.scheduledAt),
+          missed: row.scheduleMissed,
+          timeZone: row.scheduleTimeZone,
+        },
   sendingStartedAt: optionalDate(row.sendingStartedAt),
   sentAt: optionalDate(row.sentAt),
   status: row.status,
@@ -208,6 +222,29 @@ const requireConnection = (
           : Effect.void
       )
     );
+
+const requirePostalAddress = (
+  db: EffectPgDatabase,
+  organization: OrganizationId
+) =>
+  db
+    .select({ postalAddress: organizations.postalAddress })
+    .from(organizations)
+    .where(eq(organizations.id, organization))
+    .pipe(
+      Effect.orDie,
+      Effect.flatMap(([sender]) =>
+        sender === undefined || sender.postalAddress === null
+          ? Effect.fail(new PostalAddressRequired())
+          : Effect.void
+      )
+    );
+
+const NO_SCHEDULE = {
+  scheduledAt: null,
+  scheduleMissed: null,
+  scheduleTimeZone: null,
+} as const;
 
 const outcomeValues = (outcomes: readonly RecipientOutcome[]) =>
   sql.join(
@@ -486,23 +523,34 @@ export const CampaignsLive = Layer.effect(
             );
         }).pipe(Effect.orDie),
 
-      startSending: (id, batchSize, enqueue) =>
+      startSending: (id, batchSize, enqueue, scheduledAt) =>
         db
           .transaction(() =>
             Effect.gen(function* startSending() {
               const organization = yield* currentOrganizationId;
+              const sendNow = scheduledAt === undefined;
+
+              const sending = {
+                sendingStartedAt: sql`now()`,
+                status: "sending",
+                updatedAt: sql`now()`,
+              };
 
               const [started] = yield* db
                 .update(campaigns)
-                .set({
-                  sendingStartedAt: sql`now()`,
-                  status: "sending",
-                  updatedAt: sql`now()`,
-                })
+                .set(sendNow ? { ...NO_SCHEDULE, ...sending } : sending)
                 .where(
                   and(
                     inOrganization(organization, id),
-                    eq(campaigns.status, "draft")
+                    sendNow
+                      ? eq(campaigns.status, "draft")
+                      : and(
+                          eq(campaigns.status, "scheduled"),
+                          eq(
+                            campaigns.scheduledAt,
+                            DateTime.toDateUtc(scheduledAt)
+                          )
+                        )
                   )
                 )
                 .returning({
@@ -518,15 +566,7 @@ export const CampaignsLive = Layer.effect(
                 return yield* new ProviderConnectionNotFound();
               }
 
-              const [sender] = yield* db
-                .select({ postalAddress: organizations.postalAddress })
-                .from(organizations)
-                .where(eq(organizations.id, organization))
-                .pipe(Effect.orDie);
-
-              if (sender === undefined || sender.postalAddress === null) {
-                return yield* new PostalAddressRequired();
-              }
+              yield* requirePostalAddress(db, organization);
 
               const snapshot = yield* db
                 .execute<{ readonly recipients: number }>(sql`
@@ -559,6 +599,102 @@ export const CampaignsLive = Layer.effect(
             })
           )
           .pipe(Effect.catchTag("SqlError", Effect.die)),
+
+      schedule: (id, at, timeZone, schedule) =>
+        db
+          .transaction(() =>
+            Effect.gen(function* scheduleCampaign() {
+              const organization = yield* currentOrganizationId;
+
+              const [scheduled] = yield* db
+                .update(campaigns)
+                .set({
+                  scheduledAt: DateTime.toDateUtc(at),
+                  scheduleMissed: null,
+                  scheduleTimeZone: timeZone,
+                  status: "scheduled",
+                  updatedAt: sql`now()`,
+                })
+                .where(
+                  and(
+                    inOrganization(organization, id),
+                    inArray(campaigns.status, ["draft", "scheduled"])
+                  )
+                )
+                .returning({
+                  providerConnectionId: campaigns.providerConnectionId,
+                })
+                .pipe(Effect.orDie);
+
+              if (scheduled === undefined) {
+                return yield* notDraftOrMissing(organization, id);
+              }
+
+              if (scheduled.providerConnectionId === null) {
+                return yield* new ProviderConnectionNotFound();
+              }
+
+              yield* requirePostalAddress(db, organization);
+
+              const { rows } = yield* db
+                .execute<{ readonly anyone: boolean }>(sql`
+                  select exists (${recipientsOf(organization, listsOfCampaign(organization, id))}) as anyone
+                `)
+                .pipe(Effect.orDie);
+
+              if (rows[0]?.anyone !== true) {
+                return yield* new NoSubscribedContacts();
+              }
+
+              yield* schedule;
+
+              return yield* one(organization, id).pipe(Effect.orDie);
+            })
+          )
+          .pipe(Effect.catchTag("SqlError", Effect.die)),
+
+      cancelSchedule: (id) =>
+        Effect.gen(function* cancelSchedule() {
+          const organization = yield* currentOrganizationId;
+
+          const [cancelled] = yield* db
+            .update(campaigns)
+            .set({ ...NO_SCHEDULE, status: "draft", updatedAt: sql`now()` })
+            .where(
+              and(
+                inOrganization(organization, id),
+                inArray(campaigns.status, ["draft", "scheduled"])
+              )
+            )
+            .returning({ id: campaigns.id })
+            .pipe(Effect.orDie);
+
+          if (cancelled === undefined) {
+            return yield* notDraftOrMissing(organization, id);
+          }
+
+          return yield* one(organization, id).pipe(Effect.orDie);
+        }),
+
+      missSchedule: (id, at, reason) =>
+        Effect.gen(function* missSchedule() {
+          const organization = yield* currentOrganizationId;
+
+          yield* db
+            .update(campaigns)
+            .set({
+              scheduleMissed: reason,
+              status: "draft",
+              updatedAt: sql`now()`,
+            })
+            .where(
+              and(
+                inOrganization(organization, id),
+                eq(campaigns.status, "scheduled"),
+                eq(campaigns.scheduledAt, DateTime.toDateUtc(at))
+              )
+            );
+        }).pipe(Effect.orDie),
 
       update: (id, draft) =>
         Effect.gen(function* updateCampaign() {

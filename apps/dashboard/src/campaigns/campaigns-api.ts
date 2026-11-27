@@ -4,6 +4,7 @@ import type {
   CampaignId,
   ListId,
   OrganizationId,
+  ScheduleRequest,
 } from "@repo/domain";
 import {
   keepPreviousData,
@@ -11,7 +12,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { Array as Arr, Effect, Order } from "effect";
+import { Array as Arr, DateTime, Effect, Order } from "effect";
 
 import { callApi } from "../api.ts";
 import type { CampaignSearch } from "./campaign-search.ts";
@@ -54,10 +55,36 @@ export const useCampaignPage = (
         : false,
   });
 
+const SCHEDULED_POLL_MAX_MS = 60 * 60 * 1000;
+
+// WARNING: a start can fail through every retry and leave the Campaign scheduled at a time that has passed (ADR 0017), so the quick asking stops after a while.
+const SCHEDULED_START_GRACE_MS = 15 * 60 * 1000;
+
+// WARNING: a timer can't wait longer than about 24 days, so a schedule further ahead is asked for again within the hour, and the wait shortens as its time comes.
+const nextAsk = (campaign: Campaign | null | undefined) => {
+  if (campaign?.status === "sending") {
+    return SENDING_POLL_MS;
+  }
+
+  if (campaign?.status !== "scheduled" || campaign.schedule === null) {
+    return false;
+  }
+
+  const untilDue = DateTime.toEpochMillis(campaign.schedule.at) - Date.now();
+
+  if (untilDue < -SCHEDULED_START_GRACE_MS) {
+    return SCHEDULED_POLL_MAX_MS;
+  }
+
+  return Math.min(Math.max(untilDue, SENDING_POLL_MS), SCHEDULED_POLL_MAX_MS);
+};
+
 /**
  * One Campaign, or `null` when the Organization has no such Campaign: a
  * definite answer, so it isn't retried as a failure would be. While it is
  * sending, it is asked for again every couple of seconds until it's sent.
+ * While it is scheduled, it is asked for again at its time, and then every
+ * couple of seconds until it has started, for a quarter of an hour.
  */
 export const useCampaign = (
   organizationId: OrganizationId,
@@ -75,8 +102,7 @@ export const useCampaign = (
         signal
       ),
     queryKey: campaignKey(organizationId, campaignId),
-    refetchInterval: (query) =>
-      query.state.data?.status === "sending" ? SENDING_POLL_MS : false,
+    refetchInterval: (query) => nextAsk(query.state.data),
   });
 
 /** The Lists a Campaign goes to and leaves out, as the recipient count takes them. */
@@ -188,6 +214,43 @@ export const useSendCampaign = (
     mutationFn: () =>
       callApi((client) =>
         client.campaigns.send({ params: { campaignId, organizationId } })
+      ),
+    onSuccess: keep,
+  });
+};
+
+/** Schedules a draft, or moves a schedule. The API answers with it scheduled. */
+export const useScheduleCampaign = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId
+) => {
+  const keep = useKeepCampaign(organizationId);
+
+  return useMutation({
+    mutationFn: (request: typeof ScheduleRequest.Type) =>
+      callApi((client) =>
+        client.campaigns.schedule({
+          params: { campaignId, organizationId },
+          payload: request,
+        })
+      ),
+    onSuccess: keep,
+  });
+};
+
+/** Cancels a schedule. The API answers with the Campaign a draft again. */
+export const useCancelSchedule = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId
+) => {
+  const keep = useKeepCampaign(organizationId);
+
+  return useMutation({
+    mutationFn: () =>
+      callApi((client) =>
+        client.campaigns.cancelSchedule({
+          params: { campaignId, organizationId },
+        })
       ),
     onSuccess: keep,
   });

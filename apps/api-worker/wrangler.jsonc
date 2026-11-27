@@ -37,7 +37,9 @@
       },
     ],
   },
-  // Every minute: forward queue messages a request couldn't (ADR 0014).
+  // Every minute: forward queue messages a request couldn't (ADR 0014), and
+  // scheduled ones once they're due, such as a scheduled Campaign's start
+  // (ADR 0017).
   // Every day at 03:00 UTC: make delivery events' coming monthly partitions.
   "triggers": {
     "crons": ["* * * * *", "0 3 * * *"],

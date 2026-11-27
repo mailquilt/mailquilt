@@ -1,6 +1,6 @@
-import { Queue, QueueMessageSchema } from "@repo/core";
+import { Queue, QueueMessageSchema, Scheduler } from "@repo/core";
 import { sql } from "drizzle-orm";
-import { Effect, Layer, Schema } from "effect";
+import { Context, DateTime, Effect, Layer, Schema } from "effect";
 
 import { Database } from "./database.ts";
 import { queueOutbox } from "./schema.ts";
@@ -12,18 +12,21 @@ const MESSAGES_PER_SEND = 100;
 
 const encodeMessages = Schema.encodeEffect(Schema.Array(QueueMessageSchema));
 
+const encodeMessage = Schema.encodeEffect(QueueMessageSchema);
+
 /**
- * The Queue for a runtime whose queue can't join a Postgres transaction, such
- * as Cloudflare Queues: `enqueue` writes the messages to the outbox through
- * the app's database, so they join the transaction it runs in and exist only
- * if it commits. `forwardQueueOutbox` hands them to the real queue (ADR 0014).
+ * The Queue and Scheduler for a runtime whose queue can't join a Postgres
+ * transaction, such as Cloudflare Queues: `enqueue` and `schedule` write the
+ * messages to the outbox through the app's database, so they join the
+ * transaction they run in and exist only if it commits.
+ * `forwardQueueOutbox` hands them to the real queue (ADR 0014), a scheduled
+ * one once it's due (ADR 0017).
  */
-export const QueueOutboxLive = Layer.effect(
-  Queue,
+export const QueueOutboxLive = Layer.effectContext(
   Effect.gen(function* queueOutboxLive() {
     const db = yield* Database;
 
-    return {
+    const queue = Queue.of({
       enqueue: (messages) =>
         Effect.gen(function* enqueue() {
           if (messages.length === 0) {
@@ -36,7 +39,20 @@ export const QueueOutboxLive = Layer.effect(
             .insert(queueOutbox)
             .values(encoded.map((message) => ({ message })));
         }).pipe(Effect.orDie),
-    };
+    });
+
+    const scheduler = Scheduler.of({
+      schedule: (message, at) =>
+        Effect.gen(function* schedule() {
+          const encoded = yield* encodeMessage(message);
+
+          yield* db
+            .insert(queueOutbox)
+            .values({ deliverAfter: DateTime.toDateUtc(at), message: encoded });
+        }).pipe(Effect.orDie),
+    });
+
+    return Context.make(Queue, queue).pipe(Context.add(Scheduler, scheduler));
   })
 );
 
@@ -53,6 +69,7 @@ const forwardGroup = <E, R>(
             delete from ${queueOutbox}
             where id in (
               select id from ${queueOutbox}
+              where deliver_after <= now()
               order by id
               limit ${MESSAGES_PER_SEND}
               for update skip locked
@@ -73,7 +90,7 @@ const forwardGroup = <E, R>(
   });
 
 /**
- * Hands every message in the outbox to `send`, up to 100 at a time (the most
+ * Hands every message in the outbox that's due to `send`, up to 100 at a time (the most
  * Cloudflare Queues takes in one batch), deleting each group in the
  * transaction that sends it: a group `send` fails on stays for the next
  * forward, and stops this one. Messages another forward is

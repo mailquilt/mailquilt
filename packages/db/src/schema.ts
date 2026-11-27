@@ -355,6 +355,9 @@ export const providerConnections = pgTable(
  * Lists in `campaign_lists` through one Provider Connection. Deleting that Provider Connection
  * leaves the Campaign without one (`provider_connection_id` null), so a draft
  * asks for another and a send in progress stops at its next batch.
+ * `scheduled_at` is when it's scheduled to start sending, or was, in the time
+ * zone `schedule_time_zone` it was chosen in; `schedule_missed` says why a
+ * draft didn't start when it was due.
  * `recipients_*` count the Contacts it goes to, fixed when it starts sending,
  * and how many were sent it or failed so far, kept with each batch's outcomes
  * so reading them never counts recipient rows.
@@ -376,6 +379,9 @@ export const campaigns = pgTable(
     recipientsTotal: integer("recipients_total").notNull().default(0),
     recipientsSent: integer("recipients_sent").notNull().default(0),
     recipientsFailed: integer("recipients_failed").notNull().default(0),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    scheduleTimeZone: text("schedule_time_zone"),
+    scheduleMissed: text("schedule_missed"),
     sendingStartedAt: timestamp("sending_started_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: createdAt(),
@@ -397,7 +403,17 @@ export const campaigns = pgTable(
     }).onDelete("set null"),
     check(
       "campaigns_status_check",
-      sql`${table.status} in ('draft', 'sending', 'sent')`
+      sql`${table.status} in ('draft', 'scheduled', 'sending', 'sent')`
+    ),
+    check(
+      "campaigns_schedule_check",
+      sql`(${table.scheduledAt} is null) = (${table.scheduleTimeZone} is null)
+        and (${table.status} <> 'scheduled' or (${table.scheduledAt} is not null and ${table.scheduleMissed} is null))
+        and (${table.scheduleMissed} is null or (${table.status} = 'draft' and ${table.scheduledAt} is not null))`
+    ),
+    check(
+      "campaigns_schedule_missed_check",
+      sql`${table.scheduleMissed} in ('no-provider-connection', 'no-subscribed-contacts')`
     ),
   ]
 );
@@ -503,9 +519,13 @@ export const deliveryEvents = pgTable(
  * Queue messages waiting to be handed to a queue that can't join a Postgres
  * transaction, such as Cloudflare Queues. They're written in the transaction
  * that queues them, so they exist only if it commits, then forwarded and
- * deleted (ADR 0014). Each `message` is a `QueueMessage` encoded as JSON.
+ * deleted (ADR 0014). Each `message` is a `QueueMessage` encoded as JSON. A
+ * scheduled one waits until `deliver_after` (ADR 0017).
  */
 export const queueOutbox = pgTable("queue_outbox", {
   id: bigserial("id", { mode: "number" }).primaryKey(),
   message: jsonb("message").notNull(),
+  deliverAfter: timestamp("deliver_after", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

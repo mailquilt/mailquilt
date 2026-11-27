@@ -12,6 +12,7 @@ import {
   PostalAddressRequired,
   ProviderConnectionNotFound,
   RateLimited,
+  ScheduleInPast,
   SendFailed,
   SetupClosed,
   SignInRequired,
@@ -77,6 +78,11 @@ export const PostalAddressRequiredError = PostalAddressRequired.pipe(
 
 export const NoSubscribedContactsError = NoSubscribedContacts.pipe(
   HttpApiSchema.status(409)
+);
+
+/** A Campaign can only be scheduled for a time still to come. */
+export const ScheduleInPastError = ScheduleInPast.pipe(
+  HttpApiSchema.status(422)
 );
 
 export const DatabaseUnreachableError = DatabaseUnreachable.pipe(

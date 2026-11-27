@@ -39,6 +39,11 @@ const intruderCampaign = {
   subject: "Intruder",
 } as const;
 
+const intruderSchedule = {
+  localDateTime: "2099-12-01T09:00",
+  timeZone: "Europe/London",
+} as const;
+
 const intruderConnection = {
   credentials: {
     password: Redacted.make("password"),
@@ -97,6 +102,19 @@ const TENANT_ENDPOINTS = {
     client: Client,
     { campaignId, organizationId }: Target
   ) => client.campaigns.send({ params: { campaignId, organizationId } }),
+  "PUT /api/organizations/:organizationId/campaigns/:campaignId/schedule": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) =>
+    client.campaigns.schedule({
+      params: { campaignId, organizationId },
+      payload: intruderSchedule,
+    }),
+  "DELETE /api/organizations/:organizationId/campaigns/:campaignId/schedule": (
+    client: Client,
+    { campaignId, organizationId }: Target
+  ) =>
+    client.campaigns.cancelSchedule({ params: { campaignId, organizationId } }),
   "GET /api/organizations/:organizationId": (
     client: Client,
     { organizationId }: Target
@@ -718,6 +736,14 @@ layer(TestApp, { timeout: "2 minutes" })(
             .send({ params: foreign })
             .pipe(Effect.flip);
 
+          const scheduled = yield* outsider.campaigns
+            .schedule({ params: foreign, payload: intruderSchedule })
+            .pipe(Effect.flip);
+
+          const cancelled = yield* outsider.campaigns
+            .cancelSchedule({ params: foreign })
+            .pipe(Effect.flip);
+
           assert.strictEqual(toForeignList._tag, "ListNotFound");
           assert.strictEqual(leavingOutForeignList._tag, "ListNotFound");
           assert.strictEqual(countingForeignList._tag, "ListNotFound");
@@ -728,6 +754,8 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.strictEqual(read._tag, "CampaignNotFound");
           assert.strictEqual(edit._tag, "CampaignNotFound");
           assert.strictEqual(sent._tag, "CampaignNotFound");
+          assert.strictEqual(scheduled._tag, "CampaignNotFound");
+          assert.strictEqual(cancelled._tag, "CampaignNotFound");
           assert.deepStrictEqual(
             (yield* outsider.campaigns.list({
               params,

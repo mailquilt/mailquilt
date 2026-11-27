@@ -8,20 +8,33 @@ import type {
   CampaignPage,
   ContactId,
   ListNotFound,
+  MissedScheduleReason,
   NoSubscribedContacts,
+  OrganizationId,
   PostalAddressRequired,
   ProviderConnectionId,
   ProviderConnectionNotFound,
+  ScheduleRequest,
   SendFailureReason,
   Sender,
 } from "@repo/domain";
 import {
   postalAddressLine,
+  ScheduleInPast,
+  scheduledInstant,
   SendFailed,
   withFooterHtml,
   withFooterText,
 } from "@repo/domain";
-import { Array as Arr, Context, Effect, Option, pipe, Ref } from "effect";
+import {
+  Array as Arr,
+  Context,
+  DateTime,
+  Effect,
+  Option,
+  pipe,
+  Ref,
+} from "effect";
 import type { Types } from "effect";
 
 import { CurrentOrganization } from "./current-organization.ts";
@@ -32,7 +45,9 @@ import { sendThrough } from "./provider.ts";
 import type { OutgoingEmail, SentEmail, SmtpProvider } from "./provider.ts";
 import { asQueuedFor, Queue } from "./queue.ts";
 import type { QueueMessage } from "./queue.ts";
+import { Scheduler } from "./scheduler.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
+import { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
 import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 
 /** How many of a Campaign's recipients one queue message sends to. */
@@ -111,21 +126,25 @@ export class Campaigns extends Context.Service<
       filter: CampaignFilter
     ) => Effect.Effect<CampaignPage, never, CurrentOrganization>;
     /**
-     * Moves a draft to `sending` and, in the same transaction, fixes who it
+     * Moves a draft to `sending`, or with `scheduledAt`, a Campaign
+     * scheduled for that instant, and in the same transaction fixes who it
      * goes to: every Contact with a subscribed Subscription to any of its
      * Lists, none to a List it leaves out, no Opt-out and an address that
      * isn't Suppressed, once each, in one query, split into batches of
      * `batchSize`. `enqueue` is given the
      * number of batches and runs inside that transaction, so if it fails
      * nothing changes. Fails, changing nothing, if the Campaign isn't a
-     * draft, has no Provider Connection, its Organization has no postal
-     * address, or there's no one to send it to. An address can be changed
-     * but never removed, so it's still there when the batches go out.
+     * draft (or isn't scheduled for `scheduledAt`), has no Provider
+     * Connection, its Organization has no postal address, or there's no one
+     * to send it to. An address can be changed but never removed, so it's
+     * still there when the batches go out. A draft sent now loses any
+     * schedule it missed.
      */
     readonly startSending: (
       id: CampaignId,
       batchSize: number,
-      enqueue: (batches: number) => Effect.Effect<void>
+      enqueue: (batches: number) => Effect.Effect<void>,
+      scheduledAt?: DateTime.Utc
     ) => Effect.Effect<
       Campaign,
       | CampaignNotFound
@@ -135,6 +154,42 @@ export class Campaigns extends Context.Service<
       | NoSubscribedContacts,
       CurrentOrganization
     >;
+    /**
+     * Makes a draft, or a scheduled Campaign, `scheduled` for `at` in
+     * `timeZone`, after the checks `startSending` makes, in one transaction
+     * that `schedule` joins, so if it fails nothing changes.
+     */
+    readonly schedule: (
+      id: CampaignId,
+      at: DateTime.Utc,
+      timeZone: string,
+      schedule: Effect.Effect<void>
+    ) => Effect.Effect<
+      Campaign,
+      | CampaignNotFound
+      | CampaignNotDraft
+      | ProviderConnectionNotFound
+      | PostalAddressRequired
+      | NoSubscribedContacts,
+      CurrentOrganization
+    >;
+    /** Makes a draft or scheduled Campaign a draft with no schedule. */
+    readonly cancelSchedule: (
+      id: CampaignId
+    ) => Effect.Effect<
+      Campaign,
+      CampaignNotFound | CampaignNotDraft,
+      CurrentOrganization
+    >;
+    /**
+     * Makes a Campaign still scheduled for `at` a draft again, keeping its
+     * schedule with why it was missed. Anything else is left as it is.
+     */
+    readonly missSchedule: (
+      id: CampaignId,
+      at: DateTime.Utc,
+      reason: MissedScheduleReason
+    ) => Effect.Effect<void, never, CurrentOrganization>;
     /** The Campaign's content and the recipients in `batch` still queued, or none if it doesn't exist. */
     readonly queuedBatch: (
       id: CampaignId,
@@ -206,6 +261,56 @@ export const listCampaigns = (filter: CampaignFilter) =>
     return yield* campaigns.page(filter);
   });
 
+const batchMessages = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId,
+  batches: number
+) =>
+  Arr.makeBy(
+    batches,
+    (batch) => new SendCampaignBatch({ batch, campaignId, organizationId })
+  );
+
+/**
+ * Schedules a draft, or a scheduled Campaign, to start sending at the
+ * date and time a member chose in a time zone, refusing one that has
+ * passed. It's checked as sending it now would be, so a member learns now
+ * what would stop it.
+ */
+export const scheduleCampaign = (
+  id: CampaignId,
+  request: typeof ScheduleRequest.Type
+) =>
+  Effect.gen(function* scheduleOrganizationCampaign() {
+    const campaigns = yield* Campaigns;
+    const scheduler = yield* Scheduler;
+    const organization = yield* CurrentOrganization;
+    const now = yield* DateTime.now;
+
+    const at = yield* scheduledInstant(request).pipe(
+      Effect.fromOption,
+      Effect.orDie
+    );
+
+    if (!DateTime.isGreaterThan(at, now)) {
+      return yield* new ScheduleInPast();
+    }
+
+    return yield* campaigns.schedule(
+      id,
+      at,
+      request.timeZone,
+      scheduler.schedule(
+        new StartScheduledCampaign({
+          at,
+          campaignId: id,
+          organizationId: organization.id,
+        }),
+        at
+      )
+    );
+  });
+
 /**
  * Sends a draft Campaign now: fixes who it goes to and queues one message
  * per batch of them, so the request answers at once and the emails go out
@@ -218,19 +323,48 @@ export const sendCampaign = (id: CampaignId) =>
     const organization = yield* CurrentOrganization;
 
     return yield* campaigns.startSending(id, SEND_BATCH_SIZE, (batches) =>
-      queue.enqueue(
-        Arr.makeBy(
-          batches,
-          (batch) =>
-            new SendCampaignBatch({
-              batch,
-              campaignId: id,
-              organizationId: organization.id,
-            })
-        )
-      )
+      queue.enqueue(batchMessages(organization.id, id, batches))
     );
   });
+
+/** Makes a scheduled Campaign a draft again. */
+export const cancelCampaignSchedule = (id: CampaignId) =>
+  Effect.gen(function* cancelOrganizationCampaignSchedule() {
+    const campaigns = yield* Campaigns;
+
+    return yield* campaigns.cancelSchedule(id);
+  });
+
+const startScheduledCampaign = (message: StartScheduledCampaign) =>
+  Effect.gen(function* startScheduled() {
+    const campaigns = yield* Campaigns;
+    const queue = yield* Queue;
+
+    const missed = (reason: MissedScheduleReason) => () =>
+      campaigns.missSchedule(message.campaignId, message.at, reason);
+
+    yield* campaigns
+      .startSending(
+        message.campaignId,
+        SEND_BATCH_SIZE,
+        (batches) =>
+          queue.enqueue(
+            batchMessages(message.organizationId, message.campaignId, batches)
+          ),
+        message.at
+      )
+      .pipe(
+        Effect.asVoid,
+        Effect.catchTags({
+          CampaignNotDraft: () => Effect.void,
+          CampaignNotFound: () => Effect.void,
+          NoSubscribedContacts: missed("no-subscribed-contacts"),
+          ProviderConnectionNotFound: missed("no-provider-connection"),
+        }),
+        // WARNING: scheduling needs a postal address, and one can't be removed, so its absence now is a defect.
+        Effect.orDie
+      );
+  }).pipe(asQueuedFor(message));
 
 const SERVER_FAILURES = new Set<SendFailureReason>([
   "auth",
@@ -381,7 +515,15 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
  * Provider refusing one recipient doesn't stop the others; once its server
  * can't be reached or refuses the connection, the rest of the batch is
  * recorded with that failure without trying them. A batch delivered again
- * sends only to those still queued.
+ * sends only to those still queued. For a scheduled Campaign that's due:
+ * starts sending it if it's still scheduled for that time, as sending it
+ * now would; if it can't, it becomes a draft again, saying why.
  */
 export const handleQueueMessage = (message: QueueMessage) =>
-  sendCampaignBatch(message);
+  Effect.gen(function* handleMessage() {
+    if (message._tag === "SendCampaignBatch") {
+      return yield* sendCampaignBatch(message);
+    }
+
+    return yield* startScheduledCampaign(message);
+  });

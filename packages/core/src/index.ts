@@ -1,10 +1,12 @@
 export {
   Campaigns,
+  cancelCampaignSchedule,
   countRecipients,
   createCampaign,
   getCampaign,
   handleQueueMessage,
   listCampaigns,
+  scheduleCampaign,
   SEND_BATCH_SIZE,
   sendCampaign,
   updateCampaign,
@@ -32,9 +34,13 @@ export {
   queueRetryDelaySeconds,
 } from "./queue.ts";
 
+export { Scheduler } from "./scheduler.ts";
+
 export type { QueueMessage } from "./queue.ts";
 
 export { SendCampaignBatch } from "./send-campaign-batch.ts";
+
+export { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
 
 export { Contacts, createContact, listContacts } from "./contacts.ts";
 

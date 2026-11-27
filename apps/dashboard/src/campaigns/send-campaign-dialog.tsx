@@ -16,7 +16,8 @@ export type SendRefusal =
   | "gone"
   | "nobody";
 
-const refusalOf = (failure: Error) => {
+/** The refusal a failure to send or schedule is, if it is one. */
+export const refusalOf = (failure: Error) => {
   if (Predicate.isTagged(failure, "CampaignNotDraft")) {
     return "already" satisfies SendRefusal;
   }

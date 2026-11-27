@@ -59,12 +59,15 @@ export const CampaignHtml = Schema.String.check(
 );
 
 /**
- * Where a Campaign is: a `draft` can be changed and sent; `sending` once a
- * member sent it, while its emails go out; `sent` once every Contact it went
- * to was sent it, or the Provider refused it.
+ * Where a Campaign is: a `draft` can be changed, sent and scheduled;
+ * `scheduled` waits to start sending at its time, and can't be changed
+ * until its schedule is cancelled, which makes it a draft again; `sending`
+ * once it started, while its emails go out; `sent` once every Contact it
+ * went to was sent it, or the Provider refused it.
  */
 export const CampaignStatusSchema = Schema.Literals([
   "draft",
+  "scheduled",
   "sending",
   "sent",
 ]);

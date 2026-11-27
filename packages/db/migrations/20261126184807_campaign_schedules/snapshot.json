@@ -1,0 +1,192 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "8580aa7a-fa4c-471d-90f3-214243242ef3",
+  "prevIds": ["c13902ac-3ce2-4120-8a0e-479acb7183ea"],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "campaigns", "scheduled_at"],
+      "writes": [
+        "s|col|public.campaigns.scheduled_at",
+        "n|col|public.campaigns.scheduled_at",
+        "e|col|public.campaigns.scheduled_at"
+      ],
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "campaigns",
+        "schedule_time_zone"
+      ],
+      "writes": [
+        "s|col|public.campaigns.schedule_time_zone",
+        "n|col|public.campaigns.schedule_time_zone",
+        "e|col|public.campaigns.schedule_time_zone"
+      ],
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "campaigns", "schedule_missed"],
+      "writes": [
+        "s|col|public.campaigns.schedule_missed",
+        "n|col|public.campaigns.schedule_missed",
+        "e|col|public.campaigns.schedule_missed"
+      ],
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
+    },
+    {
+      "statementType": "add_column",
+      "statementTarget": ["column", "public", "queue_outbox", "deliver_after"],
+      "writes": [
+        "s|col|public.queue_outbox.deliver_after",
+        "n|col|public.queue_outbox.deliver_after",
+        "e|col|public.queue_outbox.deliver_after"
+      ],
+      "reads": ["n|tbl|public.queue_outbox", "n|sch|public"]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|ck|public.campaigns.campaigns_schedule_check",
+        "n|ck|public.campaigns.campaigns_schedule_check",
+        "e|ck|public.campaigns.campaigns_schedule_check",
+        "n|con|public.campaigns.campaigns_schedule_check"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaigns.scheduled_at",
+        "n|col|public.campaigns.schedule_time_zone",
+        "n|col|public.campaigns.status",
+        "n|col|public.campaigns.schedule_missed"
+      ]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": [
+        "s|ck|public.campaigns.campaigns_schedule_missed_check",
+        "n|ck|public.campaigns.campaigns_schedule_missed_check",
+        "e|ck|public.campaigns.campaigns_schedule_missed_check",
+        "n|con|public.campaigns.campaigns_schedule_missed_check"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaigns.schedule_missed"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": ["s|ck|public.campaigns.campaigns_status_check"],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaigns.status",
+        "e|col|public.campaigns.status"
+      ],
+      "sqlHash": "a24f3dce28854f5d"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "scheduled_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "schedule_time_zone",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "schedule_missed",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "queue_outbox",
+        "name": "deliver_after",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_schedule_check",
+        "value": "(\"scheduled_at\" is null) = (\"schedule_time_zone\" is null)\n        and (\"status\" <> 'scheduled' or (\"scheduled_at\" is not null and \"schedule_missed\" is null))\n        and (\"schedule_missed\" is null or (\"status\" = 'draft' and \"scheduled_at\" is not null))",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "campaigns",
+        "name": "campaigns_schedule_missed_check",
+        "value": "\"schedule_missed\" in ('no-provider-connection', 'no-subscribed-contacts')",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"campaigns\",\"campaigns_status_check\"]",
+      "set": {
+        "value": "\"status\" in ('draft', 'scheduled', 'sending', 'sent')"
+      }
+    }
+  ]
+}

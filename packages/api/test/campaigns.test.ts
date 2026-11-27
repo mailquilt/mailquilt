@@ -9,8 +9,9 @@ import {
   SendFailed,
 } from "@repo/domain";
 import type { ContactId, ListId } from "@repo/domain";
-import { Effect, pipe } from "effect";
+import { DateTime, Effect, pipe } from "effect";
 import { SqlClient } from "effect/sql";
+import { TestClock } from "effect/testing";
 
 import {
   clientWithCookie,
@@ -125,6 +126,19 @@ const sentTo = (subject: string) =>
       .map((send) => send.email.to)
       .toSorted();
   });
+
+const NINE_IN_NEW_YORK = {
+  localDateTime: "2099-12-01T09:00",
+  timeZone: "America/New_York",
+} as const;
+
+const NINE_IN_NEW_YORK_UTC = DateTime.makeUnsafe("2099-12-01T14:00:00Z");
+
+// WARNING: the app checks a schedule isn't in the past against the real clock, so schedules are far ahead of it; the test's own clock only decides when the in-process Queue delivers them.
+const setClock = (time: DateTime.Utc) =>
+  TestClock.setTime(DateTime.toEpochMillis(time));
+
+const withOwnClock = Effect.provide(TestClock.layer());
 
 layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   test.effect(
@@ -949,5 +963,392 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         );
         assert.isEmpty(yield* sentTo(campaign.subject));
       })
+  );
+
+  test.effect(
+    "schedules a draft for a date and time in a chosen time zone, and cancelling the schedule makes it a draft again",
+    () =>
+      Effect.gen(function* scheduleAndCancel() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, connection, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+
+        const scheduled = yield* client.campaigns.schedule({
+          params: campaignParams,
+          payload: NINE_IN_NEW_YORK,
+        });
+
+        assert.strictEqual(scheduled.status, "scheduled");
+        assert.deepStrictEqual(
+          { ...scheduled.schedule },
+          {
+            at: NINE_IN_NEW_YORK_UTC,
+            missed: null,
+            timeZone: "America/New_York",
+          }
+        );
+        assert.deepStrictEqual(
+          yield* client.campaigns.get({ params: campaignParams }),
+          scheduled
+        );
+
+        const edited = yield* client.campaigns
+          .update({
+            params: campaignParams,
+            payload: {
+              ...CONTENT,
+              excludedListIds: [],
+              listIds: [list.id],
+              providerConnectionId: connection.id,
+            },
+          })
+          .pipe(Effect.flip);
+
+        const sentNow = yield* client.campaigns
+          .send({ params: campaignParams })
+          .pipe(Effect.flip);
+
+        assert.strictEqual(edited._tag, "CampaignNotDraft");
+        assert.strictEqual(sentNow._tag, "CampaignNotDraft");
+
+        const cancelled = yield* client.campaigns.cancelSchedule({
+          params: campaignParams,
+        });
+
+        assert.strictEqual(cancelled.status, "draft");
+        assert.isNull(cancelled.schedule);
+        assert.strictEqual(cancelled.subject, campaign.subject);
+
+        yield* setClock(NINE_IN_NEW_YORK_UTC);
+        yield* (yield* QueueWorker).deliverAll;
+
+        const after = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(after.status, "draft");
+        assert.isEmpty(yield* sentTo(campaign.subject));
+      }).pipe(withOwnClock)
+  );
+
+  test.effect(
+    "starts sending a scheduled Campaign when its time comes, not before, and only at the time it was last moved to",
+    () =>
+      Effect.gen(function* startWhenDue() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+        const worker = yield* QueueWorker;
+
+        yield* addContacts(
+          owner,
+          ["ada@example.com", "grace@example.com"],
+          [list.id]
+        );
+        yield* client.campaigns.schedule({
+          params: campaignParams,
+          payload: NINE_IN_NEW_YORK,
+        });
+
+        const moved = yield* client.campaigns.schedule({
+          params: campaignParams,
+          payload: { ...NINE_IN_NEW_YORK, localDateTime: "2099-12-01T10:00" },
+        });
+
+        const tenInNewYork = DateTime.makeUnsafe("2099-12-01T15:00:00Z");
+
+        assert.strictEqual(moved.status, "scheduled");
+        assert.deepStrictEqual(moved.schedule?.at, tenInNewYork);
+
+        yield* setClock(NINE_IN_NEW_YORK_UTC);
+        yield* worker.deliverAll;
+
+        const stillScheduled = yield* client.campaigns.get({
+          params: campaignParams,
+        });
+
+        assert.strictEqual(stillScheduled.status, "scheduled");
+        assert.isEmpty(yield* sentTo(campaign.subject));
+
+        yield* setClock(DateTime.subtract(tenInNewYork, { milliseconds: 1 }));
+        yield* worker.deliverAll;
+
+        assert.strictEqual(
+          (yield* client.campaigns.get({ params: campaignParams })).status,
+          "scheduled"
+        );
+
+        yield* setClock(tenInNewYork);
+        yield* worker.deliverAll;
+
+        const sent = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(sent.status, "sent");
+        assert.isNotNull(sent.sendingStartedAt);
+        assert.deepStrictEqual(
+          { ...sent.schedule },
+          { at: tenInNewYork, missed: null, timeZone: "America/New_York" }
+        );
+        assert.deepStrictEqual(
+          { ...sent.recipients },
+          { failed: 0, sent: 2, total: 2 }
+        );
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), [
+          "ada@example.com",
+          "grace@example.com",
+        ]);
+      }).pipe(withOwnClock)
+  );
+
+  test.effect(
+    "makes a scheduled Campaign that can't start when it's due a draft again, saying why, until its schedule is cleared",
+    () =>
+      Effect.gen(function* missedSchedule() {
+        const nobody = yield* draftCampaign;
+        const noConnection = yield* draftCampaign;
+
+        const [leaving] = yield* addContacts(
+          nobody,
+          ["leaving@example.com"],
+          [nobody.list.id]
+        );
+
+        yield* addContacts(
+          noConnection,
+          ["ada@example.com"],
+          [noConnection.list.id]
+        );
+
+        for (const owner of [nobody, noConnection]) {
+          yield* owner.client.campaigns.schedule({
+            params: owner.campaignParams,
+            payload: NINE_IN_NEW_YORK,
+          });
+        }
+
+        yield* setStatus(leaving?.id ?? assert.fail(), "unsubscribed");
+        yield* noConnection.client.providerConnections.delete({
+          params: {
+            ...noConnection.params,
+            providerConnectionId: noConnection.connection.id,
+          },
+        });
+
+        yield* setClock(NINE_IN_NEW_YORK_UTC);
+        yield* (yield* QueueWorker).deliverAll;
+
+        const missed = yield* Effect.forEach([nobody, noConnection], (owner) =>
+          owner.client.campaigns.get({ params: owner.campaignParams })
+        );
+
+        assert.deepStrictEqual(
+          missed.map((campaign) => [campaign.status, { ...campaign.schedule }]),
+          [
+            [
+              "draft",
+              {
+                at: NINE_IN_NEW_YORK_UTC,
+                missed: "no-subscribed-contacts",
+                timeZone: "America/New_York",
+              },
+            ],
+            [
+              "draft",
+              {
+                at: NINE_IN_NEW_YORK_UTC,
+                missed: "no-provider-connection",
+                timeZone: "America/New_York",
+              },
+            ],
+          ]
+        );
+        assert.isEmpty(yield* sentTo(nobody.campaign.subject));
+        assert.isEmpty(yield* sentTo(noConnection.campaign.subject));
+
+        const cleared = yield* nobody.client.campaigns.cancelSchedule({
+          params: nobody.campaignParams,
+        });
+
+        assert.strictEqual(cleared.status, "draft");
+        assert.isNull(cleared.schedule);
+      }).pipe(withOwnClock)
+  );
+
+  test.effect(
+    "schedules a time the clocks skip, when daylight saving starts, that much later",
+    () =>
+      Effect.gen(function* clocksSkip() {
+        const owner = yield* draftCampaign;
+        const { campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+
+        const halfPastTwoWhenNewYorkSkipsFromTwoToThree = {
+          localDateTime: "2099-03-08T02:30",
+          timeZone: "America/New_York",
+        };
+
+        const scheduled = yield* client.campaigns.schedule({
+          params: campaignParams,
+          payload: halfPastTwoWhenNewYorkSkipsFromTwoToThree,
+        });
+
+        const halfPastThreeEdt = DateTime.makeUnsafe("2099-03-08T07:30:00Z");
+
+        assert.deepStrictEqual(scheduled.schedule?.at, halfPastThreeEdt);
+      })
+  );
+
+  test.effect(
+    "refuses to schedule a Campaign for a time that has passed, or for a date or time zone that doesn't exist, and leaves it a draft",
+    () =>
+      Effect.gen(function* badTimes() {
+        const cookie = yield* signedInPerson;
+        const client = yield* clientWithCookie(cookie);
+
+        const organization = yield* client.organizations.create({
+          payload: { name: "Acme" },
+        });
+
+        const params = { organizationId: organization.id };
+
+        yield* client.organizations.updatePostalAddress({
+          params,
+          payload: { postalAddress: POSTAL_ADDRESS },
+        });
+
+        const list = yield* client.lists.create({
+          params,
+          payload: { name: "Weekly news" },
+        });
+
+        const connection = yield* client.providerConnections.create({
+          params,
+          payload: {
+            from: { email: "hello@acme.example" },
+            name: "Postmark",
+            smtp: { host: "smtp.example.com", port: 587, security: "starttls" },
+          },
+        });
+
+        yield* client.contacts.create({
+          params,
+          payload: { email: "ada@example.com", listIds: [list.id] },
+        });
+
+        const campaign = yield* client.campaigns.create({
+          params,
+          payload: {
+            ...CONTENT,
+            excludedListIds: [],
+            listIds: [list.id],
+            providerConnectionId: connection.id,
+          },
+        });
+
+        const campaignParams = { ...params, campaignId: campaign.id };
+
+        const past = yield* client.campaigns
+          .schedule({
+            params: campaignParams,
+            payload: { localDateTime: "2020-01-01T09:00", timeZone: "UTC" },
+          })
+          .pipe(Effect.flip);
+
+        const path = `/api/organizations/${organization.id}/campaigns/${campaign.id}/schedule`;
+
+        const refused = yield* Effect.forEach(
+          [
+            { localDateTime: "2099-02-30T09:00", timeZone: "UTC" },
+            { localDateTime: "2099-12-01T24:00", timeZone: "UTC" },
+            {
+              localDateTime: "2099-12-01T09:00",
+              timeZone: "Mars/Olympus_Mons",
+            },
+          ],
+          (body) => request("PUT", path, { body, headers: { cookie } })
+        );
+
+        assert.strictEqual(past._tag, "ScheduleInPast");
+        assert.deepStrictEqual(
+          refused.map((response) => response.status),
+          [400, 400, 400]
+        );
+        assert.strictEqual(
+          (yield* client.campaigns.get({ params: campaignParams })).status,
+          "draft"
+        );
+      })
+  );
+
+  test.effect(
+    "refuses to schedule a Campaign that sending now would refuse, and to schedule or cancel one that started sending",
+    () =>
+      Effect.gen(function* refusedLikeSending() {
+        const nobody = yield* draftCampaign;
+        const noAddress = yield* draftCampaignIn(null);
+        const started = yield* draftCampaign;
+
+        yield* addContacts(noAddress, ["ada@example.com"], [noAddress.list.id]);
+        yield* addContacts(started, ["ada@example.com"], [started.list.id]);
+        yield* started.client.campaigns.send({
+          params: started.campaignParams,
+        });
+
+        const refusals = yield* Effect.forEach(
+          [nobody, noAddress, started],
+          (owner) =>
+            owner.client.campaigns
+              .schedule({
+                params: owner.campaignParams,
+                payload: NINE_IN_NEW_YORK,
+              })
+              .pipe(Effect.flip)
+        );
+
+        const cancelStarted = yield* started.client.campaigns
+          .cancelSchedule({ params: started.campaignParams })
+          .pipe(Effect.flip);
+
+        const noCampaign = yield* nobody.client.campaigns
+          .schedule({
+            params: { ...nobody.params, campaignId: NO_SUCH_CAMPAIGN },
+            payload: NINE_IN_NEW_YORK,
+          })
+          .pipe(Effect.flip);
+
+        assert.deepStrictEqual(
+          refusals.map((refusal) => refusal._tag),
+          ["NoSubscribedContacts", "PostalAddressRequired", "CampaignNotDraft"]
+        );
+        assert.strictEqual(cancelStarted._tag, "CampaignNotDraft");
+        assert.strictEqual(noCampaign._tag, "CampaignNotFound");
+
+        const after = yield* Effect.forEach([nobody, noAddress], (owner) =>
+          owner.client.campaigns.get({ params: owner.campaignParams })
+        );
+
+        assert.deepStrictEqual(
+          after.map((campaign) => [campaign.status, campaign.schedule]),
+          [
+            ["draft", null],
+            ["draft", null],
+          ]
+        );
+
+        yield* setClock(NINE_IN_NEW_YORK_UTC);
+
+        const handled = yield* (yield* QueueWorker).deliverAll;
+
+        const refusedIds = new Set<string>(
+          [nobody, noAddress, started].map((owner) => owner.campaign.id)
+        );
+
+        assert.isEmpty(
+          handled.filter(
+            (message) =>
+              message._tag === "StartScheduledCampaign" &&
+              refusedIds.has(message.campaignId)
+          )
+        );
+      }).pipe(withOwnClock)
   );
 });
