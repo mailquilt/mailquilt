@@ -15,13 +15,13 @@
     "@effect/sql-pg": "catalog:",
     "@repo/core": "workspace:*",
     "@repo/db": "workspace:*",
+    "@repo/domain": "workspace:*",
     "@repo/providers": "workspace:*",
     "effect": "catalog:",
     "pg-boss": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
-    "@repo/domain": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
