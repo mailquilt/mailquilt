@@ -17,6 +17,7 @@ import {
   SnsSigner,
   TestApp,
 } from "./harness.ts";
+import { addReadySendingDomain } from "./ready-sending-domain.ts";
 
 const SES_ACCOUNT = {
   credentials: {
@@ -62,6 +63,8 @@ const sesOrganization = Effect.gen(function* sesOrganization() {
     params,
     payload: { postalAddress: "14 Mill Lane\nBristol BS1 4XE" },
   });
+
+  yield* addReadySendingDomain(owner);
 
   const { url } = yield* client.providerConnections.sesNotificationsUrl({
     params: { ...params, providerConnectionId: connection.id },

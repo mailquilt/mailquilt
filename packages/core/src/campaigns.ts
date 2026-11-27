@@ -51,6 +51,7 @@ import type { QueueMessage } from "./queue.ts";
 import { Scheduler } from "./scheduler.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
 import type { SendDeferred } from "./send-deferred.ts";
+import { requireReadySendingDomain } from "./sending-domains.ts";
 import type { SesProvider } from "./ses-provider.ts";
 import type { SmtpProvider } from "./smtp-provider.ts";
 import { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
@@ -356,8 +357,8 @@ const batchMessages = (
 /**
  * Schedules a draft, or a scheduled Campaign, to start sending at the
  * date and time a member chose in a time zone, refusing one that has
- * passed. It's checked as sending it now would be, so a member learns now
- * what would stop it.
+ * passed. It's checked as sending it now would be, its Sending Domain's DNS
+ * included, so a member learns now what would stop it.
  */
 export const scheduleCampaign = (
   id: CampaignId,
@@ -378,6 +379,12 @@ export const scheduleCampaign = (
       return yield* new ScheduleInPast();
     }
 
+    const campaign = yield* campaigns.get(id);
+
+    if (campaign.status === "draft" || campaign.status === "scheduled") {
+      yield* requireReadySendingDomain(campaign.from.email);
+    }
+
     return yield* campaigns.schedule(
       id,
       at,
@@ -394,15 +401,20 @@ export const scheduleCampaign = (
   });
 
 /**
- * Sends a draft Campaign now: fixes who it goes to and queues one message
- * per batch of them, so the request answers at once and the emails go out
- * in the background.
+ * Sends a draft Campaign now: checks its Sending Domain's DNS, then fixes
+ * who it goes to and queues one message per batch of them, so the request
+ * answers at once and the emails go out in the background.
  */
 export const sendCampaign = (id: CampaignId) =>
   Effect.gen(function* sendOrganizationCampaign() {
     const campaigns = yield* Campaigns;
     const queue = yield* Queue;
     const organization = yield* CurrentOrganization;
+    const campaign = yield* campaigns.get(id);
+
+    if (campaign.status === "draft") {
+      yield* requireReadySendingDomain(campaign.from.email);
+    }
 
     return yield* campaigns.startSending(id, sendBatchSizeFor, (batches) =>
       queue.enqueue(batchMessages(organization.id, id, batches))
@@ -461,6 +473,36 @@ const startScheduledCampaign = (message: StartScheduledCampaign) =>
 
     const missed = (reason: MissedScheduleReason) => () =>
       campaigns.missSchedule(message.campaignId, message.at, reason);
+
+    const campaign = yield* campaigns
+      .get(message.campaignId)
+      .pipe(Effect.option);
+
+    if (
+      Option.isSome(campaign) &&
+      campaign.value.status === "scheduled" &&
+      campaign.value.schedule !== null &&
+      DateTime.toEpochMillis(campaign.value.schedule.at) ===
+        DateTime.toEpochMillis(message.at)
+    ) {
+      const domainReady = yield* requireReadySendingDomain(
+        campaign.value.from.email
+      ).pipe(
+        Effect.as(true),
+        Effect.catchTags({
+          SendingDomainNotReady: () =>
+            missed("sending-domain-not-ready")().pipe(Effect.as(false)),
+          SendingDomainRequired: () =>
+            missed("no-sending-domain")().pipe(Effect.as(false)),
+        }),
+        // WARNING: a lookup that failed, such as a DNS timeout, is a defect here, so the queue delivers the message again rather than the Campaign missing its time.
+        Effect.orDie
+      );
+
+      if (!domainReady) {
+        return;
+      }
+    }
 
     yield* campaigns
       .startSending(

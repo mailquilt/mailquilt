@@ -33,3 +33,5 @@ export {
 export type { RecordedSesSend } from "./ses-outbox.ts";
 
 export { InProcessQueueLive, QueueInbox } from "./in-process-queue.ts";
+
+export { DnsZone, ScriptedDnsLive, txtRecord } from "./scripted-dns.ts";

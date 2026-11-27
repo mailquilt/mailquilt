@@ -6,6 +6,7 @@ import { InstanceApi } from "./instance.ts";
 import { ListsApi } from "./lists.ts";
 import { OrganizationsApi } from "./organizations.ts";
 import { ProviderConnectionsApi } from "./provider-connections.ts";
+import { SendingDomainsApi } from "./sending-domains.ts";
 import { SuppressionsApi } from "./suppressions.ts";
 import { SystemApi } from "./system.ts";
 
@@ -20,6 +21,7 @@ export class MailquiltApi extends HttpApi.make("mailquilt")
   .add(SuppressionsApi)
   .add(ListsApi)
   .add(ProviderConnectionsApi)
+  .add(SendingDomainsApi)
   .add(CampaignsApi)
   .add(InstanceApi)
   .prefix("/api")

@@ -2,3 +2,7 @@
 
 # A placeholder token in an example test in a vendored agent skill.
 d1d1e28616d5b4a7acb61f1704efef8f94320079:.agents/skills/playwright-best-practices/advanced/authentication-flows.md:generic-api-key:54
+
+# A made-up DKIM public key fragment in Sending Domain tests (#31); the constants were renamed after.
+79a9db6a69fa7dccc4fea133227b5a31a7805fa7:packages/core/src/sending-domain-check.test.ts:generic-api-key:16
+79a9db6a69fa7dccc4fea133227b5a31a7805fa7:packages/api/test/ready-sending-domain.ts:generic-api-key:12

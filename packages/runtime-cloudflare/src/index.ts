@@ -1,3 +1,5 @@
+export { DnsLive } from "./dns.ts";
+
 export { emailLinksLive } from "./email-links.ts";
 
 export { postgresPortsLive } from "./postgres.ts";

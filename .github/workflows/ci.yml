@@ -155,6 +155,7 @@ jobs:
           ./node_modules/.bin/wrangler dev --port 8787 \
             --var "AUTH_SECRET:$AUTH_SECRET" \
             --var "ENCRYPTION_KEYS:$ENCRYPTION_KEYS" \
+            --var "DEV_DNS_RECORDS:$DEV_DNS_RECORDS" \
             > "$RUNNER_TEMP/wrangler.log" 2>&1 &
           for attempt in $(seq 1 60); do
             curl -fs http://localhost:8787/health && exit 0

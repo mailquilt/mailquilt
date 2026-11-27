@@ -42,7 +42,7 @@ Mailquilt is an open-source email platform for newsletters, automations and tran
 
 **Provider Connection**: One Organization's configured credentials for a Provider. _Avoid_: Integration, account, sender
 
-**Sending Domain**: A domain an Organization sends email from, whose DNS authentication (SPF, DKIM, DMARC) Mailquilt checks. _Avoid_: Sender domain, verified domain, identity
+**Sending Domain**: A domain an Organization sends email from, whose DNS authentication (SPF, DKIM, DMARC) Mailquilt checks, with the DKIM selectors its Provider signs under and, optionally, the return path its Provider sends bounces to. A Campaign is sent only from an address at one that passes DKIM and DMARC. _Avoid_: Sender domain, verified domain, identity
 
 **System Mailer**: The sending setup Mailquilt uses for its own account emails (sign-in links, invitations, receipts), separate from every Organization's Provider Connections. _Avoid_: System SMTP, platform sender, internal mailer
 

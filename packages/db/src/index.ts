@@ -12,6 +12,7 @@ import { OrganizationsLive } from "./organizations.ts";
 import { PreferencesLive } from "./preferences.ts";
 import { ProviderConnectionsLive } from "./provider-connections.ts";
 import { RateLimiterLive } from "./rate-limiter.ts";
+import { SendingDomainsLive } from "./sending-domains.ts";
 import { SuppressionsLive } from "./suppressions.ts";
 import { UnsubscribesLive } from "./unsubscribes.ts";
 
@@ -41,6 +42,8 @@ export type { EncodedQueueMessage } from "./queue-outbox.ts";
 
 export { RateLimiterLive } from "./rate-limiter.ts";
 
+export { SendingDomainsLive } from "./sending-domains.ts";
+
 export { SuppressionsLive } from "./suppressions.ts";
 
 export { UnsubscribesLive } from "./unsubscribes.ts";
@@ -61,6 +64,7 @@ export const DatabasePortsLive = Layer.mergeAll(
   PreferencesLive,
   ProviderConnectionsLive,
   RateLimiterLive,
+  SendingDomainsLive,
   SuppressionsLive,
   UnsubscribesLive
 ).pipe(Layer.provide(DatabaseLive), Layer.provide(SecureRandom.layerWebCrypto));

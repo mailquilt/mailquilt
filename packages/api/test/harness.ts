@@ -21,6 +21,7 @@ import type {
   SystemMailerSmtp,
 } from "@repo/core";
 import type {
+  DnsZone,
   SesOutbox,
   SmtpOutbox,
   SystemMailerOutbox,
@@ -30,6 +31,7 @@ import {
   QueueInbox,
   RecordingSesProviderLive,
   RecordingSmtpProviderLive,
+  ScriptedDnsLive,
   SystemMailerOutboxLive,
 } from "@repo/core/testing";
 import { DatabaseLive, DatabasePortsLive } from "@repo/db";
@@ -40,6 +42,7 @@ import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Context, Effect, Layer, Option, pipe, Redacted } from "effect";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
+import type { Dns } from "effect/net";
 import type { SqlClient } from "effect/sql";
 
 import { ApiLive, authConfigLayer } from "../src/index.ts";
@@ -86,7 +89,9 @@ type Fakes =
   | SesNotifications
   | Queue
   | QueueInbox
-  | Scheduler;
+  | Scheduler
+  | Dns.Dns
+  | DnsZone;
 
 const startPostgres = Effect.acquireRelease(
   Effect.promise(() => new PostgreSqlContainer(POSTGRES_IMAGE).start()),
@@ -275,7 +280,8 @@ export const AppFetch =
 /**
  * The whole API assembled as the entry apps assemble it, with a migrated,
  * real Postgres from Testcontainers, the System Mailer outbox (or the real
- * System Mailer), the recording SMTP and SES Providers, and the SES
+ * System Mailer), the recording SMTP and SES Providers, DNS answered from a
+ * zone tests script through `DnsZone`, and the SES
  * notifications adapter reaching a fake SNS whose messages `SnsSigner`
  * signs. Unless `install` is
  * `"fresh"`, first-run setup has made `INSTANCE_ADMIN`, whose session cookie
@@ -303,7 +309,8 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
           RecordingSmtpProviderLive,
           RecordingSesProviderLive,
           sesNotificationsFor(snsSigner),
-          InProcessQueueLive
+          InProcessQueueLive,
+          ScriptedDnsLive
         )
       );
 

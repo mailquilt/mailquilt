@@ -541,10 +541,40 @@ const ProblemBanner = ({
   );
 };
 
+// WARNING: the page can't see a Sending Domain's DNS, so a schedule missed for one is never shown as still holding.
 const MISSED_AS_PROBLEM = {
   "no-provider-connection": "connection",
+  "no-sending-domain": null,
   "no-subscribed-contacts": "nobody",
-} as const satisfies Record<MissedScheduleReason, Problem>;
+  "sending-domain-not-ready": null,
+} as const satisfies Record<MissedScheduleReason, Problem | null>;
+
+const MISSED_WHY = {
+  "no-provider-connection":
+    "Its provider connection was deleted before then, so it went back to being a draft.",
+  "no-sending-domain":
+    "Its from address’s domain was no longer a sending domain then, so it went back to being a draft.",
+  "no-subscribed-contacts":
+    "No one would have got it then, so it went back to being a draft.",
+  "sending-domain-not-ready":
+    "Its sending domain failed its DKIM or DMARC check then, so Gmail and Yahoo would have rejected it, and it went back to being a draft.",
+} as const satisfies Record<MissedScheduleReason, string>;
+
+const nextAfterMissed = (schedule: Schedule, counted: number | undefined) => {
+  if (schedule.missed === "no-subscribed-contacts" && counted !== undefined) {
+    return `${contacts(counted)} would get it now: schedule it again, or send it now.`;
+  }
+
+  if (schedule.missed === "no-sending-domain") {
+    return "Add its from address’s domain as a sending domain, then schedule it again or send it now.";
+  }
+
+  if (schedule.missed === "sending-domain-not-ready") {
+    return "Fix its domain’s DKIM and DMARC records, then schedule it again or send it now.";
+  }
+
+  return "Schedule it again, or send it now.";
+};
 
 const MissedBanner = ({
   campaign,
@@ -561,10 +591,7 @@ const MissedBanner = ({
 }) => {
   const title = `It wasn’t sent at ${missedWhen(schedule)}`;
 
-  const why =
-    schedule.missed === "no-provider-connection"
-      ? "Its provider connection was deleted before then, so it went back to being a draft."
-      : "No one would have got it then, so it went back to being a draft.";
+  const why = schedule.missed === null ? "" : MISSED_WHY[schedule.missed];
 
   if (stillHolds) {
     const what =
@@ -577,10 +604,7 @@ const MissedBanner = ({
     );
   }
 
-  const now =
-    schedule.missed === "no-subscribed-contacts" && counted !== undefined
-      ? `${contacts(counted)} would get it now: schedule it again, or send it now.`
-      : "Schedule it again, or send it now.";
+  const now = nextAfterMissed(schedule, counted);
 
   return <Banner description={`${why} ${now}`} title={title} />;
 };

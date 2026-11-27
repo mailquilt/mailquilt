@@ -6,6 +6,7 @@ import {
   ContactNotFound,
   CredentialsRequired,
   DatabaseUnreachable,
+  DnsLookupFailed,
   InstanceAdminRequired,
   ListNotFound,
   NoSubscribedContacts,
@@ -15,6 +16,10 @@ import {
   RateLimited,
   ScheduleInPast,
   SendFailed,
+  SendingDomainAlreadyExists,
+  SendingDomainNotFound,
+  SendingDomainNotReady,
+  SendingDomainRequired,
   SetupClosed,
   SignInRequired,
   SuppressionNotFound,
@@ -102,4 +107,27 @@ export const SuppressionNotFoundError = SuppressionNotFound.pipe(
 /** Only a Suppression a member added can be removed, not one from a bounce or complaint. */
 export const SuppressionNotRemovableError = SuppressionNotRemovable.pipe(
   HttpApiSchema.status(409)
+);
+
+export const SendingDomainNotFoundError = SendingDomainNotFound.pipe(
+  HttpApiSchema.status(404)
+);
+
+export const SendingDomainAlreadyExistsError = SendingDomainAlreadyExists.pipe(
+  HttpApiSchema.status(409)
+);
+
+/** A Campaign is sent only from a domain the Organization added as a Sending Domain. */
+export const SendingDomainRequiredError = SendingDomainRequired.pipe(
+  HttpApiSchema.status(409)
+);
+
+/** The Campaign's Sending Domain failed DKIM or DMARC when checked just now. */
+export const SendingDomainNotReadyError = SendingDomainNotReady.pipe(
+  HttpApiSchema.status(409)
+);
+
+/** A DNS lookup failed, so a Sending Domain couldn't be checked; trying again may work. */
+export const DnsLookupFailedError = DnsLookupFailed.pipe(
+  HttpApiSchema.status(502)
 );

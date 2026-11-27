@@ -72,6 +72,8 @@ export { CredentialsRequired } from "./credentials-required.ts";
 
 export { DatabaseUnreachable } from "./database-unreachable.ts";
 
+export { DnsLookupFailed } from "./dns-lookup-failed.ts";
+
 export { Health } from "./health.ts";
 
 export {
@@ -88,8 +90,10 @@ export {
   newSubscriptionId,
   newSuppressionId,
   newProviderConnectionId,
+  newSendingDomainId,
   OrganizationIdSchema,
   ProviderConnectionIdSchema,
+  SendingDomainIdSchema,
   SubscriptionIdSchema,
   SuppressionIdSchema,
   UserIdSchema,
@@ -102,6 +106,7 @@ export type {
   MemberId,
   OrganizationId,
   ProviderConnectionId,
+  SendingDomainId,
   SubscriptionId,
   SuppressionId,
   UserId,
@@ -174,6 +179,28 @@ export { SendFailed, SendFailureReasonSchema } from "./send-failed.ts";
 export type { SendFailureReason } from "./send-failed.ts";
 
 export { SesNotificationsUrl } from "./ses-notifications-url.ts";
+
+export {
+  DkimCheck,
+  DkimSelector,
+  DkimSelectors,
+  DmarcCheck,
+  DomainName,
+  MAX_DKIM_SELECTORS,
+  NewSendingDomain,
+  ReturnPathCheck,
+  SendingDomain,
+  SendingDomainCheck,
+  SpfCheck,
+} from "./sending-domain.ts";
+
+export { SendingDomainAlreadyExists } from "./sending-domain-already-exists.ts";
+
+export { SendingDomainNotFound } from "./sending-domain-not-found.ts";
+
+export { SendingDomainNotReady } from "./sending-domain-not-ready.ts";
+
+export { SendingDomainRequired } from "./sending-domain-required.ts";
 
 export { TestEmailSent } from "./test-email-sent.ts";
 

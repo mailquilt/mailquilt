@@ -1,6 +1,6 @@
 # Smoke test
 
-One Playwright test that proves a deployment's pieces work together: it sets up a fresh install, makes an Organization, connects Mailpit as an SMTP Provider Connection, adds a List and Contacts, writes and sends a Campaign through the dashboard, and checks every Contact's email arrived in Mailpit. It holds no rules; those are tested in the packages (`docs/agents/testing.md`).
+One Playwright test that proves a deployment's pieces work together: it sets up a fresh install, makes an Organization, connects Mailpit as an SMTP Provider Connection, adds `acme.example` as a Sending Domain, adds a List and Contacts, writes and sends a Campaign through the dashboard, and checks every Contact's email arrived in Mailpit. `acme.example` has no real DNS, so the app reads its records from `DEV_DNS_RECORDS` in `e2e/smoke.env`, a setting for development only. It holds no rules; those are tested in the packages (`docs/agents/testing.md`).
 
 It runs against the Docker image and against `wrangler dev`, in CI's `smoke` and `smoke-cloudflare` jobs.
 
@@ -28,7 +28,7 @@ docker run -d --rm --name mailquilt-smoke-mailpit -e MP_SMTP_AUTH_ACCEPT_ANY=tru
 export DATABASE_URL=postgres://postgres:smoke-test@127.0.0.1:5433/postgres
 pnpm --filter dashboard build
 pnpm --filter @repo/db migrate
-(set -a; . e2e/smoke.env; set +a; cd apps/api-worker && CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=$DATABASE_URL ./node_modules/.bin/wrangler dev --var "AUTH_SECRET:$AUTH_SECRET" --var "ENCRYPTION_KEYS:$ENCRYPTION_KEYS")
+(set -a; . e2e/smoke.env; set +a; cd apps/api-worker && CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE=$DATABASE_URL ./node_modules/.bin/wrangler dev --var "AUTH_SECRET:$AUTH_SECRET" --var "ENCRYPTION_KEYS:$ENCRYPTION_KEYS" --var "DEV_DNS_RECORDS:$DEV_DNS_RECORDS")
 ```
 
 Then, in another terminal:

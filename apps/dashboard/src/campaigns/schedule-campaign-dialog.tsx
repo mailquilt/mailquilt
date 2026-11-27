@@ -31,7 +31,7 @@ import {
   zonesOn,
 } from "./schedule-time.ts";
 import type { Zone } from "./schedule-time.ts";
-import { refusalOf } from "./send-campaign-dialog.tsx";
+import { refusalOf, sendingDomainProblemOf } from "./send-campaign-dialog.tsx";
 import type { SendRefusal } from "./send-campaign-dialog.tsx";
 
 const TEXT_SAFARI_WONT_ZOOM_INTO = "max-sm:text-lg pointer-coarse:text-lg";
@@ -101,10 +101,21 @@ const pastMessage = (
     : `${shownTime(time)} has passed${inZone(zone)}. It’s ${clockIn(now, zone)} there now.`;
 };
 
-const problemOf = (failure: Error) =>
-  Predicate.isTagged(failure, "SignInRequired")
-    ? "You’ve been signed out. Sign in again, then schedule it. It hasn’t been scheduled."
-    : "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be scheduled twice.";
+// WARNING: Change time keeps the schedule it had when it's refused, so it isn't "not scheduled".
+const problemOf = (failure: Error, moving: boolean) => {
+  const outcome = moving
+    ? "Its time hasn’t changed."
+    : "It hasn’t been scheduled.";
+
+  if (Predicate.isTagged(failure, "SignInRequired")) {
+    return `You’ve been signed out. Sign in again, then schedule it. ${outcome}`;
+  }
+
+  return (
+    sendingDomainProblemOf(failure, outcome) ??
+    "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be scheduled twice."
+  );
+};
 
 const DashedSlot = () => <CampaignBlock status="draft" />;
 
@@ -555,7 +566,7 @@ export const ScheduleCampaignDialog = ({
     refusalOf(failure) !== undefined ||
     Predicate.isTagged(failure, "ScheduleInPast")
       ? undefined
-      : problemOf(failure);
+      : problemOf(failure, moving);
 
   const submit = () => {
     const current = DateTime.nowUnsafe();

@@ -6,6 +6,7 @@ import {
 } from "@repo/core";
 import {
   consumeQueueBatch,
+  DnsLive,
   emailLinksLive,
   forwardOutboxTo,
   postgresPortsLive,
@@ -31,6 +32,8 @@ interface Env {
   readonly ENCRYPTION_KEYS?: string;
   /** `true` stops SMTP connections and SNS fetches to private networks and loopback too (ADR 0010). */
   readonly BLOCK_PRIVATE_NETWORKS?: string;
+  /** For development and the smoke test only: DNS answers Sending Domain checks read instead of real DNS (`dnsWithDevRecords` in core). */
+  readonly DEV_DNS_RECORDS?: string;
   /**
    * The System Mailer, optional: `SYSTEM_MAILER_SMTP_HOST`, `_PORT`,
    * `_SECURITY`, `SYSTEM_MAILER_FROM_EMAIL` and the optional `_FROM_NAME`,
@@ -57,6 +60,8 @@ const configFromEnv = (env: Env) =>
 
 const smtpProviderLive = (env: Env) =>
   SmtpProviderLive.pipe(Layer.provide(configFromEnv(env)));
+
+const dnsLive = (env: Env) => DnsLive.pipe(Layer.provide(configFromEnv(env)));
 
 const sesNotificationsLive = (env: Env) =>
   SesNotificationsLive.pipe(Layer.provide(configFromEnv(env)));
@@ -94,7 +99,8 @@ const makeApp = (env: Env) =>
           smtpProviderLive(env),
           SesProviderLive,
           sesNotificationsLive(env),
-          emailLinks(env)
+          emailLinks(env),
+          dnsLive(env)
         )
       ),
       HttpRouter.provideRequest(
@@ -117,6 +123,7 @@ const runWithPorts = <A, E>(
     | Layer.Success<ReturnType<typeof smtpProviderLive>>
     | Layer.Success<typeof SesProviderLive>
     | Layer.Success<ReturnType<typeof emailLinks>>
+    | Layer.Success<ReturnType<typeof dnsLive>>
   >
 ) =>
   Effect.runPromise(
@@ -126,7 +133,8 @@ const runWithPorts = <A, E>(
           postgresPorts(env),
           smtpProviderLive(env),
           SesProviderLive,
-          emailLinks(env)
+          emailLinks(env),
+          dnsLive(env)
         )
       )
     )

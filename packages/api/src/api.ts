@@ -11,6 +11,7 @@ import { ListsHandlers } from "./lists.ts";
 import { OrganizationsHandlers } from "./organizations.ts";
 import { PreferencesRoutes } from "./preferences/routes.ts";
 import { ProviderConnectionsHandlers } from "./provider-connections.ts";
+import { SendingDomainsHandlers } from "./sending-domains.ts";
 import { SuppressionsHandlers } from "./suppressions.ts";
 import { SystemHandlers } from "./system.ts";
 import { UnsubscribeRoutes } from "./unsubscribe/routes.ts";
@@ -37,6 +38,7 @@ export const ApiLive = Layer.mergeAll(
         ListsHandlers,
         OrganizationsHandlers,
         ProviderConnectionsHandlers,
+        SendingDomainsHandlers,
         SuppressionsHandlers,
         SystemHandlers
       )
