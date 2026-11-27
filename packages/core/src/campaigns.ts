@@ -742,7 +742,16 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         );
       });
 
-    yield* Effect.forEach(batch.recipients, sendOnce, { discard: true });
+    // WARNING: a batch was sized for the Provider its connection had when the Campaign started; one moved to SES since would make more requests in a Workers Free invocation than it allows, so a delivery sends at most a batch for its Provider now and queues the rest of the batch again.
+    const limit = Option.match(connection, {
+      onNone: () => batch.recipients.length,
+      onSome: (opened) => sendBatchSizeFor(opened.provider),
+    });
+
+    const now = batch.recipients.slice(0, limit);
+    const later = batch.recipients.length > now.length;
+
+    yield* Effect.forEach(now, sendOnce, { discard: true });
 
     const unsettled = yield* settle;
 
@@ -753,6 +762,18 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
 
     if (yield* Ref.get(anyPutOff)) {
       return yield* new BatchDeferred();
+    }
+
+    if (later) {
+      const queue = yield* Queue;
+
+      return yield* queue.enqueue([
+        new SendCampaignBatch({
+          batch: message.batch,
+          campaignId: message.campaignId,
+          organizationId: message.organizationId,
+        }),
+      ]);
     }
 
     if (unsettled) {

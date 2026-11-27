@@ -206,6 +206,8 @@ const THOUSAND_A_SECOND = 1000;
 
 const FORTY_ONE = 41;
 
+const FORTY = 40;
+
 const MAX_CLOCK_TICKS = 120;
 
 const STALL_MS = 30_000;
@@ -1518,6 +1520,38 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
 
         assert.lengthOf(batches, 2);
       }).pipe(Effect.scoped)
+  );
+
+  test.effect(
+    "sends a batch at most 40 at a time once its connection moves to SES, queuing the rest of it again",
+    () =>
+      Effect.gen(function* movedToSes() {
+        const owner = yield* draftCampaign;
+
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `moved-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+        yield* sendThroughSes(owner, Option.some(THOUSAND_A_SECOND));
+
+        const times = yield* sendTimesOf(
+          (yield* SesOutbox).sent,
+          owner.campaign.subject,
+          FORTY
+        );
+
+        const rest = yield* (yield* QueueInbox).takeAll;
+
+        const sent = yield* owner.client.campaigns.get({
+          params: owner.campaignParams,
+        });
+
+        assert.lengthOf(times, FORTY);
+        assert.lengthOf(rest, 1);
+        assert.strictEqual(sent.status, "sending");
+      }).pipe(withOwnClock, Effect.scoped)
   );
 
   test.effect(
