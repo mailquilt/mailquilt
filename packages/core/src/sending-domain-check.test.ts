@@ -13,7 +13,8 @@ import {
   spfCheckOf,
 } from "./sending-domain-check.ts";
 
-const PUBLISHED = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDwIRP/UC3SBsEmGqZ9ZJW3/DkM";
+const PUBLISHED =
+  "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDwIRP/UC3SBsEmGqZ9ZJW3/DkM";
 
 const txt = (...chunks: [string, ...string[]]) =>
   Dns.makeRecordUnsafe("TXT", { chunks });

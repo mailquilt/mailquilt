@@ -3,17 +3,11 @@
   "version": "10",
   "dialect": "postgres",
   "id": "c13ffdb9-d94b-45c3-a265-5b0c797a7803",
-  "prevIds": [
-    "2a55e831-011e-414f-b00b-88e951db2bbf"
-  ],
+  "prevIds": ["2a55e831-011e-414f-b00b-88e951db2bbf"],
   "footprints": [
     {
       "statementType": "create_table",
-      "statementTarget": [
-        "table",
-        "public",
-        "sending_domains"
-      ],
+      "statementTarget": ["table", "public", "sending_domains"],
       "writes": [
         "s|tbl|public.sending_domains",
         "n|tbl|public.sending_domains",
@@ -22,9 +16,7 @@
         "n|type|public.sending_domains",
         "n|rel|public.sending_domains_pkey"
       ],
-      "reads": [
-        "n|sch|public"
-      ]
+      "reads": ["n|sch|public"]
     },
     {
       "statementType": "create_index",
@@ -49,11 +41,7 @@
     },
     {
       "statementType": "create_fk",
-      "statementTarget": [
-        "table",
-        "public",
-        "sending_domains"
-      ],
+      "statementTarget": ["table", "public", "sending_domains"],
       "writes": [
         "s|fk|public.sending_domains.sending_domains_organization_id_organizations_id_fkey",
         "n|fk|public.sending_domains.sending_domains_organization_id_organizations_id_fkey",
@@ -72,14 +60,8 @@
     },
     {
       "statementType": "alter_check",
-      "statementTarget": [
-        "table",
-        "public",
-        "campaigns"
-      ],
-      "writes": [
-        "s|ck|public.campaigns.campaigns_schedule_missed_check"
-      ],
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": ["s|ck|public.campaigns.campaigns_schedule_missed_check"],
       "reads": [
         "n|tbl|public.campaigns",
         "n|sch|public",
@@ -248,14 +230,10 @@
         "table": "sending_domains",
         "name": "sending_domains_organization_id_organizations_id_fkey",
         "nameExplicit": false,
-        "columns": [
-          "organization_id"
-        ],
+        "columns": ["organization_id"],
         "schemaTo": "public",
         "tableTo": "organizations",
-        "columnsTo": [
-          "id"
-        ],
+        "columnsTo": ["id"],
         "onUpdate": "NO ACTION",
         "onDelete": "CASCADE",
         "entityType": "fks"
@@ -267,9 +245,7 @@
         "schema": "public",
         "table": "sending_domains",
         "name": "sending_domains_pkey",
-        "columns": [
-          "id"
-        ],
+        "columns": ["id"],
         "nameExplicit": false,
         "entityType": "pks"
       }
