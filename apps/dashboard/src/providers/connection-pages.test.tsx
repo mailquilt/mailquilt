@@ -1,5 +1,5 @@
 import { Organization, ProviderConnectionIdSchema } from "@repo/domain";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { Deferred, Effect, Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
@@ -132,6 +132,41 @@ describe("connecting and editing an SMTP server", () => {
       provider: "smtp",
       smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },
     });
+  });
+
+  it("keeps connecting when the Provider is changed while the request is on its way", async () => {
+    let answer: (response: Response) => void = () => {};
+
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.post(
+        CONNECTIONS,
+        () =>
+          new Promise<Response>((resolve) => {
+            answer = resolve;
+          })
+      )
+    );
+
+    const router = renderWithOrganizations(
+      <ConnectPage organization={organization} />
+    );
+
+    await screen.findByLabelText("Name");
+    type("Name", "Postmark");
+    type("Host", "smtp.postmarkapp.com");
+    type("Username", "token");
+    type("Password", "secret token");
+    type("From email", "news@acme.example");
+    submit();
+
+    await screen.findByRole("button", { name: "Connecting…" });
+    fireEvent.click(screen.getByRole("radio", { name: /Amazon SES/u }));
+    answer(HttpResponse.json(POSTMARK, { status: 201 }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/providers")
+    );
   });
 
   it("connects an SES account with its Region, access key and a sending rate", async () => {

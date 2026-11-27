@@ -76,7 +76,11 @@ export const ConnectPage = ({
         failureMessage={(provider) =>
           connectionFailureMessage(create.error, provider)
         }
-        onProviderChange={() => create.reset()}
+        onProviderChange={() => {
+          if (!create.isPending) {
+            create.reset();
+          }
+        }}
         senderDescription={senderDescription}
         senderExample={SENDER_EXAMPLE}
         sendingRate

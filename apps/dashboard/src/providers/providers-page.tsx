@@ -441,8 +441,7 @@ export const ProvidersPage = ({
     return (
       <ConnectionsTable
         rows={connected.map((connection) => ({
-          canMakeDefault:
-            connected.length > 1 && !connection.defaultForCampaigns,
+          canMakeDefault: !connection.defaultForCampaigns,
           connection,
           defaultTo: testEmailTo,
           intro: introFor(connection, justConnected, justSaved),

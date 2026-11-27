@@ -434,6 +434,19 @@ describe("providers page", () => {
     expect(alert.textContent).not.toContain("host and port");
   });
 
+  it("offers to make a sole connection the default for new Campaigns once the default was deleted", async () => {
+    withConnections([POSTMARK]);
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for Postmark" })
+    );
+
+    await expect(
+      screen.findByRole("menuitem", { name: "Make default for new Campaigns" })
+    ).resolves.toBeTruthy();
+  });
+
   it("says a connection isn't the default yet when making it so failed", async () => {
     withConnections([POSTMARK, SES]);
     api.use(
