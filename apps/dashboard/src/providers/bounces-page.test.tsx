@@ -90,6 +90,9 @@ describe("the steps for an SES connection's bounces and complaints", () => {
     expect(document.body.textContent).toContain(
       "Standard topic in Europe (Ireland), the Region SES (Ireland) sends from"
     );
+    expect(document.body.textContent).toContain(
+      "allow the service ses.amazonaws.com to sns:Publish"
+    );
     expect(document.body.textContent).not.toContain(ADDRESS);
 
     fireEvent.click(screen.getByRole("button", { name: "Show the address" }));

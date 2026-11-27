@@ -22,6 +22,10 @@ import { SES_REGIONS } from "./ses-regions.ts";
 
 const BODY = "text-base text-pretty text-(--mq-body)";
 
+// WARNING: SES can publish to a topic only once its access policy allows `ses.amazonaws.com` to; the console doesn't add it, and without it no bounce or complaint ever arrives.
+const SES_TOPIC_POLICY_GUIDE =
+  "https://docs.aws.amazon.com/ses/latest/dg/configure-sns-notifications.html";
+
 const regionName = (code: string) =>
   SES_REGIONS.find((region) => region.code === code)?.name ?? code;
 
@@ -202,13 +206,25 @@ const Steps = ({
           <span className="font-medium text-kumo-default">
             mailquilt-feedback
           </span>
-          .
+          . Then let SES publish to it: edit the topic, and under Access policy
+          allow the service{" "}
+          <span className="font-medium text-kumo-default">
+            ses.amazonaws.com
+          </span>{" "}
+          to <span className="font-medium text-kumo-default">sns:Publish</span>,
+          as AWS’s example policy shows. Without it, SES can’t send anything to
+          the topic.
         </p>
-        <ConsoleLink
-          href={consoleUrl(region, "sns/v3/home?region={region}#/topics")}
-        >
-          Open SNS in {region}
-        </ConsoleLink>
+        <span className="flex flex-wrap gap-x-5 gap-y-2">
+          <ConsoleLink
+            href={consoleUrl(region, "sns/v3/home?region={region}#/topics")}
+          >
+            Open SNS in {region}
+          </ConsoleLink>
+          <ConsoleLink href={SES_TOPIC_POLICY_GUIDE}>
+            AWS’s example policy
+          </ConsoleLink>
+        </span>
       </Step>
       <Step number={2} title="Subscribe Mailquilt to the topic">
         <p className={BODY}>
