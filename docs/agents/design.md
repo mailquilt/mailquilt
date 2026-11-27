@@ -37,7 +37,7 @@ Mailquilt's first product principle is polish that matches the paid tools (`docs
    - focus and keyboard paths checked in a real browser with real clicks and keys. Component tests run in happy-dom, where a scripted click doesn't move focus as a person's does;
    - motion, such as every open and close animation and scrim fade, checked frame by frame in the working build.
 
-   While you iterate, shoot only the state you changed, at 390 and 1440 px. Shoot the full set once, when the build is finished, before the design review in step 7.
+   While you iterate, shoot only the state you changed, at 390 and 1440 px. Shoot the full set when the build is finished, before the design review in step 7, and again for any state a review fix changes.
 
    The `dashboard-screens` skill makes all of these. Tests passing is not evidence of design, and neither are screenshots alone: on the redesign (#69) several bugs passed in screenshots and showed only in the working build.
 

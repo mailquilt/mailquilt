@@ -62,7 +62,7 @@ node $S/filmstrip.mjs --out /tmp/shots --name home-load --path / --width 1280
 ```
 
 - Widths default to 320, 390, 768, 1024, 1440, 1920 and 2560. Phones (below 700 px) are emulated as mobile, so dialogs open as sheets.
-- While you iterate, shoot only the state you changed with `--widths 390,1440`. Shoot the full matrix once, when the build is finished.
+- While you iterate, shoot only the state you changed with `--widths 390,1440`. Shoot the full matrix when the build is finished, and again for any state a review fix changes.
 - Each shot has its own Chrome, and 4 run at a time (`--parallel`). A shot is taken once the page has settled: no request in flight, fonts loaded, and no opening animation still running. Each step waits the same way.
 - Clicks are real mouse clicks at the element's centre, and keys are real key presses, so focus moves as it does for a person. Each line of output names what has focus in that shot: use it to check focus paths (where focus goes when a dialog opens and closes, after a submit, after an error).
 - `text=Label` matches only buttons, links and menu items. Reach a field with a CSS selector instead, such as `click=input[type=email]`.
