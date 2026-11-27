@@ -40,6 +40,9 @@ services:
       # Empty when unset, which the app reads as unset, so it keeps its default.
       CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
       BLOCK_PRIVATE_NETWORKS: ${BLOCK_PRIVATE_NETWORKS:-}
+      # Name servers Sending Domains are checked against, such as
+      # 1.1.1.1,8.8.8.8; unset, the system's.
+      DNS_SERVERS: ${DNS_SERVERS:-}
       SYSTEM_MAILER_SMTP_HOST: ${SYSTEM_MAILER_SMTP_HOST:-}
       SYSTEM_MAILER_SMTP_PORT: ${SYSTEM_MAILER_SMTP_PORT:-}
       SYSTEM_MAILER_SMTP_SECURITY: ${SYSTEM_MAILER_SMTP_SECURITY:-}

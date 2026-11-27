@@ -312,6 +312,34 @@ export const suppressions = pgTable(
 );
 
 /**
+ * A domain an Organization sends email from (`sdm_…`), once per
+ * Organization, lowercased. `dkim_selectors` are the selectors its Provider
+ * signs under, `return_path` the domain its Provider sends bounces to, if
+ * set, and `last_check` what its DNS showed when last checked, as
+ * `SendingDomainCheck`'s JSON, or null before the first check.
+ */
+export const sendingDomains = pgTable(
+  "sending_domains",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    domain: text("domain").notNull(),
+    dkimSelectors: text("dkim_selectors").array().notNull(),
+    returnPath: text("return_path"),
+    lastCheck: jsonb("last_check"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("sending_domains_organization_id_domain_key").on(
+      table.organizationId,
+      table.domain
+    ),
+  ]
+);
+
+/**
  * An Organization's configured sending service (`pcn_…`). `settings` holds
  * where it sends, an SMTP server's host, port and encryption or an SES
  * account's Region, and never a secret. `credentials` is sealed with
@@ -463,7 +491,7 @@ export const campaigns = pgTable(
     ),
     check(
       "campaigns_schedule_missed_check",
-      sql`${table.scheduleMissed} in ('no-provider-connection', 'no-subscribed-contacts')`
+      sql`${table.scheduleMissed} in ('no-provider-connection', 'no-subscribed-contacts', 'no-sending-domain', 'sending-domain-not-ready')`
     ),
   ]
 );

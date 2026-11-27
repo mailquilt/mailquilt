@@ -61,6 +61,22 @@ const connectMailpit = async (page: Page) => {
     .click();
 };
 
+// WARNING: acme.example has no real DNS; its records come from DEV_DNS_RECORDS in e2e/smoke.env, which the selector must match.
+const addSendingDomain = async (page: Page) => {
+  const organizations = await page.request.get("/api/organizations");
+  const [organization] = await organizations.json();
+
+  const added = await page.request.post(
+    `/api/organizations/${organization?.id}/sending-domains`,
+    {
+      data: { dkimSelectors: ["mailquilt"], domain: "acme.example" },
+      headers: { origin: new URL(page.url()).origin },
+    }
+  );
+
+  expect(added.status()).toBe(201);
+};
+
 const addContact = async (page: Page, email: string) => {
   await page.getByRole("button", { name: "Add contact" }).first().click();
 
@@ -117,6 +133,7 @@ test("a Campaign sent from the dashboard arrives in every subscribed Contact's i
   await createOrganization(page);
   await addPostalAddress(page);
   await connectMailpit(page);
+  await addSendingDomain(page);
   await addContacts(page);
   await sendCampaign(page);
 

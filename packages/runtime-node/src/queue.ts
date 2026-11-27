@@ -7,6 +7,7 @@ import type {
   SesProvider,
   SignedTokens,
   SmtpProvider,
+  SendingDomains,
 } from "@repo/core";
 import {
   createDeliveryEventPartitions,
@@ -32,6 +33,7 @@ import {
   Redacted,
   Schema,
 } from "effect";
+import type { Dns } from "effect/net";
 import { SqlClient } from "effect/sql";
 import { PgBoss } from "pg-boss";
 
@@ -163,9 +165,11 @@ export const PgBossLive = PgBossQueueLive.pipe(Layer.provideMerge(BossLive));
 type WorkerPorts =
   | Campaigns
   | DeliveryEventPartitions
+  | Dns.Dns
   | ProviderConnections
   | PublicUrl
   | Queue
+  | SendingDomains
   | SesProvider
   | SignedTokens
   | SmtpProvider;

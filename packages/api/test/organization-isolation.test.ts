@@ -8,6 +8,7 @@ import type {
   ListId,
   OrganizationId,
   ProviderConnectionId,
+  SendingDomainId,
   SuppressionId,
 } from "@repo/domain";
 import { Effect, Redacted } from "effect";
@@ -25,6 +26,7 @@ interface Target {
   readonly contactId: ContactId;
   readonly contactEmail: string;
   readonly providerConnectionId: ProviderConnectionId;
+  readonly sendingDomainId: SendingDomainId;
   readonly suppressionId: SuppressionId;
 }
 
@@ -218,6 +220,33 @@ const TENANT_ENDPOINTS = {
         params: { organizationId, providerConnectionId },
         payload: { to: "intruder@example.com" },
       }),
+  "GET /api/organizations/:organizationId/sending-domains": (
+    client: Client,
+    { organizationId }: Target
+  ) => client.sendingDomains.list({ params: { organizationId } }),
+  "POST /api/organizations/:organizationId/sending-domains": (
+    client: Client,
+    { organizationId }: Target
+  ) =>
+    client.sendingDomains.create({
+      params: { organizationId },
+      payload: { dkimSelectors: ["intruder"], domain: "intruder.example" },
+    }),
+  "GET /api/organizations/:organizationId/sending-domains/:sendingDomainId": (
+    client: Client,
+    { organizationId, sendingDomainId }: Target
+  ) =>
+    client.sendingDomains.get({ params: { organizationId, sendingDomainId } }),
+  "POST /api/organizations/:organizationId/sending-domains/:sendingDomainId/check":
+    (client: Client, { organizationId, sendingDomainId }: Target) =>
+      client.sendingDomains.check({
+        params: { organizationId, sendingDomainId },
+      }),
+  "DELETE /api/organizations/:organizationId/sending-domains/:sendingDomainId":
+    (client: Client, { organizationId, sendingDomainId }: Target) =>
+      client.sendingDomains.remove({
+        params: { organizationId, sendingDomainId },
+      }),
   "GET /api/organizations/:organizationId/suppressions": (
     client: Client,
     { organizationId }: Target
@@ -284,6 +313,11 @@ const ownedData = (owner: Client) =>
       },
     });
 
+    const sendingDomain = yield* owner.sendingDomains.create({
+      params,
+      payload: { dkimSelectors: ["s1"], domain: "acme.example" },
+    });
+
     yield* owner.suppressions.add({
       params,
       payload: { emails: [`suppressed-${readers}@example.com`] },
@@ -298,6 +332,7 @@ const ownedData = (owner: Client) =>
       listId: list.id,
       organizationId: organization.id,
       providerConnectionId: connection.id,
+      sendingDomainId: sendingDomain.id,
       suppressionId: suppressions.suppressions[0]?.id ?? assert.fail(),
     } satisfies Target;
   });
@@ -586,6 +621,49 @@ layer(TestApp, { timeout: "2 minutes" })(
           assert.deepStrictEqual(
             lists.map((list) => [list.id, list.subscriptions.subscribed]),
             [[own.listId, 1]]
+          );
+        })
+    );
+
+    test.effect(
+      "never reaches another Organization's Sending Domains from its own",
+      () =>
+        Effect.gen(function* foreignSendingDomain() {
+          const owner = yield* signedInClient;
+          const outsider = yield* signedInClient;
+          const target = yield* ownedData(owner);
+          const own = yield* ownedData(outsider);
+
+          const foreign = {
+            organizationId: own.organizationId,
+            sendingDomainId: target.sendingDomainId,
+          };
+
+          const refusals = yield* Effect.all([
+            outsider.sendingDomains.get({ params: foreign }).pipe(Effect.flip),
+            outsider.sendingDomains
+              .check({ params: foreign })
+              .pipe(Effect.flip),
+            outsider.sendingDomains
+              .remove({ params: foreign })
+              .pipe(Effect.flip),
+          ]);
+
+          const ownDomains = yield* outsider.sendingDomains.list({
+            params: { organizationId: own.organizationId },
+          });
+
+          assert.deepStrictEqual(
+            refusals.map((refusal) => refusal._tag),
+            [
+              "SendingDomainNotFound",
+              "SendingDomainNotFound",
+              "SendingDomainNotFound",
+            ]
+          );
+          assert.deepStrictEqual(
+            ownDomains.map((domain) => domain.id),
+            [own.sendingDomainId]
           );
         })
     );

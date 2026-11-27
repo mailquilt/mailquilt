@@ -5,12 +5,14 @@ import {
   PublicUrl,
   Queue,
   SendCampaignBatch,
+  SendingDomains,
   SignedTokens,
   SesProvider,
   SmtpProvider,
 } from "@repo/core";
 import { CampaignIdSchema, OrganizationIdSchema } from "@repo/domain";
 import { Effect, Layer, Option, Schema } from "effect";
+import { Dns } from "effect/net";
 
 import { consumeQueueBatch } from "../src/queue.ts";
 
@@ -46,6 +48,8 @@ const ports = (campaigns: Layer.Layer<Campaigns>) =>
     Layer.mock(ProviderConnections, {}),
     Layer.succeed(PublicUrl, { origin: "https://mail.example.com" }),
     Layer.mock(Queue, {}),
+    Layer.mock(Dns.Dns, {}),
+    Layer.mock(SendingDomains, {}),
     Layer.mock(SesProvider, {}),
     Layer.mock(SignedTokens, {}),
     Layer.mock(SmtpProvider, {})

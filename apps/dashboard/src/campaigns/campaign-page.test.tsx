@@ -196,6 +196,32 @@ describe("one campaign's page", () => {
     expect(statusLine()).toContain("Draft, created");
   });
 
+  it("keeps the confirmation open, saying why, when its sending domain fails its DNS check", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () => HttpResponse.json(DRAFT)),
+      http.post(SEND, () =>
+        HttpResponse.json(
+          {
+            _tag: "SendingDomainNotReady",
+            domain: "fernhill.example",
+            sendingDomainId: "sdm_01h455vb4pex5vsknk084sn02q",
+          },
+          { status: 409 }
+        )
+      )
+    );
+    renderPage();
+
+    const dialog = await confirmSend();
+
+    await expect(within(dialog).findByRole("alert")).resolves.toHaveProperty(
+      "textContent",
+      "fernhill.example failed its DKIM or DMARC check just now, so Gmail and Yahoo would reject this campaign. Fix its DNS records, then try again. It hasn’t been sent."
+    );
+    expect(statusLine()).toContain("Draft, created");
+  });
+
   const NOBODY = {
     ...ROAST,
     subscriptions: { ...ROAST.subscriptions, subscribed: 0 },

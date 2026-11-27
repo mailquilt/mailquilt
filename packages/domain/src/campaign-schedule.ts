@@ -50,13 +50,17 @@ export const scheduledInstant = (request: typeof ScheduleRequest.Type) =>
 
 /**
  * Why a scheduled Campaign didn't start when it was due, and went back to
- * being a draft: its Provider Connection was deleted, or no one would get
- * it. Its Organization's postal address can't be missing, since scheduling
- * needs one and it can't be removed.
+ * being a draft: its Provider Connection was deleted, no one would get it,
+ * its From address's domain was no longer a Sending Domain, or its Sending
+ * Domain failed DKIM or DMARC when checked then. Its Organization's postal
+ * address can't be missing, since scheduling needs one and it can't be
+ * removed.
  */
 export const MissedScheduleReasonSchema = Schema.Literals([
   "no-provider-connection",
   "no-subscribed-contacts",
+  "no-sending-domain",
+  "sending-domain-not-ready",
 ]);
 
 export type MissedScheduleReason = typeof MissedScheduleReasonSchema.Type;

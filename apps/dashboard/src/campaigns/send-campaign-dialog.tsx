@@ -1,4 +1,9 @@
 import { Banner } from "@cloudflare/kumo";
+import {
+  DnsLookupFailed,
+  SendingDomainNotReady,
+  SendingDomainRequired,
+} from "@repo/domain";
 import type { Campaign, List, Organization } from "@repo/domain";
 import { Predicate } from "effect";
 import { useId } from "react";
@@ -39,10 +44,34 @@ export const refusalOf = (failure: Error) => {
   }
 };
 
-const problemOf = (failure: Error) =>
-  Predicate.isTagged(failure, "SignInRequired")
-    ? "You’ve been signed out. Sign in again, then send it. It hasn’t been sent."
-    : "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be sent twice.";
+/**
+ * Why a Campaign's From address's domain stopped it being sent or
+ * scheduled, in words ending with `outcome`, if that's why the API refused.
+ */
+export const sendingDomainProblemOf = (failure: Error, outcome: string) => {
+  if (failure instanceof SendingDomainRequired) {
+    return `${failure.domain} isn’t a sending domain yet, and a campaign is sent only from a domain whose DNS records have been checked. ${outcome}`;
+  }
+
+  if (failure instanceof SendingDomainNotReady) {
+    return `${failure.domain} failed its DKIM or DMARC check just now, so Gmail and Yahoo would reject this campaign. Fix its DNS records, then try again. ${outcome}`;
+  }
+
+  if (failure instanceof DnsLookupFailed) {
+    return `Mailquilt couldn’t check this campaign’s sending domain, because looking up ${failure.name} failed: ${failure.detail} Try again in a moment. ${outcome}`;
+  }
+};
+
+const problemOf = (failure: Error) => {
+  if (Predicate.isTagged(failure, "SignInRequired")) {
+    return "You’ve been signed out. Sign in again, then send it. It hasn’t been sent.";
+  }
+
+  return (
+    sendingDomainProblemOf(failure, "It hasn’t been sent.") ??
+    "Mailquilt couldn’t reach its server. Check your connection, then try again. It won’t be sent twice."
+  );
+};
 
 const contacts = (count: number) =>
   `${formatCount(count)} ${count === 1 ? "contact" : "contacts"}`;

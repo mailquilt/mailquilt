@@ -143,3 +143,15 @@ export const newSuppressionId = newId("sup").pipe(
 export const UserIdSchema = Schema.String.pipe(Schema.brand("UserId"));
 
 export type UserId = typeof UserIdSchema.Type;
+
+/** A Sending Domain's ID, `sdm_…`. */
+export const SendingDomainIdSchema = Schema.String.check(hasPrefix("sdm")).pipe(
+  Schema.brand("SendingDomainId")
+);
+
+export type SendingDomainId = typeof SendingDomainIdSchema.Type;
+
+/** A new Sending Domain ID. IDs made later sort after earlier ones. */
+export const newSendingDomainId = newId("sdm").pipe(
+  Effect.map((id) => SendingDomainIdSchema.make(id))
+);

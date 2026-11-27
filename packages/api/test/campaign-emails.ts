@@ -4,6 +4,7 @@ import { Effect, pipe } from "effect";
 
 import type { ownOrganization } from "./accounts.ts";
 import { APP_URL, AppFetch, QueueWorker } from "./harness.ts";
+import { addReadySendingDomain } from "./ready-sending-domain.ts";
 
 /** A signed-in person's typed client and their Organization's path params. */
 export type Owner = Effect.Success<typeof ownOrganization>;
@@ -62,6 +63,9 @@ export const startCampaign = (
       params,
       payload: { postalAddress: "14 Mill Lane\nBristol BS1 4XE" },
     });
+    yield* addReadySendingDomain(owner).pipe(
+      Effect.catchTag("SendingDomainAlreadyExists", () => Effect.void)
+    );
     yield* client.campaigns.send({
       params: { ...params, campaignId: campaign.id },
     });

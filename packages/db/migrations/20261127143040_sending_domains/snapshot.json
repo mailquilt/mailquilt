@@ -1,0 +1,285 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "c13ffdb9-d94b-45c3-a265-5b0c797a7803",
+  "prevIds": [
+    "2a55e831-011e-414f-b00b-88e951db2bbf"
+  ],
+  "footprints": [
+    {
+      "statementType": "create_table",
+      "statementTarget": [
+        "table",
+        "public",
+        "sending_domains"
+      ],
+      "writes": [
+        "s|tbl|public.sending_domains",
+        "n|tbl|public.sending_domains",
+        "e|tbl|public.sending_domains",
+        "n|rel|public.sending_domains",
+        "n|type|public.sending_domains",
+        "n|rel|public.sending_domains_pkey"
+      ],
+      "reads": [
+        "n|sch|public"
+      ]
+    },
+    {
+      "statementType": "create_index",
+      "statementTarget": [
+        "index",
+        "public",
+        "sending_domains",
+        "sending_domains_organization_id_domain_key"
+      ],
+      "writes": [
+        "s|idx|public.sending_domains_organization_id_domain_key",
+        "n|idx|public.sending_domains_organization_id_domain_key",
+        "e|idx|public.sending_domains_organization_id_domain_key",
+        "n|rel|public.sending_domains_organization_id_domain_key"
+      ],
+      "reads": [
+        "n|tbl|public.sending_domains",
+        "n|sch|public",
+        "n|col|public.sending_domains.organization_id",
+        "n|col|public.sending_domains.domain"
+      ]
+    },
+    {
+      "statementType": "create_fk",
+      "statementTarget": [
+        "table",
+        "public",
+        "sending_domains"
+      ],
+      "writes": [
+        "s|fk|public.sending_domains.sending_domains_organization_id_organizations_id_fkey",
+        "n|fk|public.sending_domains.sending_domains_organization_id_organizations_id_fkey",
+        "e|fk|public.sending_domains.sending_domains_organization_id_organizations_id_fkey",
+        "n|con|public.sending_domains.sending_domains_organization_id_organizations_id_fkey"
+      ],
+      "reads": [
+        "n|tbl|public.sending_domains",
+        "n|sch|public",
+        "n|tbl|public.organizations",
+        "n|sch|public",
+        "n|col|public.sending_domains.organization_id",
+        "n|col|public.organizations.id",
+        "e|uniqueness|public.organizations.id"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": [
+        "table",
+        "public",
+        "campaigns"
+      ],
+      "writes": [
+        "s|ck|public.campaigns.campaigns_schedule_missed_check"
+      ],
+      "reads": [
+        "n|tbl|public.campaigns",
+        "n|sch|public",
+        "n|col|public.campaigns.schedule_missed",
+        "e|col|public.campaigns.schedule_missed"
+      ],
+      "sqlHash": "deb2d69be3f3aba0"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "name": "sending_domains",
+        "isRlsEnabled": false,
+        "entityType": "tables"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "organization_id",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "domain",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "dkim_selectors",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 1,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "return_path",
+        "type": "text",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "last_check",
+        "type": "jsonb",
+        "typeSchema": null,
+        "notNull": false,
+        "dimensions": 0,
+        "default": null,
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "created_at",
+        "type": "timestamp with time zone",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "now()",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_organization_id_domain_key",
+        "nameExplicit": true,
+        "columns": [
+          {
+            "value": "organization_id",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          },
+          {
+            "value": "domain",
+            "isExpression": false,
+            "asc": true,
+            "nullsFirst": false,
+            "opclass": null
+          }
+        ],
+        "isUnique": true,
+        "where": null,
+        "with": "",
+        "method": "btree",
+        "entityType": "indexes"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_organization_id_organizations_id_fkey",
+        "nameExplicit": false,
+        "columns": [
+          "organization_id"
+        ],
+        "schemaTo": "public",
+        "tableTo": "organizations",
+        "columnsTo": [
+          "id"
+        ],
+        "onUpdate": "NO ACTION",
+        "onDelete": "CASCADE",
+        "entityType": "fks"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "sending_domains",
+        "name": "sending_domains_pkey",
+        "columns": [
+          "id"
+        ],
+        "nameExplicit": false,
+        "entityType": "pks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"campaigns\",\"campaigns_schedule_missed_check\"]",
+      "set": {
+        "value": "\"schedule_missed\" in ('no-provider-connection', 'no-subscribed-contacts', 'no-sending-domain', 'sending-domain-not-ready')"
+      }
+    }
+  ]
+}

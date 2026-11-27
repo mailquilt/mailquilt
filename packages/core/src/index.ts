@@ -57,6 +57,17 @@ export { Contacts, createContact, listContacts } from "./contacts.ts";
 export type { ContactFilter } from "./contacts.ts";
 
 export {
+  addSendingDomain,
+  checkSendingDomain,
+  getSendingDomain,
+  listSendingDomains,
+  removeSendingDomain,
+  SendingDomains,
+} from "./sending-domains.ts";
+
+export { dnsWithDevRecords } from "./dev-dns-records.ts";
+
+export {
   addSuppressions,
   listSuppressions,
   removeSuppression,

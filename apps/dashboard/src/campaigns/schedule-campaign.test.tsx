@@ -542,6 +542,25 @@ describe("scheduling a campaign", () => {
     expect(screen.queryByRole("button", { name: "Schedule" })).toBeNull();
   });
 
+  it("says a draft missed its time because its sending domain failed its DNS check", async () => {
+    api.use(
+      ...ready(),
+      http.get(CAMPAIGN, () =>
+        HttpResponse.json({
+          ...DRAFT,
+          schedule: { ...NINE_IN_NEW_YORK, missed: "sending-domain-not-ready" },
+        })
+      )
+    );
+    renderPage();
+
+    await expect(
+      screen.findByText(
+        "Its sending domain failed its DKIM or DMARC check then, so Gmail and Yahoo would have rejected it, and it went back to being a draft. Fix its domain’s DKIM and DMARC records, then schedule it again or send it now."
+      )
+    ).resolves.toBeDefined();
+  });
+
   it("offers Schedule and Send now again once what a draft missed its time for has gone", async () => {
     api.use(
       ...ready({ recipients: 3 }),

@@ -40,6 +40,7 @@ import {
   signedInPerson,
 } from "./accounts.ts";
 import { QueueWorker, TestApp } from "./harness.ts";
+import { addReadySendingDomain } from "./ready-sending-domain.ts";
 
 type Owner = Effect.Success<typeof ownOrganization>;
 
@@ -101,6 +102,8 @@ const draftCampaignIn = (postalAddress: string | null) =>
     campaigns += 1;
 
     const { client, params } = yield* ownOrganization;
+
+    yield* addReadySendingDomain({ client, params });
 
     if (postalAddress !== null) {
       yield* client.organizations.updatePostalAddress({

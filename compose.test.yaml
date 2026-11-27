@@ -14,6 +14,10 @@ services:
   # Checked every second, not every 5 or 10, so the smoke test starts as soon
   # as both are up. As many retries cover as long a start as before.
   app:
+    # DNS answers for the smoke test's Sending Domain, which has no real DNS.
+    # For development only, so compose.yaml doesn't pass it on.
+    environment:
+      DEV_DNS_RECORDS: ${DEV_DNS_RECORDS:?Set DEV_DNS_RECORDS, as e2e/smoke.env does}
     healthcheck:
       interval: 1s
       retries: 30
