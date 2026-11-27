@@ -18,7 +18,9 @@ import { formatCount } from "../audience/format.ts";
 import {
   CalendarIcon,
   PaperPlaneTiltIcon,
+  PauseIcon,
   PencilSimpleIcon,
+  PlayIcon,
 } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
@@ -36,13 +38,17 @@ import {
   listsInWords,
   namesOf,
 } from "./campaign-lists.tsx";
+import { CampaignProgress, stillToSend } from "./campaign-progress.tsx";
 import { CampaignBlock } from "./campaign-status.tsx";
 import {
   useCampaign,
   useCancelSchedule,
+  usePauseCampaign,
   useRecipientCount,
   useRefreshCampaignPages,
+  useResumeCampaign,
 } from "./campaigns-api.ts";
+import { CancelCampaignDialog, movedOn } from "./cancel-campaign-dialog.tsx";
 import { EmailPreview } from "./email-preview.tsx";
 import { failedToCount, TryAgain } from "./list-choice.tsx";
 import { ScheduleCampaignDialog } from "./schedule-campaign-dialog.tsx";
@@ -71,6 +77,9 @@ const sentTo = ({ recipients }: Campaign) =>
 
 const sentSoFar = ({ recipients }: Campaign) =>
   `${formatCount(recipients.sent)} of ${contacts(recipients.total)}`;
+
+const isUnderway = ({ status }: Campaign) =>
+  status === "sending" || status === "paused";
 
 type Schedule = NonNullable<Campaign["schedule"]>;
 
@@ -138,13 +147,8 @@ const statusWords = (campaign: Campaign, connectionName: string) => {
   if (campaign.status === "paused") {
     return (
       <>
-        <Strong>Paused</Strong> after sending to {sentSoFar(campaign)}.{" "}
-        {formatCount(
-          campaign.recipients.total -
-            campaign.recipients.sent -
-            campaign.recipients.failed
-        )}{" "}
-        wait until it’s resumed.
+        <Strong>Paused</Strong>, with {sentSoFar(campaign)} sent it and{" "}
+        {formatCount(stillToSend(campaign))} waiting until you resume it.
       </>
     );
   }
@@ -152,8 +156,8 @@ const statusWords = (campaign: Campaign, connectionName: string) => {
   if (campaign.status === "cancelled") {
     return (
       <>
-        <Strong>Cancelled</Strong> after sending to {sentSoFar(campaign)}. The
-        rest won’t be sent it.
+        <Strong>Cancelled</Strong>, with {sentSoFar(campaign)} sent it and{" "}
+        {formatCount(stillToSend(campaign))} left unsent.
       </>
     );
   }
@@ -318,9 +322,9 @@ const audienceFacts = (
 
   if (unsent) {
     rows.push(["Goes to now", <GoesToNow count={count} key="now" />]);
-  } else if (campaign.status === "sending") {
+  } else if (campaign.status === "sending" || campaign.status === "paused") {
     rows.push(["Sending to", contacts(campaign.recipients.total)]);
-  } else if (campaign.status === "paused" || campaign.status === "cancelled") {
+  } else if (campaign.status === "cancelled") {
     rows.push(["Sent to", sentSoFar(campaign)]);
   } else {
     rows.push(["Sent to", sentTo(campaign)]);
@@ -399,6 +403,14 @@ const aboutTheAudience = (campaign: Campaign) => {
     return "Everyone subscribed to its lists when it starts, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address. If no one is by then, it isn’t sent and goes back to being a draft.";
   }
 
+  if (isUnderway(campaign)) {
+    return "Everyone subscribed to its lists when it started sending, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address. Anyone who subscribed later doesn’t get it.";
+  }
+
+  if (campaign.status === "cancelled") {
+    return "The contacts it was going to when it started sending, once each. It was cancelled before it reached them all.";
+  }
+
   return campaign.status === "draft"
     ? "Everyone subscribed to its lists at the moment you send, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address."
     : "The contacts it went to when it was sent, once each. Anyone who subscribed later doesn’t get it.";
@@ -407,6 +419,10 @@ const aboutTheAudience = (campaign: Campaign) => {
 const aboutTheEmail = (campaign: Campaign) => {
   if (campaign.status === "scheduled") {
     return "The email exactly as it’s sent, in a preview that runs no scripts. To change it, cancel the schedule, then edit it.";
+  }
+
+  if (isUnderway(campaign)) {
+    return "The email as it goes out, in a preview that runs no scripts. Its footer shows your postal address as it is now.";
   }
 
   return campaign.status === "draft"
@@ -732,11 +748,34 @@ const stillRefused = (refused: Refused | undefined, loaded: Loaded) =>
     ? refused.reason
     : undefined;
 
+const movedOnMessage = (now: Campaign | null | undefined, tried: string) => {
+  if (now?.status === "sent") {
+    return {
+      description: `Every email had been sent or tried before it could be ${tried}.`,
+      title: "It had already finished sending",
+    };
+  }
+
+  if (now?.status === "cancelled") {
+    return {
+      description:
+        "It was cancelled from another tab or by someone else, so the emails it hadn’t sent won’t be.",
+      title: "It had already been cancelled",
+    };
+  }
+
+  return {
+    description: "The page now shows where it stands.",
+    title: "It had already changed",
+  };
+};
+
 const CampaignView = ({
   campaign,
   connections,
   count,
   lists,
+  onMovedOn,
   onRefusal,
   organization,
 }: {
@@ -744,6 +783,7 @@ const CampaignView = ({
   connections: readonly ProviderConnection[];
   count: RecipientCount;
   lists: readonly List[];
+  onMovedOn: () => Promise<Campaign | null | undefined>;
   onRefusal: () => void;
   organization: Organization;
 }) => {
@@ -763,6 +803,7 @@ const CampaignView = ({
 
   const sending = useDialog();
   const scheduling = useDialog();
+  const stopping = useDialog();
   const sendButton = useRef<HTMLButtonElement>(null);
   const scheduleButton = useRef<HTMLButtonElement>(null);
   const statusLine = useRef<HTMLSpanElement>(null);
@@ -789,6 +830,10 @@ const CampaignView = ({
   const toasts = useConfirmationToast();
   const cancelling = useCancelSchedule(organization.id, campaign.id);
   const cancelProblem = useProblemToast(`cancel-schedule-${campaign.id}`);
+  const pausing = usePauseCampaign(organization.id, campaign.id);
+  const resuming = useResumeCampaign(organization.id, campaign.id);
+  const moveProblem = useProblemToast(`pause-or-resume-${campaign.id}`);
+  const cancelCampaignButton = useRef<HTMLButtonElement>(null);
 
   const refuse = (reason: SendRefusal) => {
     setRefused({ ...loaded, reason });
@@ -837,9 +882,115 @@ const CampaignView = ({
     });
   };
 
+  const shownStatus = useRef(campaign.status);
+
+  // WARNING: when asking again moves the Campaign on (it finished, or someone else paused or cancelled it), the button that had focus goes with the old status; focus would drop to the page, so it moves to the status line, which says what changed.
+  useEffect(() => {
+    if (shownStatus.current === campaign.status) {
+      return;
+    }
+
+    shownStatus.current = campaign.status;
+
+    if (document.activeElement === document.body) {
+      statusLine.current?.focus();
+    }
+  }, [campaign.status]);
+
+  const sayMovedOn = async (tried: string) => {
+    moveProblem.clear();
+    toasts.add(movedOnMessage(await onMovedOn(), tried));
+    statusLine.current?.focus();
+  };
+
+  const moveFailed = (error: Error, tried: string) => {
+    if (movedOn(error)) {
+      sayMovedOn(tried);
+
+      return;
+    }
+
+    moveProblem.show({
+      description: Predicate.isTagged(error, "SignInRequired")
+        ? `You’ve been signed out. Sign in again, then ${tried === "paused" ? "pause" : "resume"} it.`
+        : "Mailquilt couldn’t reach its server. Check your connection, then try again.",
+      title:
+        campaign.status === "paused"
+          ? "It’s still paused"
+          : "It’s still sending",
+    });
+  };
+
+  const pause = () => {
+    if (pausing.isPending) {
+      return;
+    }
+
+    pausing.mutate(undefined, {
+      onError: (error) => moveFailed(error, "paused"),
+      onSuccess: (paused) => {
+        moveProblem.clear();
+        toasts.add({
+          description: `${formatCount(stillToSend(paused))} wait until you resume it.`,
+          title: "Paused",
+        });
+        statusLine.current?.focus();
+      },
+    });
+  };
+
+  const resume = () => {
+    if (resuming.isPending) {
+      return;
+    }
+
+    resuming.mutate(undefined, {
+      onError: (error) => moveFailed(error, "resumed"),
+      onSuccess: (resumed) => {
+        moveProblem.clear();
+        toasts.add({
+          description: `Sending to the ${formatCount(stillToSend(resumed))} it hasn’t reached yet.`,
+          title: "Sending again",
+        });
+        statusLine.current?.focus();
+      },
+    });
+  };
+
+  const cancelCampaign = (
+    <Button
+      onClick={() => {
+        returnFocus.current = cancelCampaignButton.current;
+        stopping.setOpen(true);
+      }}
+      ref={cancelCampaignButton}
+      variant="secondary"
+    >
+      Cancel campaign
+    </Button>
+  );
+
   let actions: React.ReactNode;
 
-  if (campaign.status === "scheduled") {
+  if (campaign.status === "sending") {
+    actions = (
+      <>
+        {cancelCampaign}
+        <Button icon={PauseIcon} onClick={pause} variant="secondary">
+          {pausing.isPending ? "Pausing…" : "Pause"}
+        </Button>
+      </>
+    );
+  } else if (campaign.status === "paused") {
+    actions = (
+      <>
+        {cancelCampaign}
+        <Button icon={PlayIcon} onClick={resume} variant="primary">
+          {resuming.isPending ? "Resuming…" : "Resume"}
+        </Button>
+      </>
+    );
+  } else if (campaign.status === "scheduled") {
     actions = (
       <>
         <Button onClick={cancelSchedule} variant="secondary">
@@ -900,6 +1051,7 @@ const CampaignView = ({
           title={campaign.subject}
           titleRunsToActions
         />
+        {unsent ? null : <CampaignProgress campaign={campaign} />}
         <div
           className="outline-none empty:hidden [&:not(:empty)]:mb-7 [&>*]:w-full"
           ref={problemRegion}
@@ -916,7 +1068,9 @@ const CampaignView = ({
         <div className="flex flex-col">
           <SettingsSection
             about={aboutTheAudience(campaign)}
-            title={unsent ? "Who gets it" : "Who got it"}
+            title={
+              unsent || isUnderway(campaign) ? "Who gets it" : "Who got it"
+            }
           >
             <Facts rows={audienceFacts(campaign, lists, count)} />
           </SettingsSection>
@@ -955,6 +1109,33 @@ const CampaignView = ({
           sending.setOpen(false);
         }}
         open={sending.open}
+        organization={organization}
+      />
+      <CancelCampaignDialog
+        campaign={campaign}
+        finalFocus={returnFocus}
+        key={stopping.key}
+        onCancelled={(cancelled) => {
+          moveProblem.clear();
+          toasts.add({
+            description: `${sentSoFar(cancelled)} were sent it, and ${formatCount(stillToSend(cancelled))} were left unsent.`,
+            title: "Campaign cancelled",
+          });
+          returnFocus.current = statusLine.current;
+          stopping.setOpen(false);
+        }}
+        onExited={stopping.handleExited}
+        onOpenChange={stopping.handleOpenChange}
+        onOutdated={() => {
+          returnFocus.current = statusLine.current;
+          stopping.setOpen(false);
+        }}
+        onRefused={() => {
+          returnFocus.current = statusLine.current;
+          stopping.setOpen(false);
+          sayMovedOn("cancelled");
+        }}
+        open={stopping.open}
         organization={organization}
       />
       <ScheduleCampaignDialog
@@ -1144,6 +1325,14 @@ export const CampaignPage = ({
       connections={connections.data}
       count={count}
       lists={lists.data}
+      onMovedOn={async () => {
+        // WARNING: the page says why its Pause or Cancel did nothing, so it doesn't also add its own "Sent to …" toast when asking again shows the Campaign finished.
+        seenStatus.current = undefined;
+
+        const now = await campaign.refetch();
+
+        return now.data;
+      }}
       onRefusal={() => {
         campaign.refetch();
         connections.refetch();

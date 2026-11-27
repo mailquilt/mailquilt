@@ -256,3 +256,37 @@ export const useCancelSchedule = (
     onSuccess: keep,
   });
 };
+
+const useMoveSending = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId,
+  move: "pause" | "resume" | "cancel"
+) => {
+  const keep = useKeepCampaign(organizationId);
+
+  return useMutation({
+    mutationFn: () =>
+      callApi((client) =>
+        client.campaigns[move]({ params: { campaignId, organizationId } })
+      ),
+    onSuccess: keep,
+  });
+};
+
+/** Holds a sending Campaign's emails not yet sent. The API answers with it paused. */
+export const usePauseCampaign = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId
+) => useMoveSending(organizationId, campaignId, "pause");
+
+/** Sends a paused Campaign's emails not yet sent. The API answers with it sending. */
+export const useResumeCampaign = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId
+) => useMoveSending(organizationId, campaignId, "resume");
+
+/** Stops a sending or paused Campaign for good. The API answers with it cancelled. */
+export const useCancelCampaign = (
+  organizationId: OrganizationId,
+  campaignId: CampaignId
+) => useMoveSending(organizationId, campaignId, "cancel");

@@ -1072,6 +1072,39 @@ aside.mq-frame {
   }
 }
 
+/*
+ * How far a Campaign has got, in its status blocks' language: ink for sent,
+ * the danger colour for couldn't be sent, and the dashed slot for the rest.
+ * It doesn't animate: the counts arrive every couple of seconds, and width
+ * isn't animated here.
+ */
+.mq-meter {
+  display: flex;
+  height: 0.625rem;
+  width: 100%;
+  gap: var(--mq-batch-gap);
+  overflow: hidden;
+  border-radius: 0.3125rem;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--mq-logo-slot) 0 0.375rem,
+    transparent 0.375rem 0.625rem
+  );
+  background-position: 0 50%;
+  background-repeat: no-repeat;
+  background-size: 100% var(--mq-slot-dash);
+}
+
+.mq-meter-sent {
+  background: var(--mq-block-ink);
+}
+
+/* A handful of failures among thousands still shows. */
+.mq-meter-failed {
+  min-width: var(--mq-batch-gap);
+  background: var(--color-kumo-danger);
+}
+
 /* Where a CSV file is dropped: the logo's dashed slot, a piece not there yet. */
 .mq-dropzone {
   border: var(--mq-slot-dash) dashed var(--mq-logo-slot);
