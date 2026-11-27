@@ -9,7 +9,7 @@ import {
   SendFailed,
 } from "@repo/domain";
 import type { ContactId, ListId } from "@repo/domain";
-import { DateTime, Effect, pipe } from "effect";
+import { DateTime, Duration, Effect, Exit, pipe } from "effect";
 import { SqlClient } from "effect/sql";
 import { TestClock } from "effect/testing";
 
@@ -43,6 +43,12 @@ const CONTENT = {
 } as const;
 
 const NOT_SENT = { failed: 0, sent: 0, total: 0 };
+
+const THREE_CONTACTS = [
+  "ada@example.com",
+  "alan@example.com",
+  "grace@example.com",
+];
 
 let campaigns = 0;
 
@@ -795,23 +801,100 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
       })
   );
 
-  test.effect("sends a batch delivered twice only once", () =>
-    Effect.gen(function* deliveredTwice() {
-      const owner = yield* draftCampaign;
-      const { campaign, campaignParams, client, list } = owner;
+  test.effect(
+    "sends each Contact in a batch once, even when the batch is delivered twice at the same moment",
+    () =>
+      Effect.gen(function* deliveredTwiceAtOnce() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
 
-      yield* addContacts(owner, ["ada@example.com"], [list.id]);
-      yield* client.campaigns.send({ params: campaignParams });
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
 
-      const worker = yield* QueueWorker;
-      const [message] = yield* worker.deliverAll;
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
 
-      yield* worker.deliver(message ?? assert.fail());
+        yield* Effect.all(
+          [
+            Effect.ignore(worker.deliver(batch)),
+            Effect.ignore(worker.deliver(batch)),
+          ],
+          { concurrency: "unbounded" }
+        );
+        yield* worker.deliver(batch);
 
-      assert.deepStrictEqual(yield* sentTo(campaign.subject), [
-        "ada@example.com",
-      ]);
-    })
+        const sent = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), THREE_CONTACTS);
+        assert.strictEqual(sent.status, "sent");
+        assert.deepStrictEqual(
+          { ...sent.recipients },
+          { failed: 0, sent: 3, total: 3 }
+        );
+      })
+  );
+
+  test.effect(
+    "never sends again to a Contact a batch reached before it was cut off, and records them as failed once that send can't still be going on",
+    () =>
+      Effect.gen(function* cutOffPartway() {
+        const owner = yield* draftCampaign;
+        const { campaign, campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, THREE_CONTACTS, [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+        const batch = message ?? assert.fail();
+
+        yield* (yield* SmtpOutbox).afterNextSend(
+          Effect.die(new Error("The process stopped"))
+        );
+
+        const cutOff = yield* Effect.exit(worker.deliver(batch));
+        const tooSoon = yield* Effect.exit(worker.deliver(batch));
+
+        const partway = yield* client.campaigns.get({
+          params: campaignParams,
+        });
+
+        yield* TestClock.adjust(Duration.minutes(3));
+        yield* worker.deliver(batch);
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        const sql = yield* SqlClient.SqlClient;
+
+        const failures = yield* sql<{
+          readonly email: string;
+          readonly failure_detail: string;
+        }>`
+          select email, failure_detail from campaign_recipients
+          where campaign_id = ${campaign.id} and status = 'failed'`;
+
+        assert.isTrue(Exit.isFailure(cutOff));
+        assert.isTrue(Exit.isFailure(tooSoon));
+        assert.strictEqual(partway.status, "sending");
+        assert.deepStrictEqual(
+          { ...partway.recipients },
+          { failed: 0, sent: 2, total: 3 }
+        );
+        assert.deepStrictEqual(yield* sentTo(campaign.subject), THREE_CONTACTS);
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 1, sent: 2, total: 3 }
+        );
+        assert.deepStrictEqual(failures, [
+          {
+            email: "ada@example.com",
+            failure_detail:
+              "Sending to them was cut off, so it may or may not have reached them. It isn't sent again, so no one gets it twice.",
+          },
+        ]);
+      }).pipe(withOwnClock)
   );
 
   test.effect(

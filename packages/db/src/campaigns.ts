@@ -456,60 +456,103 @@ export const CampaignsLive = Layer.effect(
           });
         }).pipe(Effect.orDie),
 
-      stillConsents: (id, contactId) =>
-        Effect.gen(function* stillConsents() {
+      // WARNING: the update waits for a concurrent claim of the same recipient to commit and then finds them no longer queued, so only one delivery ever sends to them.
+      claim: (id, contactId, at) =>
+        Effect.gen(function* claim() {
           const organization = yield* currentOrganizationId;
 
           const { rows } = yield* db.execute<{
+            readonly claimed: boolean;
             readonly consents: boolean;
           }>(sql`
-            select exists (
-              select 1
-              from (${recipientsOf(organization, targetedListsOfCampaign(organization, id))}) as r
-              where r.id = ${contactId}
-            ) as consents
+            with claimed as (
+              update ${campaignRecipients}
+              set status = 'sending', claimed_at = ${DateTime.formatIso(at)}::timestamptz
+              where organization_id = ${organization}
+                and campaign_id = ${id}
+                and contact_id = ${contactId}
+                and status = 'queued'
+              returning contact_id
+            )
+            select exists (select 1 from claimed) as claimed,
+              exists (
+                select 1
+                from (${recipientsOf(organization, targetedListsOfCampaign(organization, id))}) as r
+                where r.id = ${contactId}
+              ) as consents
           `);
 
-          return rows[0]?.consents === true;
+          const [row] = rows;
+
+          if (row?.claimed !== true) {
+            return "taken" as const;
+          }
+
+          return row.consents ? ("consents" as const) : ("left" as const);
         }).pipe(Effect.orDie),
 
-      // WARNING: the Campaign is marked sent in a statement after the outcomes commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
-      recordOutcomes: (id, outcomes) =>
-        Effect.gen(function* recordOutcomes() {
+      recordOutcome: (id, outcome) =>
+        Effect.gen(function* recordOutcome() {
           const organization = yield* currentOrganizationId;
 
-          if (outcomes.length > 0) {
-            yield* db.execute(sql`
-              with outcome (contact_id, status, provider_message_id, failure_reason, failure_detail) as (
-                values ${outcomeValues(outcomes)}
-              ),
-              recorded as (
-                update ${campaignRecipients} as r
-                set status = outcome.status,
-                  provider_message_id = outcome.provider_message_id,
-                  failure_reason = outcome.failure_reason,
-                  failure_detail = outcome.failure_detail,
-                  processed_at = now()
-                from outcome
-                where r.organization_id = ${organization}
-                  and r.campaign_id = ${id}
-                  and r.contact_id = outcome.contact_id
-                  and r.status = 'queued'
-                returning r.organization_id, r.campaign_id, r.contact_id, r.status, r.provider_message_id
-              ),
-              events as (
-                insert into delivery_events (organization_id, campaign_id, contact_id, kind, provider_message_id)
-                select organization_id, campaign_id, contact_id, 'sent', provider_message_id
-                from recorded
-                where status = 'sent'
-              )
-              update ${campaigns}
-              set recipients_sent = recipients_sent + (select count(*) from recorded where status = 'sent'),
-                recipients_failed = recipients_failed + (select count(*) from recorded where status = 'failed'),
-                updated_at = now()
-              where organization_id = ${organization} and id = ${id}
-            `);
-          }
+          yield* db.execute(sql`
+            with outcome (contact_id, status, provider_message_id, failure_reason, failure_detail) as (
+              values ${outcomeValues([outcome])}
+            ),
+            recorded as (
+              update ${campaignRecipients} as r
+              set status = outcome.status,
+                provider_message_id = outcome.provider_message_id,
+                failure_reason = outcome.failure_reason,
+                failure_detail = outcome.failure_detail,
+                processed_at = now()
+              from outcome
+              where r.organization_id = ${organization}
+                and r.campaign_id = ${id}
+                and r.contact_id = outcome.contact_id
+                and r.status = 'sending'
+              returning r.organization_id, r.campaign_id, r.contact_id, r.status, r.provider_message_id
+            ),
+            events as (
+              insert into delivery_events (organization_id, campaign_id, contact_id, kind, provider_message_id)
+              select organization_id, campaign_id, contact_id, 'sent', provider_message_id
+              from recorded
+              where status = 'sent'
+            )
+            update ${campaigns}
+            set recipients_sent = recipients_sent + (select count(*) from recorded where status = 'sent'),
+              recipients_failed = recipients_failed + (select count(*) from recorded where status = 'failed'),
+              updated_at = now()
+            where organization_id = ${organization} and id = ${id}
+              and exists (select 1 from recorded)
+          `);
+        }).pipe(Effect.orDie),
+
+      // WARNING: the Campaign is marked sent in a statement after the cut-off claims commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
+      settleBatch: (id, batch, claimedBefore, cutOff) =>
+        Effect.gen(function* settleBatch() {
+          const organization = yield* currentOrganizationId;
+
+          yield* db.execute(sql`
+            with cut_off as (
+              update ${campaignRecipients}
+              set status = 'failed',
+                failure_reason = ${cutOff.reason},
+                failure_detail = ${cutOff.detail},
+                processed_at = now()
+              where organization_id = ${organization}
+                and campaign_id = ${id}
+                and batch = ${batch}
+                and status = 'sending'
+                and claimed_at < ${DateTime.formatIso(claimedBefore)}::timestamptz
+              returning 1
+            )
+            update ${campaigns}
+            set recipients_failed = recipients_failed + (select count(*) from cut_off),
+              updated_at = now()
+            where organization_id = ${organization} and id = ${id}
+              and exists (select 1 from cut_off)
+          `);
 
           yield* db
             .update(campaigns)
@@ -521,6 +564,20 @@ export const CampaignsLive = Layer.effect(
                 sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} >= ${campaigns.recipientsTotal}`
               )
             );
+
+          const { rows } = yield* db.execute<{
+            readonly stillSending: boolean;
+          }>(sql`
+            select exists (
+              select 1 from ${campaignRecipients}
+              where organization_id = ${organization}
+                and campaign_id = ${id}
+                and batch = ${batch}
+                and status = 'sending'
+            ) as "stillSending"
+          `);
+
+          return { stillSending: rows[0]?.stillSending === true };
         }).pipe(Effect.orDie),
 
       startSending: (id, batchSize, enqueue, scheduledAt) =>

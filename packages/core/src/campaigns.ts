@@ -30,13 +30,14 @@ import {
   Array as Arr,
   Context,
   DateTime,
+  Duration,
   Effect,
   Option,
-  pipe,
   Ref,
 } from "effect";
 import type { Types } from "effect";
 
+import { BatchStillSending } from "./batch-still-sending.ts";
 import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
 import { preferencesUrl } from "./preferences-link.ts";
@@ -77,6 +78,9 @@ export interface CampaignBatch {
   readonly providerConnectionId: ProviderConnectionId | null;
   readonly recipients: readonly QueuedRecipient[];
 }
+
+/** Whether a delivery of a batch claimed a recipient, and whether they still consent (see `Campaigns.claim`). */
+export type RecipientClaim = "consents" | "left" | "taken";
 
 /** What the Provider did with the Campaign for one recipient. */
 export type RecipientOutcome =
@@ -199,22 +203,47 @@ export class Campaigns extends Context.Service<
       never,
       CurrentOrganization
     >;
-    /** Whether the Contact is still subscribed to one of the Lists the Campaign goes to, has no Opt-out, and their address isn't Suppressed. The Lists it leaves out were applied when it started sending. */
-    readonly stillConsents: (
-      id: CampaignId,
-      contactId: ContactId
-    ) => Effect.Effect<boolean, never, CurrentOrganization>;
     /**
-     * Records what the Provider did for each recipient still queued, adds
-     * them to the Campaign's counts and writes a `sent` delivery event for
-     * each email it accepted, in one statement. Then, in a statement of its
-     * own, marks the Campaign `sent` once none of its recipients are still
-     * queued; with no outcomes, only that runs.
+     * Claims a recipient still queued for one delivery of its batch, at `at`,
+     * so no other delivery sends to them: `"taken"` if they aren't queued,
+     * because another delivery claimed them or they were already recorded.
+     * A claimed recipient `"consents"` while they're still subscribed to one
+     * of the Lists the Campaign goes to, have no Opt-out and their address
+     * isn't Suppressed, and has `"left"` otherwise. The Lists it leaves out
+     * were applied when it started sending.
      */
-    readonly recordOutcomes: (
+    readonly claim: (
       id: CampaignId,
-      outcomes: readonly RecipientOutcome[]
+      contactId: ContactId,
+      at: DateTime.Utc
+    ) => Effect.Effect<RecipientClaim, never, CurrentOrganization>;
+    /**
+     * Records what happened to a recipient this delivery claimed, adds it to
+     * the Campaign's counts and, for an email the Provider accepted, writes a
+     * `sent` delivery event, in one statement.
+     */
+    readonly recordOutcome: (
+      id: CampaignId,
+      outcome: RecipientOutcome
     ) => Effect.Effect<void, never, CurrentOrganization>;
+    /**
+     * Once a delivery of `batch` has tried everyone it could claim: records
+     * as `cutOff` every recipient in it claimed before `claimedBefore` and
+     * never recorded, whose delivery must have stopped, then, in a statement
+     * of its own, marks the Campaign `sent` once none of its recipients are
+     * queued or claimed. Says whether any in the batch are still claimed by
+     * a delivery that may still be sending to them.
+     */
+    readonly settleBatch: (
+      id: CampaignId,
+      batch: number,
+      claimedBefore: DateTime.Utc,
+      cutOff: SendFailed
+    ) => Effect.Effect<
+      { readonly stillSending: boolean },
+      never,
+      CurrentOrganization
+    >;
   }
 >()("@repo/core/Campaigns") {}
 
@@ -386,6 +415,34 @@ const NO_CONNECTION = new SendFailed({
   reason: "failed",
 });
 
+// WARNING: a claim older than this is taken to be a delivery that stopped, and its recipient is recorded as failed, so it must outlast any one email's send (60 seconds over SMTP) and the write after it; one that expires too soon only mislabels a recipient, never sends twice.
+const CLAIM_EXPIRES_AFTER = Duration.minutes(2);
+
+const CUT_OFF = new SendFailed({
+  detail:
+    "Sending to them was cut off, so it may or may not have reached them. It isn't sent again, so no one gets it twice.",
+  reason: "failed",
+});
+
+const outcomeOf = <R>(
+  recipient: QueuedRecipient,
+  sending: Effect.Effect<SentEmail, SendFailed, R>
+) =>
+  sending.pipe(
+    Effect.match({
+      onFailure: (failed) =>
+        ({
+          contactId: recipient.contactId,
+          failed,
+        }) satisfies RecipientOutcome,
+      onSuccess: (sent) =>
+        ({
+          contactId: recipient.contactId,
+          sent,
+        }) satisfies RecipientOutcome,
+    })
+  );
+
 const sendCampaignBatch = (message: SendCampaignBatch) =>
   Effect.gen(function* sendBatch() {
     const campaigns = yield* Campaigns;
@@ -400,8 +457,23 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
       return;
     }
 
+    const settle = Effect.gen(function* settleBatch() {
+      const now = yield* DateTime.now;
+
+      const { stillSending } = yield* campaigns.settleBatch(
+        message.campaignId,
+        message.batch,
+        DateTime.subtractDuration(now, CLAIM_EXPIRES_AFTER),
+        CUT_OFF
+      );
+
+      if (stillSending) {
+        return yield* new BatchStillSending();
+      }
+    });
+
     if (found.value.recipients.length === 0) {
-      return yield* campaigns.recordOutcomes(message.campaignId, []);
+      return yield* settle;
     }
 
     const batch = found.value;
@@ -477,35 +549,31 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         })
       );
 
-    // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes, opts out or is Suppressed partway through still gets it.
-    const sendOrSkip = (recipient: QueuedRecipient) =>
-      Effect.flatMap(
-        campaigns.stillConsents(message.campaignId, recipient.contactId),
-        (consents) =>
-          consents
+    // WARNING: a batch can take minutes to send, so consent is read again just before each email, not once per batch; otherwise someone who unsubscribes, opts out or is Suppressed partway through still gets it. Each outcome is recorded as soon as it's known, so a delivery cut off later never sends it again.
+    const sendOnce = (recipient: QueuedRecipient) =>
+      Effect.gen(function* sendOnceTo() {
+        const claim = yield* campaigns.claim(
+          message.campaignId,
+          recipient.contactId,
+          yield* DateTime.now
+        );
+
+        if (claim === "taken") {
+          return;
+        }
+
+        const outcome = yield* outcomeOf(
+          recipient,
+          claim === "consents"
             ? sendUnlessServerFailed(recipient)
             : Effect.fail(NO_LONGER_CONSENTS)
-      );
+        );
 
-    const outcomeFor = (recipient: QueuedRecipient) =>
-      sendOrSkip(recipient).pipe(
-        Effect.match({
-          onFailure: (failed) =>
-            ({
-              contactId: recipient.contactId,
-              failed,
-            }) satisfies RecipientOutcome,
-          onSuccess: (sent) =>
-            ({
-              contactId: recipient.contactId,
-              sent,
-            }) satisfies RecipientOutcome,
-        })
-      );
+        yield* campaigns.recordOutcome(message.campaignId, outcome);
+      });
 
-    const outcomes = yield* pipe(batch.recipients, Effect.forEach(outcomeFor));
-
-    yield* campaigns.recordOutcomes(message.campaignId, outcomes);
+    yield* Effect.forEach(batch.recipients, sendOnce, { discard: true });
+    yield* settle;
   }).pipe(asQueuedFor(message));
 
 /**
@@ -514,8 +582,11 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
  * Campaign's Provider Connection, and records what happened to each. A
  * Provider refusing one recipient doesn't stop the others; once its server
  * can't be reached or refuses the connection, the rest of the batch is
- * recorded with that failure without trying them. A batch delivered again
- * sends only to those still queued. For a scheduled Campaign that's due:
+ * recorded with that failure without trying them. Each recipient is claimed
+ * before their email and recorded right after it, so however often a batch
+ * is delivered, no one is sent it twice (ADR 0014); a delivery that finds
+ * someone claimed by another that may still be sending fails with
+ * `BatchStillSending`, to be delivered again. For a scheduled Campaign that's due:
  * starts sending it if it's still scheduled for that time, as sending it
  * now would; if it can't, it becomes a draft again, saying why.
  */
