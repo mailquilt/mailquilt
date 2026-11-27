@@ -9,6 +9,7 @@ import {
   ArrowRight02Icon,
   ArrowRightDoubleIcon,
   ArrowUp01Icon,
+  Calendar03Icon,
   Cancel01Icon,
   ComputerIcon,
   Copy01Icon,
@@ -131,6 +132,7 @@ export const CaretDoubleRightIcon = hugeicon(
   "CaretDoubleRightIcon"
 );
 
+export const CalendarIcon = hugeicon(Calendar03Icon, "CalendarIcon");
 export const CaretDownIcon = hugeicon(ArrowDown01Icon, "CaretDownIcon");
 export const CaretLeftIcon = hugeicon(ArrowLeft01Icon, "CaretLeftIcon");
 export const CaretRightIcon = hugeicon(ArrowRight01Icon, "CaretRightIcon");

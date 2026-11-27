@@ -6,7 +6,9 @@ import { Fragment } from "react";
  * (`crumbs`), a two-tone display title like the wordmark
  * (what it is in ink, `titleDetail` such as a count in quilt grey), one
  * sentence, and the page's actions on the right. On phones the actions go
- * full width under the sentence. A long title, such as a Campaign's subject,
+ * full width under the sentence, sharing the row equally; when their labels
+ * don't fit side by side, as with three on a 320px phone, the last moves to
+ * a row of its own rather than wrap its label. A long title, such as a Campaign's subject,
  * can run up to the actions (`titleRunsToActions`) rather than wrap at the
  * sentence's measure.
  */
@@ -54,7 +56,7 @@ export const PageHeader = ({
       </p>
     </div>
     {actions === undefined ? null : (
-      <div className="flex gap-2 max-sm:w-full max-sm:*:flex-1 max-sm:*:justify-center">
+      <div className="flex flex-wrap gap-2 max-sm:w-full max-sm:*:min-w-fit max-sm:*:flex-1 max-sm:*:justify-center max-sm:*:whitespace-nowrap">
         {actions}
       </div>
     )}

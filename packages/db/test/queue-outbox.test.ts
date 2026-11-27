@@ -1,9 +1,15 @@
 import { PgClient } from "@effect/sql-pg";
 import { assert, layer } from "@effect/vitest";
-import { Queue, QueueMessageSchema, SendCampaignBatch } from "@repo/core";
+import {
+  Queue,
+  QueueMessageSchema,
+  Scheduler,
+  SendCampaignBatch,
+  StartScheduledCampaign,
+} from "@repo/core";
 import type { QueueMessage } from "@repo/core";
 import { CampaignIdSchema, OrganizationIdSchema } from "@repo/domain";
-import { Effect, Layer, Redacted, Ref, Schema } from "effect";
+import { DateTime, Effect, Layer, Redacted, Ref, Schema } from "effect";
 
 import { Database, DatabaseLive } from "../src/database.ts";
 import { migrateDatabase } from "../src/migrate.ts";
@@ -67,8 +73,18 @@ const decodeMessage = Schema.decodeUnknownSync(QueueMessageSchema);
 
 const batchNumbers = (messages: readonly unknown[]) =>
   messages
-    .map((message) => decodeMessage(message).batch)
+    .map((message) => decodeMessage(message))
+    .flatMap((message) =>
+      message._tag === "SendCampaignBatch" ? [message.batch] : []
+    )
     .toSorted((a, b) => a - b);
+
+const startAt = (at: DateTime.Utc) =>
+  new StartScheduledCampaign({
+    at,
+    campaignId: CampaignIdSchema.make("cmp_01h455vb4pex5vsknk084sn02q"),
+    organizationId: OrganizationIdSchema.make("org_01h455vb4pex5vsknk084sn02q"),
+  });
 
 layer(PostgresLive, { timeout: "2 minutes" })("Queue outbox", (test) => {
   test.effect(
@@ -120,5 +136,34 @@ layer(PostgresLive, { timeout: "2 minutes" })("Queue outbox", (test) => {
         assert.lengthOf(yield* forwardAll, count);
       }).pipe(Effect.provide(database));
     })
+  );
+
+  test.effect(
+    "keeps a scheduled message in the outbox until it's due, and forwards it once it is",
+    () =>
+      Effect.gen(function* scheduledMessages() {
+        const database = yield* migratedDatabase;
+        const due = DateTime.makeUnsafe("2020-01-01T09:00:00Z");
+        const notDue = DateTime.makeUnsafe("2099-12-01T14:00:00Z");
+
+        yield* Effect.gen(function* scheduleAndForward() {
+          const scheduler = yield* Scheduler;
+          const db = yield* Database;
+
+          yield* db.transaction(() =>
+            Effect.gen(function* scheduleBoth() {
+              yield* scheduler.schedule(startAt(notDue), notDue);
+              yield* scheduler.schedule(startAt(due), due);
+            })
+          );
+
+          const forwarded = (yield* forwardAll).map((message) =>
+            decodeMessage(message)
+          );
+
+          assert.deepStrictEqual(forwarded, [startAt(due)]);
+          assert.deepStrictEqual(yield* forwardAll, []);
+        }).pipe(Effect.provide(database));
+      })
   );
 });

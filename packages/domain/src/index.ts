@@ -35,6 +35,17 @@ export {
 
 export type { CampaignFooter } from "./campaign-footer.ts";
 
+export {
+  CampaignSchedule,
+  LocalDateTime,
+  MissedScheduleReasonSchema,
+  ScheduleRequest,
+  scheduledInstant,
+  TimeZoneName,
+} from "./campaign-schedule.ts";
+
+export type { MissedScheduleReason } from "./campaign-schedule.ts";
+
 export { CampaignSummary } from "./campaign-summary.ts";
 
 export { CampaignNotDraft } from "./campaign-not-draft.ts";
@@ -167,6 +178,8 @@ export {
   MAX_SUPPRESSIONS_ADDED_AT_ONCE,
   SuppressionsAdded,
 } from "./suppressions-added.ts";
+
+export { ScheduleInPast } from "./schedule-in-past.ts";
 
 export { SetupClosed } from "./setup-closed.ts";
 

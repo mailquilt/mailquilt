@@ -3,7 +3,15 @@ import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { Schema } from "effect";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import {
   ACME,
@@ -125,6 +133,53 @@ describe("campaigns page", () => {
         "u"
       )
     );
+  });
+
+  it("says when a scheduled campaign goes, on your clock, and when a draft missed its time", async () => {
+    const zone = process.env.TZ;
+    process.env.TZ = "Europe/London";
+    vi.useFakeTimers({
+      now: new Date("2026-11-27T10:20:00.000Z"),
+      shouldAdvanceTime: true,
+    });
+
+    const nineInNewYork = {
+      at: "2026-11-30T14:00:00.000Z",
+      missed: null,
+      timeZone: "America/New_York",
+    };
+
+    try {
+      api.use(
+        ...ready(),
+        withCampaigns(
+          page([
+            { ...DRAFT, schedule: nineInNewYork, status: "scheduled" },
+            {
+              ...DRAFT,
+              id: OLDER,
+              schedule: { ...nineInNewYork, missed: "no-subscribed-contacts" },
+              subject: "Wholesale price list",
+            },
+          ])
+        )
+      );
+      renderPage();
+
+      const scheduled = await screen.findByRole("row", {
+        name: /December roast/u,
+      });
+
+      const missed = screen.getByRole("row", { name: /Wholesale price list/u });
+
+      expect(within(scheduled).getByText("Scheduled")).toBeDefined();
+      expect(within(scheduled).getByText("Goes Nov 30, 14:00")).toBeDefined();
+      expect(within(missed).getByText("Draft")).toBeDefined();
+      expect(within(missed).getByText("Missed Nov 30")).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+      process.env.TZ = zone;
+    }
   });
 
   it("counts every campaign and pages on to the older ones", async () => {

@@ -191,7 +191,9 @@
     input:not([type="checkbox"], [type="radio"]),
     textarea,
     [data-slot^="input-group"],
-    [data-kumo-component="Select"][data-kumo-part="trigger"]
+    [data-kumo-component="Select"][data-kumo-part="trigger"],
+    [data-kumo-component="Combobox"][data-kumo-part="trigger"],
+    .mq-picker-button
   ) {
   --color-kumo-line: var(--mq-patch-grey);
 }
@@ -200,7 +202,9 @@
   :is(
     :is(input:not([type="checkbox"], [type="radio"]), textarea):focus-visible,
     [data-slot="input-group"]:has(input:focus-visible),
-    [data-kumo-component="Select"][data-kumo-part="trigger"]:focus-visible
+    [data-kumo-component="Select"][data-kumo-part="trigger"]:focus-visible,
+    [data-kumo-component="Combobox"][data-kumo-part="trigger"]:focus-visible,
+    .mq-picker-button:focus-visible
   ) {
   outline: 2px solid var(--color-kumo-focus);
   outline-offset: 2px;
@@ -1779,4 +1783,86 @@ html[data-theme="mailquilt"]:has(.mq-lasting-toast):has(
   html[data-theme="mailquilt"]:has(.mq-lasting-toast) .mq-auth footer {
     padding-bottom: 8rem;
   }
+}
+
+/* A field drawn as a button that opens a picker, such as Schedule's Day, in Kumo's input box. */
+.mq-picker-button {
+  justify-content: space-between;
+  gap: 0.5rem;
+  text-align: left;
+}
+
+.mq-picker-button[data-empty] {
+  color: var(--text-color-kumo-placeholder);
+}
+
+/* A time zone in Schedule's list: the city and its zone's name, then its GMT offset. */
+/* WARNING: Kumo's option is a grid whose text column grows to fit its text, so the option doesn't let its text widen it (contain: inline-size), or on a 320px phone a long zone name pushes the offset out of the list instead of being cut short. */
+.mq-zone-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  min-width: 0;
+  width: 100%;
+  contain: inline-size;
+}
+
+/* Wider than the field Kumo matches it to, so a zone's name and offset fit. */
+.mq-zone-list {
+  width: min(24rem, calc(100vw - 2rem));
+}
+
+.mq-zone-search {
+  margin-bottom: 0.25rem;
+}
+
+/* Under Schedule's fields: the moment in plain words, and what it is on your clock. */
+.mq-when {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--color-kumo-elevated);
+  padding: 0.875rem 1rem;
+  box-shadow: 0 0 0 1px var(--color-kumo-hairline);
+}
+
+.mq-when-mark {
+  display: flex;
+  height: 1.625rem;
+  align-items: center;
+}
+
+.mq-when-main {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1.625rem;
+  font-weight: 600;
+  color: var(--text-color-kumo-strong);
+  text-wrap: balance;
+}
+
+.mq-when-main[data-empty] {
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 400;
+  color: var(--text-color-kumo-subtle);
+}
+
+.mq-when-line {
+  margin-top: 0.125rem;
+  color: var(--text-color-kumo-default);
+  text-wrap: pretty;
+}
+
+.mq-when-note {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.625rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--color-kumo-hairline);
+  font-size: var(--text-sm);
+  color: var(--text-color-kumo-default);
+  text-wrap: pretty;
 }

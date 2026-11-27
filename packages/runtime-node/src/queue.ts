@@ -3,6 +3,7 @@ import type {
   DeliveryEventPartitions,
   ProviderConnections,
   PublicUrl,
+  QueueMessage,
   SignedTokens,
   SmtpProvider,
 } from "@repo/core";
@@ -14,6 +15,7 @@ import {
   QUEUE_RETRY_DELAY_SECONDS,
   QueueMessageSchema,
   queueRetryDelaySeconds,
+  Scheduler,
   SEND_BATCH_SIZE,
 } from "@repo/core";
 import { SEND_TIMEOUT_SECONDS } from "@repo/providers/smtp";
@@ -21,6 +23,7 @@ import {
   Cause,
   Config,
   Context,
+  DateTime,
   Effect,
   Layer,
   pipe,
@@ -54,7 +57,7 @@ const MESSAGES_QUEUE_OPTIONS = {
   retryLimit: QUEUE_RETRIES,
 };
 
-const encodeMessages = Schema.encodeEffect(Schema.Array(QueueMessageSchema));
+const encodeMessage = Schema.encodeEffect(QueueMessageSchema);
 
 const decodeMessage = Schema.decodeUnknownEffect(QueueMessageSchema);
 
@@ -92,44 +95,62 @@ const BossLive = Layer.effect(
   )
 );
 
-const PgBossQueueLive = Layer.effect(
-  Queue,
+interface Job {
+  readonly message: QueueMessage;
+  readonly startAfter?: Date;
+}
+
+const PgBossQueueLive = Layer.effectContext(
   Effect.gen(function* pgBossQueue() {
     const boss = yield* Boss;
     const sql = yield* SqlClient.SqlClient;
 
-    return {
-      enqueue: (messages) =>
-        Effect.gen(function* enqueue() {
-          if (messages.length === 0) {
-            return;
-          }
+    const insert = (jobs: readonly Job[]) =>
+      Effect.gen(function* insertJobs() {
+        if (jobs.length === 0) {
+          return;
+        }
 
-          const encoded = yield* encodeMessages(messages);
-
-          // WARNING: the fiber's context holds an open transaction's connection; pg-boss's statement must run with it to join that transaction.
-          const context = yield* Effect.context<never>();
-
-          const db = {
-            executeSql: (text: string, values?: unknown[]) =>
-              Effect.runPromiseWith(context)(sql.unsafe(text, values)).then(
-                (rows) => ({ rows: [...rows] })
-              ),
-          };
-
-          yield* Effect.promise(() =>
-            boss.insert(
-              MESSAGES_QUEUE,
-              encoded.map((data) => ({ data })),
-              { db }
+        const encoded = yield* pipe(
+          jobs,
+          Effect.forEach(({ message, startAfter }) =>
+            Effect.map(encodeMessage(message), (data) =>
+              startAfter === undefined ? { data } : { data, startAfter }
             )
-          );
-        }).pipe(Effect.orDie),
-    };
+          )
+        );
+
+        // WARNING: the fiber's context holds an open transaction's connection; pg-boss's statement must run with it to join that transaction.
+        const context = yield* Effect.context<never>();
+
+        const db = {
+          executeSql: (text: string, values?: unknown[]) =>
+            Effect.runPromiseWith(context)(sql.unsafe(text, values)).then(
+              (rows) => ({ rows: [...rows] })
+            ),
+        };
+
+        yield* Effect.promise(() =>
+          boss.insert(MESSAGES_QUEUE, encoded, { db })
+        );
+      }).pipe(Effect.orDie);
+
+    return Context.make(Queue, {
+      enqueue: (messages) => insert(messages.map((message) => ({ message }))),
+    }).pipe(
+      Context.add(Scheduler, {
+        schedule: (message, at) =>
+          insert([{ message, startAfter: DateTime.toDateUtc(at) }]),
+      })
+    );
   })
 );
 
-/** pg-boss and the Queue on it. Needs the app's `SqlClient`, so queued messages join its transactions. */
+/**
+ * pg-boss, and the Queue and Scheduler on it: a scheduled message is a job
+ * that starts after its time (ADR 0017). Needs the app's `SqlClient`, so
+ * queued messages join its transactions.
+ */
 export const PgBossLive = PgBossQueueLive.pipe(Layer.provideMerge(BossLive));
 
 type WorkerPorts =
@@ -137,6 +158,7 @@ type WorkerPorts =
   | DeliveryEventPartitions
   | ProviderConnections
   | PublicUrl
+  | Queue
   | SignedTokens
   | SmtpProvider;
 

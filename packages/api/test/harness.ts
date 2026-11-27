@@ -11,6 +11,7 @@ import {
 import type {
   Queue,
   QueueMessage,
+  Scheduler,
   SmtpProvider,
   SystemMailer,
   SystemMailerSmtp,
@@ -71,7 +72,8 @@ type Fakes =
   | SmtpProvider
   | SmtpOutbox
   | Queue
-  | QueueInbox;
+  | QueueInbox
+  | Scheduler;
 
 const startPostgres = Effect.acquireRelease(
   Effect.promise(() => new PostgreSqlContainer(POSTGRES_IMAGE).start()),
@@ -137,7 +139,7 @@ const appWith = (
 export const QueueWorker = Context.Service<{
   /** Handles one message. */
   readonly deliver: (message: QueueMessage) => Effect.Effect<void>;
-  /** Handles every queued message, and any they queue, until none are left. Returns what it handled. */
+  /** Handles every queued message that's due by the `Clock`, and any they queue, until none are left. Returns what it handled. */
   readonly deliverAll: Effect.Effect<readonly QueueMessage[]>;
 }>("test/QueueWorker");
 

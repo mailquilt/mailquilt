@@ -12,7 +12,7 @@ This is the design P1 builds toward. Where a part isn't built yet, it says **pla
 | Database | Postgres through Hyperdrive, or a serverless Postgres such as Neon | Postgres in the compose file |
 | Storage (planned, #25) | R2 | Any S3-compatible store (R2, S3, MinIO) |
 | Queue | Cloudflare Queues, fed from an outbox table ([ADR 0014](adr/0014-queued-work-acts-in-the-organization-its-message-names.md)) | pg-boss on Postgres |
-| Scheduler | Cron Triggers | pg-boss cron |
+| Scheduler | Outbox rows forwarded by the every-minute Cron Trigger once due ([ADR 0017](adr/0017-a-scheduled-campaign-starts-from-a-delayed-queue-message.md)) | pg-boss jobs with `startAfter` |
 | Rate limiting | Postgres counters | Postgres counters; a Redis adapter only if several replicas or measured load need it |
 | Inbound bounces (planned, #19, #21) | Email Workers handler | Provider webhooks; bounce-mailbox polling (P2) |
 | Migrations | Run in the deploy step | Run on boot behind a Postgres advisory lock |
@@ -47,9 +47,9 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Sending pipeline (outline)
 
-Today a Campaign is sent now, once each, to the Contacts subscribed to any of its Lists, except anyone on a List it leaves out, with an Opt-out or with a Suppressed address, in batches through its Provider Connection. Members see how many it reaches before sending. Members add and remove Suppressions by hand; bounces and complaints will add them (#19, #21). Segments, scheduling (#16), throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
+Today a Campaign is sent now, or at a time a member schedules in a time zone they choose, once each, to the Contacts subscribed to any of its Lists, except anyone on a List it leaves out, with an Opt-out or with a Suppressed address, in batches through its Provider Connection. Members see how many it reaches before sending. Members add and remove Suppressions by hand; bounces and complaints will add them (#19, #21). Segments, throttling (#18), Provider events (#19, #21) and pause, resume and cancel (#17) are planned.
 
-1. **Start:** a Campaign starts (now or when the scheduler finds it due).
+1. **Start:** a Campaign starts now, or when the message the Scheduler holds for it comes due; one that can't start then becomes a draft again, saying why (ADR 0017).
 2. **Resolve recipients in one set-based query:**
    - Include Contacts subscribed to any targeted List or matching a targeted Segment.
    - Drop excluded Lists and Segments, pending or unsubscribed Subscriptions, Contacts with an Opt-out, and Suppressed addresses.

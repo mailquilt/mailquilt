@@ -45,6 +45,7 @@ export const DRAFT = {
   providerConnectionId: POSTMARK.id,
   recipients: { failed: 0, sent: 0, total: 0 },
   replyTo: null,
+  schedule: null,
   sendingStartedAt: null,
   sentAt: null,
   status: "draft",

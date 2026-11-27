@@ -4,16 +4,22 @@ import type {
   Campaign,
   CampaignId,
   List,
+  MissedScheduleReason,
   Organization,
   ProviderConnection,
 } from "@repo/domain";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { Predicate } from "effect";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
 import { useLists } from "../audience/audience-api.ts";
 import { formatCount } from "../audience/format.ts";
-import { PaperPlaneTiltIcon, PencilSimpleIcon } from "../icons/icons.tsx";
+import {
+  CalendarIcon,
+  PaperPlaneTiltIcon,
+  PencilSimpleIcon,
+} from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
@@ -21,7 +27,7 @@ import { PageHeader } from "../layout/page-header.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { SettingsSection } from "../layout/settings-section.tsx";
 import { TableRegion } from "../layout/table-region.tsx";
-import { useConfirmationToast } from "../layout/toast.tsx";
+import { useConfirmationToast, useProblemToast } from "../layout/toast.tsx";
 import { useProviderConnections } from "../providers/providers-api.ts";
 import { formatMoment, formatSince } from "./campaign-dates.ts";
 import {
@@ -33,12 +39,22 @@ import {
 import { CampaignBlock } from "./campaign-status.tsx";
 import {
   useCampaign,
+  useCancelSchedule,
   useRecipientCount,
   useRefreshCampaignPages,
 } from "./campaigns-api.ts";
 import { EmailPreview } from "./email-preview.tsx";
 import { failedToCount, TryAgain } from "./list-choice.tsx";
-import { SendCampaignDialog } from "./send-campaign-dialog.tsx";
+import { ScheduleCampaignDialog } from "./schedule-campaign-dialog.tsx";
+import {
+  cityOf,
+  clockIn,
+  inZone,
+  longDayIn,
+  viewerClock,
+  viewerZone,
+} from "./schedule-time.ts";
+import { refusalOf, SendCampaignDialog } from "./send-campaign-dialog.tsx";
 import type { SendRefusal } from "./send-campaign-dialog.tsx";
 
 const CRUMBS = [{ href: "/campaigns", label: "Campaigns" }];
@@ -52,6 +68,30 @@ const sentTo = ({ recipients }: Campaign) =>
   recipients.failed === 0
     ? contacts(recipients.total)
     : `${formatCount(recipients.sent)} of ${contacts(recipients.total)}`;
+
+type Schedule = NonNullable<Campaign["schedule"]>;
+
+const scheduledDay = ({ at, timeZone }: Schedule) =>
+  `${longDayIn(at, timeZone)} at ${clockIn(at, timeZone)}`;
+
+const scheduledWords = (schedule: Schedule) => {
+  const yours = viewerClock(schedule.at, schedule.timeZone);
+
+  return yours === undefined
+    ? scheduledDay(schedule)
+    : `${scheduledDay(schedule)} in ${cityOf(schedule.timeZone)} (${yours} for you)`;
+};
+
+const scheduledWhere = ({ at, timeZone }: Schedule) => {
+  const yours = viewerClock(at, timeZone);
+
+  return yours === undefined
+    ? `In ${cityOf(viewerZone())}, your time zone.`
+    : `In ${cityOf(timeZone)}. That’s ${yours} for you.`;
+};
+
+const missedWhen = ({ at, timeZone }: Schedule) =>
+  `${clockIn(at, timeZone)} on ${longDayIn(at, timeZone)}${inZone(timeZone)}`;
 
 const Strong = ({ children }: { children: React.ReactNode }) => (
   <strong className="font-medium text-kumo-strong">{children}</strong>
@@ -88,6 +128,16 @@ const statusWords = (campaign: Campaign, connectionName: string) => {
       <>
         <Strong>Sending</Strong> to {contacts(campaign.recipients.total)}
         {since}. It carries on if you close this page.
+      </>
+    );
+  }
+
+  if (campaign.status === "scheduled" && campaign.schedule !== null) {
+    return (
+      <>
+        <Strong>Scheduled</Strong> for {scheduledWords(campaign.schedule)}.
+        Nothing has been sent, and it can’t be edited until you cancel the
+        schedule.
       </>
     );
   }
@@ -178,6 +228,9 @@ const Facts = ({ rows }: { rows: FactRows }) => (
 
 type Problem = "connection" | "nobody" | "address" | "already";
 
+const isUnsent = (campaign: Campaign) =>
+  campaign.status === "draft" || campaign.status === "scheduled";
+
 type FactRows = readonly (readonly [string, React.ReactNode])[];
 
 type RecipientCount = UseQueryResult<number>;
@@ -214,25 +267,28 @@ const audienceFacts = (
   lists: readonly List[],
   count: RecipientCount
 ) => {
-  const draft = campaign.status === "draft";
+  const unsent = isUnsent(campaign);
 
   const rows: (readonly [string, React.ReactNode])[] = [
     [
-      { draft: "Sends to", sending: "Sending to lists", sent: "Sent to lists" }[
-        campaign.status
-      ],
+      {
+        draft: "Sends to",
+        scheduled: "Sends to",
+        sending: "Sending to lists",
+        sent: "Sent to lists",
+      }[campaign.status],
       <ListLines ids={campaign.listIds} key="to" lists={lists} />,
     ],
   ];
 
   if (campaign.excludedListIds.length > 0) {
     rows.push([
-      draft ? "Leaves out" : "Left out",
+      unsent ? "Leaves out" : "Left out",
       <ListLines ids={campaign.excludedListIds} key="out" lists={lists} />,
     ]);
   }
 
-  if (draft) {
+  if (unsent) {
     rows.push(["Goes to now", <GoesToNow count={count} key="now" />]);
   } else if (campaign.status === "sending") {
     rows.push(["Sending to", contacts(campaign.recipients.total)]);
@@ -270,7 +326,7 @@ const senderFacts = (
       ),
     ],
     [
-      campaign.status === "draft" ? "Goes through" : "Went through",
+      isUnsent(campaign) ? "Goes through" : "Went through",
       connection === undefined ? (
         <Missing>The connection was deleted</Missing>
       ) : (
@@ -286,11 +342,12 @@ const problemOf = (
   count: number | undefined,
   refusal: SendRefusal | undefined
 ) => {
-  if (refusal === "already") {
+  // WARNING: CampaignNotDraft also answers a Campaign someone else scheduled; once it has loaded as scheduled, the page says so in its status line, not as "already sending".
+  if (refusal === "already" && campaign.status !== "scheduled") {
     return "already" satisfies Problem;
   }
 
-  if (campaign.status !== "draft") {
+  if (!isUnsent(campaign)) {
     return;
   }
 
@@ -305,6 +362,26 @@ const problemOf = (
   if (count === 0 || refusal === "nobody") {
     return "nobody" satisfies Problem;
   }
+};
+
+const aboutTheAudience = (campaign: Campaign) => {
+  if (campaign.status === "scheduled") {
+    return "Everyone subscribed to its lists when it starts, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address. If no one is by then, it isn’t sent and goes back to being a draft.";
+  }
+
+  return campaign.status === "draft"
+    ? "Everyone subscribed to its lists at the moment you send, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address."
+    : "The contacts it went to when it was sent, once each. Anyone who subscribed later doesn’t get it.";
+};
+
+const aboutTheEmail = (campaign: Campaign) => {
+  if (campaign.status === "scheduled") {
+    return "The email exactly as it’s sent, in a preview that runs no scripts. To change it, cancel the schedule, then edit it.";
+  }
+
+  return campaign.status === "draft"
+    ? "The email exactly as it’s sent, in a preview that runs no scripts."
+    : "The email as it went out, in a preview that runs no scripts. Its footer shows your postal address as it is now.";
 };
 
 const ADDRESS_SLOT = "Your postal address goes here";
@@ -374,9 +451,16 @@ const ProblemBanner = ({
   if (problem === "already") {
     const when = alreadySentWhen(campaign);
 
+    const startedOnSchedule =
+      campaign.status !== "draft" && campaign.schedule !== null;
+
     return (
       <Banner
-        description={`${when}, from another tab or by someone else in ${organization.name}. It wasn’t sent again.`}
+        description={
+          startedOnSchedule
+            ? `${when}, at the time it was scheduled for.`
+            : `${when}, from another tab or by someone else in ${organization.name}. It wasn’t sent again.`
+        }
         title={
           campaign.status === "sent"
             ? "This campaign had already been sent"
@@ -407,6 +491,151 @@ const ProblemBanner = ({
       description={blocked.description}
       title={blocked.title}
       variant="alert"
+    />
+  );
+};
+
+const MISSED_AS_PROBLEM = {
+  "no-provider-connection": "connection",
+  "no-subscribed-contacts": "nobody",
+} as const satisfies Record<MissedScheduleReason, Problem>;
+
+const MissedBanner = ({
+  campaign,
+  counted,
+  lists,
+  schedule,
+  stillHolds,
+}: {
+  campaign: Campaign;
+  counted: number | undefined;
+  lists: readonly List[];
+  schedule: Schedule;
+  stillHolds: boolean;
+}) => {
+  const title = `It wasn’t sent at ${missedWhen(schedule)}`;
+
+  const why =
+    schedule.missed === "no-provider-connection"
+      ? "Its provider connection was deleted before then, so it went back to being a draft."
+      : "No one would have got it then, so it went back to being a draft.";
+
+  if (stillHolds) {
+    const what =
+      schedule.missed === "no-provider-connection"
+        ? "Edit it to choose another connection, then schedule it again or send it now."
+        : nobodyWhy(campaign, lists);
+
+    return (
+      <Banner description={`${why} ${what}`} title={title} variant="alert" />
+    );
+  }
+
+  const now =
+    schedule.missed === "no-subscribed-contacts" && counted !== undefined
+      ? `${contacts(counted)} would get it now: schedule it again, or send it now.`
+      : "Schedule it again, or send it now.";
+
+  return <Banner description={`${why} ${now}`} title={title} />;
+};
+
+const ScheduledProblemBanner = ({
+  campaign,
+  lists,
+  organization,
+  problem,
+  schedule,
+}: {
+  campaign: Campaign;
+  lists: readonly List[];
+  organization: Organization;
+  problem: Exclude<Problem, "already">;
+  schedule: Schedule;
+}) => {
+  const said = {
+    address: {
+      description: `Every campaign ends with ${organization.name}’s postal address, as anti-spam laws require. Add it once in Organization settings.`,
+      title: `It won’t be sent at ${missedWhen(schedule)} without a postal address`,
+    },
+    connection: {
+      description:
+        "Its provider connection was deleted. Cancel the schedule, then edit it to choose another, or it goes back to being a draft at its time.",
+      title: `It won’t be sent at ${missedWhen(schedule)}`,
+    },
+    nobody: {
+      description: `If no one is subscribed to ${listsInWords(namesOf(campaign.listIds, lists))} by then, it isn’t sent and goes back to being a draft. Add contacts, or cancel the schedule and edit it to choose other lists.`,
+      title: "No one would get it now",
+    },
+  }[problem];
+
+  return (
+    <Banner description={said.description} title={said.title} variant="alert" />
+  );
+};
+
+// WARNING: one banner at most: a missed schedule's note takes the place of the problem that made it miss while that problem still holds, but a different problem since then is the one to show.
+const PageBanner = ({
+  campaign,
+  counted,
+  lists,
+  organization,
+  problem,
+}: {
+  campaign: Campaign;
+  counted: number | undefined;
+  lists: readonly List[];
+  organization: Organization;
+  problem: Problem | undefined;
+}) => {
+  const { schedule } = campaign;
+
+  if (
+    campaign.status === "scheduled" &&
+    schedule !== null &&
+    problem !== undefined &&
+    problem !== "already"
+  ) {
+    return (
+      <ScheduledProblemBanner
+        campaign={campaign}
+        lists={lists}
+        organization={organization}
+        problem={problem}
+        schedule={schedule}
+      />
+    );
+  }
+
+  const missed =
+    campaign.status === "draft" ? (schedule?.missed ?? null) : null;
+
+  const stillHolds =
+    missed !== null &&
+    problem !== undefined &&
+    problem === MISSED_AS_PROBLEM[missed];
+
+  if (
+    schedule !== null &&
+    missed !== null &&
+    (problem === undefined || stillHolds)
+  ) {
+    return (
+      <MissedBanner
+        campaign={campaign}
+        counted={counted}
+        lists={lists}
+        schedule={schedule}
+        stillHolds={stillHolds}
+      />
+    );
+  }
+
+  return problem === undefined ? null : (
+    <ProblemBanner
+      campaign={campaign}
+      lists={lists}
+      organization={organization}
+      problem={problem}
     />
   );
 };
@@ -503,7 +732,9 @@ const CampaignView = ({
   const refusal = stillRefused(refused, loaded);
 
   const sending = useDialog();
+  const scheduling = useDialog();
   const sendButton = useRef<HTMLButtonElement>(null);
+  const scheduleButton = useRef<HTMLButtonElement>(null);
   const statusLine = useRef<HTMLSpanElement>(null);
   const problemRegion = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -523,16 +754,91 @@ const CampaignView = ({
   );
 
   const draft = campaign.status === "draft";
+  const unsent = isUnsent(campaign);
   const editHref = `/campaigns/${campaign.id}/edit`;
+  const toasts = useConfirmationToast();
+  const cancelling = useCancelSchedule(organization.id, campaign.id);
+  const cancelProblem = useProblemToast(`cancel-schedule-${campaign.id}`);
+
+  const refuse = (reason: SendRefusal) => {
+    setRefused({ ...loaded, reason });
+    onRefusal();
+  };
+
+  const openSchedule = () => {
+    returnFocus.current = scheduleButton.current;
+    scheduling.setOpen(true);
+  };
+
+  const cancelSchedule = () => {
+    const was = campaign.schedule;
+
+    if (cancelling.isPending || was === null) {
+      return;
+    }
+
+    cancelling.mutate(undefined, {
+      onError: (error) => {
+        const reason = refusalOf(error);
+
+        if (reason !== undefined) {
+          refuse(reason);
+          problemRegion.current?.focus();
+
+          return;
+        }
+
+        cancelProblem.show({
+          description: Predicate.isTagged(error, "SignInRequired")
+            ? "You’ve been signed out. Sign in again, then cancel it."
+            : "Mailquilt couldn’t reach its server. Check your connection, then try again.",
+          title: "It’s still scheduled",
+        });
+      },
+      onSuccess: () => {
+        cancelProblem.clear();
+        setRefused(undefined);
+        toasts.add({
+          description: `It was set for ${missedWhen(was)}. It’s a draft again, and nothing was sent.`,
+          title: "Schedule cancelled",
+        });
+        statusLine.current?.focus();
+      },
+    });
+  };
 
   let actions: React.ReactNode;
 
-  if (draft && problem !== undefined) {
+  if (campaign.status === "scheduled") {
+    actions = (
+      <>
+        <Button onClick={cancelSchedule} variant="secondary">
+          {cancelling.isPending ? "Cancelling…" : "Cancel schedule"}
+        </Button>
+        <Button
+          icon={CalendarIcon}
+          onClick={openSchedule}
+          ref={scheduleButton}
+          variant="secondary"
+        >
+          Change time
+        </Button>
+      </>
+    );
+  } else if (draft && problem !== undefined) {
     actions = <BlockedActions editHref={editHref} problem={problem} />;
   } else if (draft) {
     actions = (
       <>
         <EditLink href={editHref} variant="secondary" />
+        <Button
+          icon={CalendarIcon}
+          onClick={openSchedule}
+          ref={scheduleButton}
+          variant="secondary"
+        >
+          Schedule
+        </Button>
         <Button
           icon={PaperPlaneTiltIcon}
           onClick={() => {
@@ -569,23 +875,18 @@ const CampaignView = ({
           ref={problemRegion}
           tabIndex={-1}
         >
-          {problem === undefined ? null : (
-            <ProblemBanner
-              campaign={campaign}
-              lists={lists}
-              organization={organization}
-              problem={problem}
-            />
-          )}
+          <PageBanner
+            campaign={campaign}
+            counted={counted}
+            lists={lists}
+            organization={organization}
+            problem={problem}
+          />
         </div>
         <div className="flex flex-col">
           <SettingsSection
-            about={
-              draft
-                ? "Everyone subscribed to its lists at the moment you send, once each, except anyone who is or was on a list it leaves out, stopped all marketing email or has a suppressed address."
-                : "The contacts it went to when it was sent, once each. Anyone who subscribed later doesn’t get it."
-            }
-            title={draft ? "Who gets it" : "Who got it"}
+            about={aboutTheAudience(campaign)}
+            title={unsent ? "Who gets it" : "Who got it"}
           >
             <Facts rows={audienceFacts(campaign, lists, count)} />
           </SettingsSection>
@@ -595,14 +896,7 @@ const CampaignView = ({
           >
             <Facts rows={senderFacts(campaign, connection)} />
           </SettingsSection>
-          <SettingsSection
-            about={
-              draft
-                ? "The email exactly as it’s sent, in a preview that runs no scripts."
-                : "The email as it went out, in a preview that runs no scripts. Its footer shows your postal address as it is now."
-            }
-            title="Email"
-          >
+          <SettingsSection about={aboutTheEmail(campaign)} title="Email">
             <EmailPreview
               className="h-[38rem]"
               fit
@@ -621,8 +915,7 @@ const CampaignView = ({
         onExited={sending.handleExited}
         onOpenChange={sending.handleOpenChange}
         onRefused={(reason) => {
-          setRefused({ ...loaded, reason });
-          onRefusal();
+          refuse(reason);
           returnFocus.current = problemRegion.current;
           sending.setOpen(false);
         }}
@@ -632,6 +925,35 @@ const CampaignView = ({
           sending.setOpen(false);
         }}
         open={sending.open}
+        organization={organization}
+      />
+      <ScheduleCampaignDialog
+        campaign={campaign}
+        connectionName={connectionName}
+        count={counted}
+        finalFocus={returnFocus}
+        key={scheduling.key}
+        onExited={scheduling.handleExited}
+        onOpenChange={scheduling.handleOpenChange}
+        onRefused={(reason) => {
+          refuse(reason);
+          returnFocus.current = problemRegion.current;
+          scheduling.setOpen(false);
+        }}
+        onScheduled={(scheduled) => {
+          setRefused(undefined);
+
+          if (scheduled.schedule !== null) {
+            toasts.add({
+              description: scheduledWhere(scheduled.schedule),
+              title: `${campaign.status === "scheduled" ? "Moved to" : "Scheduled for"} ${scheduledDay(scheduled.schedule)}`,
+            });
+          }
+
+          returnFocus.current = statusLine.current;
+          scheduling.setOpen(false);
+        }}
+        open={scheduling.open}
         organization={organization}
       />
     </PageFrame>
@@ -657,7 +979,11 @@ export const CampaignPage = ({
   const campaign = useCampaign(organization.id, campaignId);
   const connections = useProviderConnections(organization.id);
   const lists = useLists(organization.id);
-  const draft = campaign.data?.status === "draft";
+
+  const unsent =
+    campaign.data !== undefined &&
+    campaign.data !== null &&
+    isUnsent(campaign.data);
 
   const count = useRecipientCount(
     organization.id,
@@ -665,7 +991,7 @@ export const CampaignPage = ({
       excludedListIds: campaign.data?.excludedListIds ?? [],
       listIds: campaign.data?.listIds ?? [],
     },
-    draft
+    unsent
   );
 
   const toasts = useConfirmationToast();
@@ -703,12 +1029,12 @@ export const CampaignPage = ({
     toasts,
   ]);
 
-  // WARNING: a draft's page waits for its recipient count too; drawn later, its "No one to send to yet" and Send now would change after the page appeared.
+  // WARNING: a draft's or scheduled Campaign's page waits for its recipient count too; drawn later, its "No one to send to yet" and Send now would change after the page appeared.
   const waiting =
     loadingFirstTime(campaign) ||
     loadingFirstTime(connections) ||
     loadingFirstTime(lists) ||
-    (draft && loadingFirstTime(count));
+    (unsent && loadingFirstTime(count));
 
   if (waiting) {
     return <PageAreaLoading label="Loading the campaign" />;

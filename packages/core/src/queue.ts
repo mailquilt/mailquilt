@@ -2,13 +2,17 @@ import { Context, Effect, Schema } from "effect";
 
 import { CurrentOrganization } from "./current-organization.ts";
 import { SendCampaignBatch } from "./send-campaign-batch.ts";
+import { StartScheduledCampaign } from "./start-scheduled-campaign.ts";
 
 /**
  * Work the app sends itself to do later, outside the request that asked for
  * it. Every message names the Organization it acts in. Messages are JSON on
  * the wire, so each runtime decodes them with this schema.
  */
-export const QueueMessageSchema = Schema.Union([SendCampaignBatch]);
+export const QueueMessageSchema = Schema.Union([
+  SendCampaignBatch,
+  StartScheduledCampaign,
+]);
 
 export type QueueMessage = typeof QueueMessageSchema.Type;
 

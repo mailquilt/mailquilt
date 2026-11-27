@@ -24,7 +24,7 @@ import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { TableRegion } from "../layout/table-region.tsx";
 import { useProviderConnections } from "../providers/providers-api.ts";
-import { formatSince } from "./campaign-dates.ts";
+import { formatSince, formatTime } from "./campaign-dates.ts";
 import { listSummary, namesOf } from "./campaign-lists.tsx";
 import type { CampaignSearch } from "./campaign-search.ts";
 import { CampaignSetupNeeded, isReadyToWrite } from "./campaign-setup.tsx";
@@ -69,23 +69,56 @@ const ListsCell = ({ names }: { names: readonly string[] }) => {
   );
 };
 
+// WARNING: a scheduled time is shown on the viewer's own clock, like every other date in the column, so rows can be compared; the Campaign's page also gives it in the zone it was scheduled in.
 const dateOf = (campaign: CampaignSummary) => {
+  const { schedule } = campaign;
+
+  if (campaign.status === "scheduled" && schedule !== null) {
+    const day = formatDay(schedule.at);
+    const time = formatTime(schedule.at);
+
+    return {
+      line: `goes ${day} at ${time}`,
+      short: `Goes ${day}, ${time}`,
+      tone: "text-kumo-strong",
+    };
+  }
+
+  if (campaign.status === "draft" && schedule?.missed) {
+    const day = formatDay(schedule.at);
+
+    return {
+      line: `missed its time ${day}`,
+      short: `Missed ${day}`,
+      tone: "text-kumo-danger",
+    };
+  }
+
   if (campaign.status === "sent" && campaign.sentAt !== null) {
     return {
       line: `sent ${formatDay(campaign.sentAt)}`,
       short: formatDay(campaign.sentAt),
+      tone: undefined,
     };
   }
 
   if (campaign.status === "sending" && campaign.sendingStartedAt !== null) {
     const since = formatSince(campaign.sendingStartedAt);
 
-    return { line: `started ${since}`, short: `Started ${since}` };
+    return {
+      line: `started ${since}`,
+      short: `Started ${since}`,
+      tone: undefined,
+    };
   }
 
   const created = formatDay(campaign.createdAt);
 
-  return { line: `created ${created}`, short: `Created ${created}` };
+  return {
+    line: `created ${created}`,
+    short: `Created ${created}`,
+    tone: undefined,
+  };
 };
 
 const features = tableFeatures({});
@@ -131,28 +164,38 @@ const COLUMNS = helper.columns([
     id: "sentTo",
   }),
   helper.accessor((row) => row.campaign, {
-    cell: ({ getValue }) => (
-      <span className="text-sm text-kumo-subtle tabular-nums">
-        {dateOf(getValue()).short}
-      </span>
-    ),
+    cell: ({ getValue }) => {
+      const date = dateOf(getValue());
+
+      return (
+        <span
+          className={`text-sm tabular-nums ${date.tone ?? "text-kumo-subtle"}`}
+        >
+          {date.short}
+        </span>
+      );
+    },
     header: "Date",
     id: "date",
   }),
   helper.display({
-    cell: ({ row }) => (
-      <span className="line-clamp-2 text-sm text-kumo-subtle">
-        {listSummary(row.original.listNames)},{" "}
-        {dateOf(row.original.campaign).line}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const date = dateOf(row.original.campaign);
+
+      return (
+        <span className="line-clamp-2 text-sm text-kumo-subtle">
+          {listSummary(row.original.listNames)},{" "}
+          <span className={date.tone}>{date.line}</span>
+        </span>
+      );
+    },
     header: () => <span className="sr-only">Summary</span>,
     id: "summary",
   }),
 ]);
 
 const COLUMN_CLASSES = {
-  date: "w-36 whitespace-nowrap max-md:hidden",
+  date: "w-40 whitespace-nowrap max-md:hidden",
   list: "w-64 max-w-64 whitespace-nowrap text-kumo-default max-lg:hidden",
   sentTo: "text-right whitespace-nowrap tabular-nums max-xl:hidden",
   status: "w-32 whitespace-nowrap max-sm:w-auto",

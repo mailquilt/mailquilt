@@ -3,9 +3,10 @@ import {
   Queue,
   QueueMessageSchema,
   queueRetryDelaySeconds,
+  Scheduler,
 } from "@repo/core";
 import { forwardQueueOutbox, QueueOutboxLive } from "@repo/db";
-import { Cause, Effect, Layer, Ref, Schema } from "effect";
+import { Cause, Context, Effect, Layer, Ref, Schema } from "effect";
 
 import type { QueueBinding } from "./queue-binding.ts";
 
@@ -21,18 +22,22 @@ export const forwardOutboxTo = (binding: QueueBinding) =>
   );
 
 /**
- * The Queue on Workers, for one request. Cloudflare Queues can't join a
- * Postgres transaction, so `enqueue` writes to the outbox in it (ADR 0014),
- * and once the request is done, while its database connection is still
- * open, a request that queued anything forwards the outbox. If that fails,
- * the messages wait for the next forward, which a Cron Trigger runs every
- * minute.
+ * The Queue and Scheduler on Workers, for one request. Cloudflare Queues
+ * can't join a Postgres transaction, so `enqueue` writes to the outbox in it
+ * (ADR 0014), and once the request is done, while its database connection
+ * is still open, a request that queued anything forwards the outbox. If that
+ * fails, the messages wait for the next forward, which a Cron Trigger runs
+ * every minute. `schedule` writes to the outbox too, and that Cron Trigger
+ * forwards the message once it's due (ADR 0017).
  */
 export const outboxQueueLive = (binding: QueueBinding) =>
-  Layer.effect(
-    Queue,
+  Layer.effectContext(
     Effect.gen(function* outboxQueue() {
-      const outbox = yield* Queue.pipe(Effect.provide(QueueOutboxLive));
+      const { outbox, scheduler } = yield* Effect.all({
+        outbox: Queue,
+        scheduler: Scheduler,
+      }).pipe(Effect.provide(QueueOutboxLive));
+
       const enqueued = yield* Ref.make(false);
 
       yield* Effect.addFinalizer(() =>
@@ -52,12 +57,12 @@ export const outboxQueueLive = (binding: QueueBinding) =>
         })
       );
 
-      return {
+      return Context.make(Queue, {
         enqueue: (messages) =>
           outbox
             .enqueue(messages)
             .pipe(Effect.andThen(Ref.set(enqueued, true))),
-      };
+      }).pipe(Context.add(Scheduler, scheduler));
     })
   );
 

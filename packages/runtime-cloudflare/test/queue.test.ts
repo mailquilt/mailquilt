@@ -3,6 +3,7 @@ import {
   Campaigns,
   ProviderConnections,
   PublicUrl,
+  Queue,
   SendCampaignBatch,
   SignedTokens,
   SmtpProvider,
@@ -43,6 +44,7 @@ const ports = (campaigns: Layer.Layer<Campaigns>) =>
     campaigns,
     Layer.mock(ProviderConnections, {}),
     Layer.succeed(PublicUrl, { origin: "https://mail.example.com" }),
+    Layer.mock(Queue, {}),
     Layer.mock(SignedTokens, {}),
     Layer.mock(SmtpProvider, {})
   );

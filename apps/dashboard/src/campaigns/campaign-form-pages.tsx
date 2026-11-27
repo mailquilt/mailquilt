@@ -68,7 +68,7 @@ const saveFailureMessage = (failure: Error | null, saving: string) => {
   }
 
   if (Predicate.isTagged(failure, "CampaignNotDraft")) {
-    return "This campaign has started sending, so it can’t be changed any more.";
+    return "This campaign was scheduled or has started sending, so it can’t be changed now.";
   }
 
   if (Predicate.isTagged(failure, "CampaignNotFound")) {
@@ -259,8 +259,16 @@ export const EditCampaignPage = ({
                 Go to the campaign
               </LinkButton>
             }
-            description="A campaign can be changed only while it’s a draft. Once it starts sending, it stays as it went out."
-            title="This campaign can’t be changed"
+            description={
+              draft.status === "scheduled"
+                ? "It’s scheduled. Cancel its schedule on its page to change it."
+                : "A campaign can be changed only while it’s a draft. Once it starts sending, it stays as it went out."
+            }
+            title={
+              draft.status === "scheduled"
+                ? "This campaign is scheduled"
+                : "This campaign can’t be changed"
+            }
           />
         </InPlaceOfForm>
       );
