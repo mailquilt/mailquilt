@@ -80,7 +80,8 @@ const connectionParams = {
  * one saved. An SES account without one keeps to the account's own sending
  * limit, read before each batch of a Campaign. `makeCampaignDefault` makes
  * a connection the one new Campaigns start with, in place of any other
- * (`defaultForCampaigns`); a Campaign keeps the connection it was given. `sendTestEmail` sends a short email through a
+ * (`defaultForCampaigns`); one created while there's none becomes it. A
+ * Campaign keeps the connection it was given. `sendTestEmail` sends a short email through a
  * connection, at most 10 every 10 minutes per person; when the Provider
  * refuses it, `SendFailed` (502) says why in the Provider's words.
  */

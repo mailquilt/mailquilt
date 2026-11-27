@@ -32,7 +32,7 @@ import {
 import { SecureRandom } from "effect/crypto";
 
 import { Database } from "./database.ts";
-import { providerConnections, sendSlots } from "./schema.ts";
+import { organizations, providerConnections, sendSlots } from "./schema.ts";
 
 const decodeConnection = Schema.decodeUnknownEffect(ProviderConnectionSchema);
 
@@ -195,6 +195,14 @@ export const ProviderConnectionsLive = Layer.effect(
     const cipher = yield* CredentialCipher;
     const random = yield* SecureRandom.SecureRandom;
 
+    // WARNING: every change to which connection is the Organization's default for Campaigns, a delete included, takes this lock first, so two at once can't both find none and fail on the index's one default, nor a create miss a default being deleted.
+    const lockDefaults = (organization: OrganizationId) =>
+      db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.id, organization))
+        .for("no key update");
+
     const sealedColumns = (
       organization: OrganizationId,
       id: string,
@@ -238,52 +246,58 @@ export const ProviderConnectionsLive = Layer.effect(
       }).pipe(Effect.orDie),
 
       create: (connection) =>
-        Effect.gen(function* createConnection() {
-          const organization = yield* currentOrganizationId;
+        db
+          .transaction(() =>
+            Effect.gen(function* createConnection() {
+              const organization = yield* currentOrganizationId;
 
-          const id = yield* newProviderConnectionId.pipe(
-            Effect.provideService(SecureRandom.SecureRandom, random)
-          );
+              yield* lockDefaults(organization);
 
-          const sealed = yield* sealedColumns(organization, id, connection);
+              const id = yield* newProviderConnectionId.pipe(
+                Effect.provideService(SecureRandom.SecureRandom, random)
+              );
 
-          const [created] = yield* db
-            .insert(providerConnections)
-            .values({
-              ...sealed,
-              emailsPerMinute: Option.getOrNull(connection.emailsPerMinute),
-              fromEmail: connection.from.email,
-              fromName: connection.from.name ?? null,
-              id,
-              name: connection.name,
-              organizationId: organization,
-              provider: connection.provider,
-              settings: yield* settingsOf(connection),
+              const sealed = yield* sealedColumns(organization, id, connection);
+
+              const [created] = yield* db
+                .insert(providerConnections)
+                .values({
+                  ...sealed,
+                  emailsPerMinute: Option.getOrNull(connection.emailsPerMinute),
+                  fromEmail: connection.from.email,
+                  fromName: connection.from.name ?? null,
+                  id,
+                  name: connection.name,
+                  organizationId: organization,
+                  defaultForCampaigns: sql`not exists (
+                select 1 from ${providerConnections}
+                where ${providerConnections.organizationId} = ${organization}
+                  and ${providerConnections.defaultForCampaigns}
+              )`,
+                  provider: connection.provider,
+                  settings: yield* settingsOf(connection),
+                })
+                .returning(connectionColumns);
+
+              if (created === undefined) {
+                return yield* Effect.die(
+                  new Error("Inserting a Provider Connection returned no row")
+                );
+              }
+
+              return yield* decodeConnection(toConnection(created));
             })
-            .returning(connectionColumns);
+          )
+          .pipe(Effect.orDie),
 
-          if (created === undefined) {
-            return yield* Effect.die(
-              new Error("Inserting a Provider Connection returned no row")
-            );
-          }
-
-          return yield* decodeConnection(toConnection(created));
-        }).pipe(Effect.orDie),
-
-      // WARNING: the partial unique index allows one default per Organization at every moment, so the Organization's connections are locked first, then the old default is cleared before the new one is set; without the lock, two at once could each miss the other's new default and fail on the index.
+      // WARNING: the partial unique index allows one default per Organization at every moment, so the old default is cleared before the new one is set, with the Organization's defaults locked.
       makeCampaignDefault: (id) =>
         db
           .transaction(() =>
             Effect.gen(function* makeCampaignDefault() {
               const organization = yield* currentOrganizationId;
 
-              yield* db
-                .select({ id: providerConnections.id })
-                .from(providerConnections)
-                .where(eq(providerConnections.organizationId, organization))
-                .for("update")
-                .pipe(Effect.orDie);
+              yield* lockDefaults(organization).pipe(Effect.orDie);
 
               yield* db
                 .update(providerConnections)
@@ -315,19 +329,25 @@ export const ProviderConnectionsLive = Layer.effect(
           .pipe(Effect.catchTag("SqlError", Effect.die)),
 
       remove: (id) =>
-        Effect.gen(function* removeConnection() {
-          const organization = yield* currentOrganizationId;
+        db
+          .transaction(() =>
+            Effect.gen(function* removeConnection() {
+              const organization = yield* currentOrganizationId;
 
-          const removed = yield* db
-            .delete(providerConnections)
-            .where(inOrganization(organization, id))
-            .returning({ id: providerConnections.id })
-            .pipe(Effect.orDie);
+              yield* lockDefaults(organization).pipe(Effect.orDie);
 
-          if (removed.length === 0) {
-            return yield* new ProviderConnectionNotFound();
-          }
-        }),
+              const removed = yield* db
+                .delete(providerConnections)
+                .where(inOrganization(organization, id))
+                .returning({ id: providerConnections.id })
+                .pipe(Effect.orDie);
+
+              if (removed.length === 0) {
+                return yield* new ProviderConnectionNotFound();
+              }
+            })
+          )
+          .pipe(Effect.catchTag("SqlError", Effect.die)),
 
       // WARNING: a concurrent take of the same slot waits for this one's row lock and then moves on from the slot this one left, so no two emails share a slot. `for key share` makes a delete committing meanwhile leave nothing to insert, rather than fail the foreign key.
       takeSendSlot: (id, interval, now) =>

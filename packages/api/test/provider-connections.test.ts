@@ -710,7 +710,6 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
           })
           .pipe(Effect.flip);
 
-        assert.isFalse(smtp.defaultForCampaigns);
         assert.isTrue(madeDefault.defaultForCampaigns);
         assert.deepStrictEqual(
           listed.map((connection) => [
@@ -723,6 +722,37 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
           ]
         );
         assert.strictEqual(missing._tag, "ProviderConnectionNotFound");
+      })
+  );
+
+  test.effect(
+    "makes a connection the default for Campaigns when the Organization has none, and only then",
+    () =>
+      Effect.gen(function* firstIsDefault() {
+        const { client, params } = yield* owner;
+
+        const first = yield* client.providerConnections.create({
+          params,
+          payload: WITHOUT_CREDENTIALS,
+        });
+
+        const second = yield* client.providerConnections.create({
+          params,
+          payload: SES,
+        });
+
+        yield* client.providerConnections.delete({
+          params: { ...params, providerConnectionId: first.id },
+        });
+
+        const afterDefaultDeleted = yield* client.providerConnections.create({
+          params,
+          payload: { ...WITHOUT_CREDENTIALS, name: "Relay" },
+        });
+
+        assert.isTrue(first.defaultForCampaigns);
+        assert.isFalse(second.defaultForCampaigns);
+        assert.isTrue(afterDefaultDeleted.defaultForCampaigns);
       })
   );
 
