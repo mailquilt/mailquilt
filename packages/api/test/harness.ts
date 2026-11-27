@@ -14,6 +14,7 @@ import type {
   Queue,
   QueueMessage,
   Scheduler,
+  SesNotifications,
   SesProvider,
   SmtpProvider,
   SystemMailer,
@@ -34,6 +35,7 @@ import {
 import { DatabaseLive, DatabasePortsLive } from "@repo/db";
 import { migrateDatabase } from "@repo/db/migrate";
 import type { SignUpPolicy } from "@repo/domain";
+import { makeSnsSigner, sesNotificationsFor } from "@repo/providers/testing";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Context, Effect, Layer, Option, pipe, Redacted } from "effect";
 import { FetchHttpClient, HttpRouter, HttpServer } from "effect/http";
@@ -81,6 +83,7 @@ type Fakes =
   | SmtpOutbox
   | SesProvider
   | SesOutbox
+  | SesNotifications
   | Queue
   | QueueInbox
   | Scheduler;
@@ -261,6 +264,10 @@ export class ApiClient extends Context.Service<
   HttpApiClient.ForApi<typeof MailquiltApi>
 >()("test/ApiClient") {}
 
+/** Signs SNS messages as SNS would, with the certificate the app's SES notifications adapter fetches. */
+export const SnsSigner =
+  Context.Service<ReturnType<typeof makeSnsSigner>>("test/SnsSigner");
+
 /** Plain `fetch` to the app in process, for routes outside `contract`. */
 export const AppFetch =
   Context.Service<typeof globalThis.fetch>("test/AppFetch");
@@ -268,7 +275,9 @@ export const AppFetch =
 /**
  * The whole API assembled as the entry apps assemble it, with a migrated,
  * real Postgres from Testcontainers, the System Mailer outbox (or the real
- * System Mailer) and the recording SMTP and SES Providers. Unless `install` is
+ * System Mailer), the recording SMTP and SES Providers, and the SES
+ * notifications adapter reaching a fake SNS whose messages `SnsSigner`
+ * signs. Unless `install` is
  * `"fresh"`, first-run setup has made `INSTANCE_ADMIN`, whose session cookie
  * is `InstanceAdminCookie`. Its `SqlClient` reaches that Postgres directly,
  * to set up states no endpoint can make yet; tests still check results
@@ -286,11 +295,14 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
         Effect.provide(PgClient.layer({ url: Redacted.make(databaseUrl) }))
       );
 
+      const snsSigner = makeSnsSigner();
+
       const fakes = yield* Layer.build(
         Layer.mergeAll(
           SystemMailerOutboxLive,
           RecordingSmtpProviderLive,
           RecordingSesProviderLive,
+          sesNotificationsFor(snsSigner),
           InProcessQueueLive
         )
       );
@@ -331,6 +343,7 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
 
       const context = Context.make(ApiClient, client).pipe(
         Context.add(AppFetch, fetchInProcess),
+        Context.add(SnsSigner, snsSigner),
         Context.add(
           QueueWorker,
           queueWorker(Context.merge(databasePorts, fakes))

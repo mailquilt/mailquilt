@@ -7,6 +7,7 @@ import {
   Sender,
   SesAccount,
   SesCredentials,
+  SesNotificationsUrl,
   SmtpCredentials,
   SmtpServer,
   TestEmailSent,
@@ -81,7 +82,10 @@ const connectionParams = {
  * limit, read before each batch of a Campaign. `makeCampaignDefault` makes
  * a connection the one new Campaigns start with, in place of any other
  * (`defaultForCampaigns`); one created while there's none becomes it. A
- * Campaign keeps the connection it was given. `sendTestEmail` sends a short email through a
+ * Campaign keeps the connection it was given. `sesNotificationsUrl` is the
+ * URL an SES connection's SNS topic posts bounces and complaints to, whose
+ * signed token is its only credential (ADR 0019); an SMTP connection has
+ * none, and is answered `ProviderConnectionNotFound`. `sendTestEmail` sends a short email through a
  * connection, at most 10 every 10 minutes per person; when the Provider
  * refuses it, `SendFailed` (502) says why in the Provider's words.
  */
@@ -155,6 +159,21 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
         ],
         params: connectionParams,
         success: ProviderConnectionSchema,
+      }
+    )
+  )
+  .add(
+    HttpApiEndpoint.get(
+      "sesNotificationsUrl",
+      "/organizations/:organizationId/provider-connections/:providerConnectionId/ses-notifications-url",
+      {
+        error: [
+          SignInRequiredError,
+          OrganizationNotFoundError,
+          ProviderConnectionNotFoundError,
+        ],
+        params: connectionParams,
+        success: SesNotificationsUrl,
       }
     )
   )

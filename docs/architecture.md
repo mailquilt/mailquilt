@@ -14,7 +14,7 @@ This is the design P1 builds toward. Where a part isn't built yet, it says **pla
 | Queue | Cloudflare Queues, fed from an outbox table ([ADR 0014](adr/0014-queued-work-acts-in-the-organization-its-message-names.md)) | pg-boss on Postgres |
 | Scheduler | Outbox rows forwarded by the every-minute Cron Trigger once due ([ADR 0017](adr/0017-a-scheduled-campaign-starts-from-a-delayed-queue-message.md)) | pg-boss jobs with `startAfter` |
 | Rate limiting | Postgres counters | Postgres counters; a Redis adapter only if several replicas or measured load need it |
-| Inbound bounces (planned, #19, #21) | Email Workers handler | Provider webhooks; bounce-mailbox polling (P2) |
+| Inbound bounces | SES through SNS webhooks (#19); Email Workers handler (planned, #21) | SES through SNS webhooks (#19); bounce-mailbox polling (P2) |
 | Migrations | Run in the deploy step | Run on boot behind a Postgres advisory lock |
 
 Each entry app serves the JSON API, the public pages, and the dashboard's static files. The compose file holds only the app and Postgres.
@@ -28,7 +28,7 @@ Each entry app serves the JSON API, the public pages, and the dashboard's static
 | `core` | Use cases, written only against ports (Effect services) | `domain`, and `html-to-text` for a Campaign's plain-text part |
 | `api` | `HttpApi` handlers: each endpoint calls a `core` use case. Better Auth behind our allow list ([ADR 0005](adr/0005-better-auth-runs-per-request-on-the-sql-client.md)). One `ApiLive` Layer that every entry app serves | `domain`, `contract`, `core` |
 | `db` | Drizzle Postgres schema, migrations, repository implementations | `domain`, ports in `core` |
-| `providers` | One adapter per Provider, implementing its Provider port from `core`: SMTP through Nodemailer, SES through `aws4fetch` and `fetch`. Use cases reach them through `sendThrough` ([ADR 0015](adr/0015-use-cases-send-through-a-provider-connection-with-one-function.md)). Parsing Provider webhooks is planned (#19, #21) | `domain`, ports in `core` |
+| `providers` | One adapter per Provider, implementing its Provider port from `core`: SMTP through Nodemailer, SES through `aws4fetch` and `fetch`. Use cases reach them through `sendThrough` ([ADR 0015](adr/0015-use-cases-send-through-a-provider-connection-with-one-function.md)). SES's bounces and complaints are read from SNS, with SNS's signature checked ([ADR 0019](adr/0019-a-provider-webhook-url-carries-a-signed-token-naming-its-connection.md)) | `domain`, ports in `core` |
 | `runtime-cloudflare` | Layers for each port on Cloudflare | `domain`, ports in `core`, `db`, `providers` |
 | `runtime-node` | Layers for each port on Node | ports in `core`, `db`, `providers` |
 
@@ -47,7 +47,7 @@ Apps only assemble Layers. On Workers, the runtime is built once per isolate, no
 
 ## Sending pipeline (outline)
 
-Today a Campaign is sent now, or at a time a member schedules in a time zone they choose, once each, to the Contacts subscribed to any of its Lists, except anyone on a List it leaves out, with an Opt-out or with a Suppressed address, in batches through its Provider Connection. Members see how many it reaches before sending. Members add and remove Suppressions by hand; bounces and complaints will add them (#19, #21). Members can pause, resume and cancel it while it sends. Each email through a Provider Connection with a sending rate waits for that connection's next send slot (ADR 0018). Segments and Provider events (#19, #21) are planned.
+Today a Campaign is sent now, or at a time a member schedules in a time zone they choose, once each, to the Contacts subscribed to any of its Lists, except anyone on a List it leaves out, with an Opt-out or with a Suppressed address, in batches through its Provider Connection. Members see how many it reaches before sending. Members add and remove Suppressions by hand; SES's bounces and complaints add them through SNS (#19), and bounces to a bounce address will (#21). Members can pause, resume and cancel it while it sends. Each email through a Provider Connection with a sending rate waits for that connection's next send slot (ADR 0018). Segments and bounce addresses (#21) are planned.
 
 1. **Start:** a Campaign starts now, or once the message the Scheduler holds for it has come due and been taken: from its time, the message waits for the worker on Node to finish any batch it is sending, and on Workers for the next forward of the outbox (the Cron Trigger every minute, or sooner at the end of any request that queued a message) and any batches already in the queue. One that can't start then, because its connection was deleted or no one would get it, becomes a draft again, saying why. A start that fails for another reason, such as Postgres being unreachable, through every retry leaves it scheduled at a time that has passed until a member cancels or moves it (ADR 0017).
 2. **Resolve recipients in one set-based query:**
@@ -56,7 +56,7 @@ Today a Campaign is sent now, or at a time a member schedules in a time zone the
    - Remove duplicates.
 3. **Snapshot** the recipients for the Campaign.
 4. **Enqueue** batches. Consumers keep to each Provider Connection's sending rate by taking its next send slot in Postgres before each email (ADR 0018), claim each recipient, call the Provider adapter, and record the outcome right away, so no one is sent it twice (ADR 0014). An email the Provider puts off goes back in the queue for the batch's next delivery, up to the queue's last: through SMTP, a 4xx reply or a connection that never opened; through SES, a 429, a 503, a throttling error or a request that never connected. An SES 403 or a signing error is a refusal of the credentials, recorded failed, not put off. A batch holds 100 recipients, or 40 through SES, so its requests fit a Workers Free invocation.
-5. **Update state:** Provider webhooks or inbound bounces update delivery events, Suppressions and Campaign totals.
+5. **Update state:** SES's bounces and complaints, through SNS, record delivery events and Suppress addresses (ADR 0019). Bounce addresses (#21) and Campaign totals (#22) are planned.
 6. **Pause, resume and cancel** act on the snapshot. A batch stops before its next email once its Campaign isn't sending; resume queues again every batch with anyone left, and cancel leaves them unsent.
 
 **Transactional Messages** skip step 2's Subscription and Opt-out checks. They still respect bounce and complaint Suppressions.

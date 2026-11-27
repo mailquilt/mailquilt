@@ -12,7 +12,7 @@ export interface SesSettings {
 
 /**
  * Port: sends through Amazon SES, and reads the account's sending limit.
- * Bounces and complaints come back through SNS (#19).
+ * Its bounces and complaints come back through SNS (`SesNotifications`).
  */
 export class SesProvider extends Context.Service<
   SesProvider,

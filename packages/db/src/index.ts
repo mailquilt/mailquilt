@@ -5,6 +5,7 @@ import { CampaignsLive } from "./campaigns.ts";
 import { ContactsLive } from "./contacts.ts";
 import { DatabaseHealthLive, DatabaseLive } from "./database.ts";
 import { DeliveryEventPartitionsLive } from "./delivery-event-partitions.ts";
+import { DeliveryFeedbackLive } from "./delivery-feedback.ts";
 import { InstanceLive } from "./instance.ts";
 import { ListsLive } from "./lists.ts";
 import { OrganizationsLive } from "./organizations.ts";
@@ -21,6 +22,8 @@ export { ContactsLive } from "./contacts.ts";
 export { Database, DatabaseHealthLive, DatabaseLive } from "./database.ts";
 
 export { DeliveryEventPartitionsLive } from "./delivery-event-partitions.ts";
+
+export { DeliveryFeedbackLive } from "./delivery-feedback.ts";
 
 export { InstanceLive } from "./instance.ts";
 
@@ -51,6 +54,7 @@ export const DatabasePortsLive = Layer.mergeAll(
   ContactsLive,
   DatabaseHealthLive,
   DeliveryEventPartitionsLive,
+  DeliveryFeedbackLive,
   InstanceLive,
   ListsLive,
   OrganizationsLive,

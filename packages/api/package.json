@@ -25,6 +25,7 @@
     "@effect/sql-pg": "catalog:",
     "@effect/vitest": "catalog:",
     "@repo/db": "workspace:*",
+    "@repo/providers": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@testcontainers/postgresql": "catalog:",
     "@types/node": "catalog:",

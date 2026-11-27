@@ -11,3 +11,5 @@ export { providePerRequest } from "./request.ts";
 export { SesProviderLive } from "./ses.ts";
 
 export { SmtpProviderLive, SmtpProviderUnavailable } from "./smtp.ts";
+
+export { SesNotificationsLive } from "./sns.ts";
