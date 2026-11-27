@@ -18,6 +18,7 @@ import {
   Scheduler,
   SEND_BATCH_SIZE,
 } from "@repo/core";
+import { MIN_EMAILS_PER_MINUTE } from "@repo/domain";
 import { SEND_TIMEOUT_SECONDS } from "@repo/providers/smtp";
 import {
   Cause,
@@ -39,9 +40,14 @@ const MAINTENANCE_QUEUE = "maintenance";
 
 const MARGIN_SECONDS = 300;
 
-// WARNING: pg-boss retries a job it thinks expired while the first attempt may still be sending, so a batch's deadline covers every email in it taking its longest.
+const MINUTE_SECONDS = 60;
+
+const LONGEST_SLOT_WAIT_SECONDS = MINUTE_SECONDS / MIN_EMAILS_PER_MINUTE;
+
+// WARNING: pg-boss retries a job it thinks expired while the first attempt may still be sending, so a batch's deadline covers every email in it waiting for its slot at the slowest sending rate and then taking its longest.
 const BATCH_EXPIRES_IN_SECONDS =
-  SEND_BATCH_SIZE * SEND_TIMEOUT_SECONDS + MARGIN_SECONDS;
+  SEND_BATCH_SIZE * (LONGEST_SLOT_WAIT_SECONDS + SEND_TIMEOUT_SECONDS) +
+  MARGIN_SECONDS;
 
 // WARNING: without a heartbeat, a batch whose worker was killed mid-send waits out its expiry, over an hour and a half, before another worker retries it (ADR 0014).
 const HEARTBEAT_SECONDS = 30;

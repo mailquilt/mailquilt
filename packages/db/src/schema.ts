@@ -316,6 +316,7 @@ export const suppressions = pgTable(
  * never a secret. `credentials` is sealed with AES-256-GCM under the key
  * numbered `credentials_key_version`, bound to this row's Organization and
  * ID (ADR 0009); both are null for a server that needs no sign-in.
+ * `emails_per_minute` is its sending rate, null when it has none.
  */
 export const providerConnections = pgTable(
   "provider_connections",
@@ -331,6 +332,7 @@ export const providerConnections = pgTable(
     settings: jsonb("settings").notNull(),
     credentials: text("credentials"),
     credentialsKeyVersion: integer("credentials_key_version"),
+    emailsPerMinute: integer("emails_per_minute"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -347,6 +349,39 @@ export const providerConnections = pgTable(
       "provider_connections_credentials_check",
       sql`(${table.credentials} is null) = (${table.credentialsKeyVersion} is null)`
     ),
+    check(
+      "provider_connections_emails_per_minute_check",
+      sql`${table.emailsPerMinute} between 10 and 60000`
+    ),
+  ]
+);
+
+/**
+ * When a Provider Connection may next start sending an email, so emails
+ * through it keep to its sending rate however many batches send at once
+ * (ADR 0018). Each email takes the slot and moves it on by one interval in
+ * one statement.
+ */
+export const sendSlots = pgTable(
+  "send_slots",
+  {
+    organizationId: text("organization_id").notNull(),
+    providerConnectionId: text("provider_connection_id").notNull(),
+    nextAt: timestamp("next_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.organizationId, table.providerConnectionId],
+      name: "send_slots_pkey",
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.providerConnectionId],
+      foreignColumns: [
+        providerConnections.organizationId,
+        providerConnections.id,
+      ],
+      name: "send_slots_provider_connection_fkey",
+    }).onDelete("cascade"),
   ]
 );
 

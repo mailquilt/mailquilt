@@ -1,14 +1,15 @@
 import type { SendFailed } from "@repo/domain";
-import { Context, Effect, Layer, Option, Ref } from "effect";
+import { Context, DateTime, Effect, Layer, Option, Ref } from "effect";
 
 import { SmtpProvider } from "./provider.ts";
 import type { OutgoingEmail, SmtpSettings } from "./provider.ts";
 import type { SendDeferred } from "./send-deferred.ts";
 
-/** One email the recording SMTP Provider was asked to send, with the settings it was given. */
+/** One email the recording SMTP Provider was asked to send, with the settings it was given, and when by the `Clock`. */
 export interface RecordedSend {
   readonly settings: SmtpSettings;
   readonly email: OutgoingEmail;
+  readonly at: DateTime.Utc;
 }
 
 /**
@@ -53,9 +54,11 @@ export const RecordingSmtpProviderLive = Layer.effectContext(
             return yield* failure.value;
           }
 
+          const at = yield* DateTime.now;
+
           const all = yield* Ref.updateAndGet(sent, (sends) => [
             ...sends,
-            { email, settings },
+            { at, email, settings },
           ]);
 
           const after = yield* Ref.getAndSet(afterNext, Option.none());

@@ -655,6 +655,9 @@ importers:
       '@repo/db':
         specifier: workspace:*
         version: link:../db
+      '@repo/domain':
+        specifier: workspace:*
+        version: link:../domain
       '@repo/providers':
         specifier: workspace:*
         version: link:../providers
@@ -668,9 +671,6 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.4(effect@4.1.4)(vitest@5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(happy-dom@21.0.4)(msw@3.0.5(@types/node@24.19.2)(graphql@17.1.0)(supports-color@10.2.2)(typescript@7.0.2)(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
-      '@repo/domain':
-        specifier: workspace:*
-        version: link:../domain
       '@repo/typescript-config':
         specifier: workspace:*
         version: link:../typescript-config

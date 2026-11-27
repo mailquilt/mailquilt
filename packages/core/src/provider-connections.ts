@@ -14,7 +14,7 @@ import {
   TestEmailSent,
 } from "@repo/domain";
 import { Context, Duration, Effect } from "effect";
-import type { Option } from "effect";
+import type { DateTime, Option } from "effect";
 
 import type { CurrentOrganization } from "./current-organization.ts";
 import { CurrentUser } from "./current-user.ts";
@@ -28,18 +28,22 @@ export interface NewProviderConnection {
   readonly from: typeof Sender.Type;
   readonly smtp: typeof SmtpServer.Type;
   readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
+  /** Its sending rate, if it has one. */
+  readonly emailsPerMinute: Option.Option<number>;
 }
 
 /**
  * New settings for a Provider Connection. `credentials` is `"keep"` to keep
  * the saved ones, or the new ones, `None` for a server that needs no
- * sign-in.
+ * sign-in. `emailsPerMinute` is `"keep"` to keep the saved sending rate, or
+ * the new one, `None` for none.
  */
 export interface ProviderConnectionChanges {
   readonly name: string;
   readonly from: typeof Sender.Type;
   readonly smtp: typeof SmtpServer.Type;
   readonly credentials: "keep" | Option.Option<typeof SmtpCredentials.Type>;
+  readonly emailsPerMinute: "keep" | Option.Option<number>;
 }
 
 /**
@@ -83,6 +87,18 @@ export class ProviderConnections extends Context.Service<
       ProviderConnectionNotFound,
       CurrentOrganization
     >;
+    /**
+     * Takes the connection's next free send slot, no earlier than `now`, and
+     * moves it on by `interval`, in one statement, so emails through it are
+     * at least `interval` apart however many batches send at once (ADR
+     * 0018). Says when the slot starts, or `None` once the connection is
+     * deleted.
+     */
+    readonly takeSendSlot: (
+      id: ProviderConnectionId,
+      interval: Duration.Duration,
+      now: DateTime.Utc
+    ) => Effect.Effect<Option.Option<DateTime.Utc>, never, CurrentOrganization>;
   }
 >()("@repo/core/ProviderConnections") {}
 

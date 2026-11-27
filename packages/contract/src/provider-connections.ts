@@ -1,4 +1,5 @@
 import {
+  EmailsPerMinute,
   MailAddress,
   ProviderConnection,
   ProviderConnectionIdSchema,
@@ -32,7 +33,13 @@ const connectionParams = {
  * credentials when it leaves them out, and removes them when they are
  * `null`; a change of host, port or encryption needs them entered again
  * (`CredentialsRequired`), so saved credentials only ever go to the server
- * they were entered for. `sendTestEmail` sends a short email through a
+ * they were entered for. `emailsPerMinute` is the rate a connection sends
+ * at, across every Campaign sending through it: each email's send slot
+ * starts one interval after the last one's, and emails leave just after
+ * their slots, so a few can leave closer together, most after a stall
+ * (ADR 0018); `create`
+ * without it, or with `null`, sets none, and `update` without it keeps the
+ * one saved. `sendTestEmail` sends a short email through a
  * connection, at most 10 every 10 minutes per person; when the Provider
  * refuses it, `SendFailed` (502) says why in the Provider's words.
  */
@@ -62,6 +69,7 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
           from: Sender,
           smtp: SmtpServer,
           credentials: Schema.optionalKey(SmtpCredentials),
+          emailsPerMinute: Schema.optionalKey(Schema.NullOr(EmailsPerMinute)),
         }),
         success: ProviderConnection.pipe(HttpApiSchema.status(201)),
       }
@@ -84,6 +92,7 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
           from: Sender,
           smtp: SmtpServer,
           credentials: Schema.optionalKey(Schema.NullOr(SmtpCredentials)),
+          emailsPerMinute: Schema.optionalKey(Schema.NullOr(EmailsPerMinute)),
         }),
         success: ProviderConnection,
       }

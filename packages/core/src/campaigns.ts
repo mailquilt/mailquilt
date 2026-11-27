@@ -497,6 +497,8 @@ const NO_CONNECTION = new SendFailed({
   reason: "failed",
 });
 
+const MINUTE_MS = 60_000;
+
 // WARNING: a claim older than this is taken to be a delivery that stopped, and its recipient is recorded as failed, so it must outlast any one email's send (60 seconds over SMTP) and the write after it; one that expires too soon only mislabels a recipient, never sends twice.
 const CLAIM_EXPIRES_AFTER = Duration.minutes(2);
 
@@ -555,6 +557,34 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         : yield* connections
             .withCredentials(batch.providerConnectionId)
             .pipe(Effect.option);
+
+    const interval = connection.pipe(
+      Option.flatMap((opened) =>
+        Option.fromNullishOr(opened.connection.emailsPerMinute)
+      ),
+      Option.map((perMinute) => Duration.millis(MINUTE_MS / perMinute))
+    );
+
+    // WARNING: the slot is taken before the recipient is claimed, so however long the wait, the claim is never old enough for another delivery to take it as cut off.
+    const waitForSendSlot = Effect.gen(function* waitForSendSlot() {
+      if (Option.isNone(interval) || batch.providerConnectionId === null) {
+        return;
+      }
+
+      const now = yield* DateTime.now;
+
+      const slot = yield* connections.takeSendSlot(
+        batch.providerConnectionId,
+        interval.value,
+        now
+      );
+
+      const reserved = yield* DateTime.now;
+
+      if (Option.isSome(slot) && DateTime.isGreaterThan(slot.value, reserved)) {
+        yield* Effect.sleep(DateTime.distance(reserved, slot.value));
+      }
+    });
 
     const sendTo = (recipient: QueuedRecipient) =>
       Effect.gen(function* sendToRecipient() {
@@ -654,6 +684,10 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
       Effect.gen(function* sendOnceTo() {
         if ((yield* Ref.get(serverPutOff)) || (yield* Ref.get(stopped))) {
           return;
+        }
+
+        if (Option.isNone(yield* Ref.get(serverFailure))) {
+          yield* waitForSendSlot;
         }
 
         const claim = yield* campaigns.claim(
