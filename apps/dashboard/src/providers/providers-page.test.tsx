@@ -31,6 +31,7 @@ const POSTMARK = {
   name: "Postmark",
   provider: "smtp",
   signsIn: true,
+  emailsPerMinute: null,
   smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },
 };
 

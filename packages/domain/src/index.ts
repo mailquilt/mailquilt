@@ -139,8 +139,11 @@ export type { Role } from "./organization.ts";
 export { ProviderConnectionNotFound } from "./provider-connection-not-found.ts";
 
 export {
+  EmailsPerMinute,
   MailAddress,
   MAX_CREDENTIAL_LENGTH,
+  MAX_EMAILS_PER_MINUTE,
+  MIN_EMAILS_PER_MINUTE,
   ProviderConnection,
   ProviderConnectionName,
   Sender,

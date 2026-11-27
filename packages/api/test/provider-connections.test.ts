@@ -388,6 +388,67 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
       })
   );
 
+  test.effect(
+    "sets a sending rate, keeps it when an edit leaves it out, and clears it with null",
+    () =>
+      Effect.gen(function* sendingRate() {
+        const { client, params } = yield* owner;
+
+        const unset = yield* client.providerConnections.create({
+          params,
+          payload: WITHOUT_CREDENTIALS,
+        });
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: { ...WITHOUT_CREDENTIALS, emailsPerMinute: 30 },
+        });
+
+        const connectionParams = {
+          ...params,
+          providerConnectionId: created.id,
+        };
+
+        const kept = yield* client.providerConnections.update({
+          params: connectionParams,
+          payload: { ...WITHOUT_CREDENTIALS, name: "Postmark (slow)" },
+        });
+
+        const cleared = yield* client.providerConnections.update({
+          params: connectionParams,
+          payload: { ...WITHOUT_CREDENTIALS, emailsPerMinute: null },
+        });
+
+        assert.isNull(unset.emailsPerMinute);
+        assert.strictEqual(created.emailsPerMinute, 30);
+        assert.strictEqual(kept.emailsPerMinute, 30);
+        assert.isNull(cleared.emailsPerMinute);
+      })
+  );
+
+  test.effect(
+    "refuses a sending rate that isn't a whole number from 10 to 60,000 a minute",
+    () =>
+      Effect.gen(function* sendingRateLimits() {
+        const { cookie, params } = yield* owner;
+
+        const statuses = yield* Effect.forEach(
+          [9, 60_001, 12.5, 10, 60_000],
+          (emailsPerMinute) =>
+            send(
+              "POST",
+              `/api/organizations/${params.organizationId}/provider-connections`,
+              {
+                body: { ...WITHOUT_CREDENTIALS, emailsPerMinute },
+                headers: { cookie },
+              }
+            ).pipe(Effect.map((response) => response.status))
+        );
+
+        assert.deepStrictEqual(statuses, [400, 400, 400, 201, 201]);
+      })
+  );
+
   test.effect("deletes a connection", () =>
     Effect.gen(function* deleteConnection() {
       const { client, params } = yield* owner;

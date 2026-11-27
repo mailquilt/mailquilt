@@ -27,6 +27,7 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
       .handle("create", ({ params, payload }) =>
         createProviderConnection({
           credentials: Option.fromUndefinedOr(payload.credentials),
+          emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
           from: payload.from,
           name: payload.name,
           smtp: payload.smtp,
@@ -38,6 +39,10 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
             payload.credentials === undefined
               ? "keep"
               : Option.fromNullishOr(payload.credentials),
+          emailsPerMinute:
+            payload.emailsPerMinute === undefined
+              ? "keep"
+              : Option.fromNullishOr(payload.emailsPerMinute),
           from: payload.from,
           name: payload.name,
           smtp: payload.smtp,

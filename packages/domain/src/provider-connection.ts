@@ -12,6 +12,25 @@ const MAX_HOST_LENGTH = 253;
 
 const MAX_PORT = 65_535;
 
+/** The slowest sending rate a Provider Connection can have, in emails a minute: a batch of 100 then takes 10 minutes, within a Workers consumer's 15. */
+export const MIN_EMAILS_PER_MINUTE = 10;
+
+/** The fastest sending rate a Provider Connection can have, in emails a minute: 1,000 a second. */
+export const MAX_EMAILS_PER_MINUTE = 60_000;
+
+/**
+ * How many emails a minute a Provider Connection sends at most, across
+ * every Campaign sending through it.
+ */
+export const EmailsPerMinute = Schema.Int.check(
+  Schema.isBetween(
+    { maximum: MAX_EMAILS_PER_MINUTE, minimum: MIN_EMAILS_PER_MINUTE },
+    {
+      message: `Enter a whole number of emails from ${MIN_EMAILS_PER_MINUTE} to ${MAX_EMAILS_PER_MINUTE.toLocaleString("en")} a minute.`,
+    }
+  )
+);
+
 /** The longest SMTP username or password accepted. */
 export const MAX_CREDENTIAL_LENGTH = 1000;
 
@@ -110,6 +129,7 @@ export const SmtpCredentials = Schema.Struct({
 /**
  * One Organization's configured SMTP server, as the API shows it: without
  * its credentials, only whether it has saved ones (`signsIn`).
+ * `emailsPerMinute` is its sending rate, `null` when it has none.
  */
 export class ProviderConnection extends Schema.Class<ProviderConnection>(
   "ProviderConnection"
@@ -120,5 +140,6 @@ export class ProviderConnection extends Schema.Class<ProviderConnection>(
   from: Sender,
   smtp: SmtpServer,
   signsIn: Schema.Boolean,
+  emailsPerMinute: Schema.NullOr(EmailsPerMinute),
   createdAt: Schema.DateTimeUtc,
 }) {}

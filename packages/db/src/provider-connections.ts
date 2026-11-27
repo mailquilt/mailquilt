@@ -13,11 +13,19 @@ import {
   SmtpServer,
 } from "@repo/domain";
 import { and, asc, eq, isNull, or, sql } from "drizzle-orm";
-import { DateTime, Effect, Layer, Option, Redacted, Schema } from "effect";
+import {
+  DateTime,
+  Duration,
+  Effect,
+  Layer,
+  Option,
+  Redacted,
+  Schema,
+} from "effect";
 import { SecureRandom } from "effect/crypto";
 
 import { Database } from "./database.ts";
-import { providerConnections } from "./schema.ts";
+import { providerConnections, sendSlots } from "./schema.ts";
 
 const decodeConnection = Schema.decodeUnknownEffect(ProviderConnection);
 
@@ -59,11 +67,13 @@ interface ConnectionRow {
   readonly fromEmail: string;
   readonly settings: unknown;
   readonly signsIn: boolean;
+  readonly emailsPerMinute: number | null;
   readonly createdAt: Date;
 }
 
 const connectionColumns = {
   createdAt: providerConnections.createdAt,
+  emailsPerMinute: providerConnections.emailsPerMinute,
   fromEmail: providerConnections.fromEmail,
   fromName: providerConnections.fromName,
   id: providerConnections.id,
@@ -75,6 +85,7 @@ const connectionColumns = {
 
 const toConnection = (row: ConnectionRow) => ({
   createdAt: DateTime.fromDateUnsafe(row.createdAt),
+  emailsPerMinute: row.emailsPerMinute,
   from:
     row.fromName === null
       ? { email: row.fromEmail }
@@ -154,6 +165,7 @@ export const ProviderConnectionsLive = Layer.effect(
             .insert(providerConnections)
             .values({
               ...sealed,
+              emailsPerMinute: Option.getOrNull(connection.emailsPerMinute),
               fromEmail: connection.from.email,
               fromName: connection.from.name ?? null,
               id,
@@ -188,6 +200,29 @@ export const ProviderConnectionsLive = Layer.effect(
           }
         }),
 
+      // WARNING: a concurrent take of the same slot waits for this one's row lock and then moves on from the slot this one left, so no two emails share a slot. `for key share` makes a delete committing meanwhile leave nothing to insert, rather than fail the foreign key.
+      takeSendSlot: (id, interval, now) =>
+        Effect.gen(function* takeSendSlot() {
+          const organization = yield* currentOrganizationId;
+          const step = sql`${Duration.toMillis(interval)}::float8 * interval '1 millisecond'`;
+          const from = sql`${DateTime.formatIso(now)}::timestamptz`;
+
+          const { rows } = yield* db.execute<{ readonly startsAt: number }>(sql`
+            insert into ${sendSlots} (organization_id, provider_connection_id, next_at)
+            select organization_id, id, ${from} + ${step}
+            from ${providerConnections}
+            where organization_id = ${organization} and id = ${id}
+            for key share
+            on conflict (organization_id, provider_connection_id) do update
+            set next_at = greatest(${sendSlots.nextAt}, ${from}) + ${step}
+            returning (extract(epoch from next_at - ${step}) * 1000)::float8 as "startsAt"
+          `);
+
+          return Option.map(Option.fromUndefinedOr(rows[0]), (row) =>
+            DateTime.makeUnsafe(row.startsAt)
+          );
+        }).pipe(Effect.orDie),
+
       update: (id, changes) =>
         Effect.gen(function* updateConnection() {
           const organization = yield* currentOrganizationId;
@@ -198,6 +233,11 @@ export const ProviderConnectionsLive = Layer.effect(
             changes.credentials === "keep"
               ? {}
               : yield* sealedColumns(organization, id, changes.credentials);
+
+          const emailsPerMinute =
+            changes.emailsPerMinute === "keep"
+              ? {}
+              : { emailsPerMinute: Option.getOrNull(changes.emailsPerMinute) };
 
           const keptOnlyForTheSameServer =
             changes.credentials === "keep"
@@ -211,6 +251,7 @@ export const ProviderConnectionsLive = Layer.effect(
             .update(providerConnections)
             .set({
               ...credentials,
+              ...emailsPerMinute,
               fromEmail: changes.from.email,
               fromName: changes.from.name ?? null,
               name: changes.name,
