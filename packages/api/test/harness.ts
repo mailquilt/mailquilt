@@ -9,6 +9,7 @@ import {
   SystemMailerLive,
 } from "@repo/core";
 import type {
+  BatchStillSending,
   Queue,
   QueueMessage,
   Scheduler,
@@ -137,10 +138,15 @@ const appWith = (
  * the same ports the app's requests use.
  */
 export const QueueWorker = Context.Service<{
-  /** Handles one message. */
-  readonly deliver: (message: QueueMessage) => Effect.Effect<void>;
+  /** Handles one message. It fails as the runtime's handler would, asking the queue to deliver it again. */
+  readonly deliver: (
+    message: QueueMessage
+  ) => Effect.Effect<void, BatchStillSending>;
   /** Handles every queued message that's due by the `Clock`, and any they queue, until none are left. Returns what it handled. */
-  readonly deliverAll: Effect.Effect<readonly QueueMessage[]>;
+  readonly deliverAll: Effect.Effect<
+    readonly QueueMessage[],
+    BatchStillSending
+  >;
 }>("test/QueueWorker");
 
 const queueWorker = (ports: Context.Context<DatabasePorts | Fakes>) => {

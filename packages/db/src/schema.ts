@@ -448,7 +448,9 @@ export const campaignLists = pgTable(
 /**
  * The Contacts a Campaign goes to, fixed in one query when it starts sending,
  * with the address each had then. `batch` groups them into the queue messages
- * that send them. Each starts `queued`, and becomes `sent`, with the
+ * that send them. Each starts `queued`. A delivery of its batch claims it
+ * (`sending`, at `claimed_at`) before handing its email to the Provider, so
+ * only that delivery sends it, and then records it `sent`, with the
  * Provider's message ID, or `failed`, with why.
  */
 export const campaignRecipients = pgTable(
@@ -463,6 +465,7 @@ export const campaignRecipients = pgTable(
     providerMessageId: text("provider_message_id"),
     failureReason: text("failure_reason"),
     failureDetail: text("failure_detail"),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (table) => [
@@ -478,7 +481,7 @@ export const campaignRecipients = pgTable(
     }).onDelete("cascade"),
     check(
       "campaign_recipients_status_check",
-      sql`${table.status} in ('queued', 'sent', 'failed')`
+      sql`${table.status} in ('queued', 'sending', 'sent', 'failed')`
     ),
   ]
 );

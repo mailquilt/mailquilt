@@ -1,0 +1,2 @@
+ALTER TABLE "campaign_recipients" ADD COLUMN "claimed_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "campaign_recipients" DROP CONSTRAINT "campaign_recipients_status_check", ADD CONSTRAINT "campaign_recipients_status_check" CHECK ("status" in ('queued', 'sending', 'sent', 'failed'));

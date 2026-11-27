@@ -16,6 +16,7 @@ export type {
   CampaignBatch,
   CampaignFilter,
   QueuedRecipient,
+  RecipientClaim,
   RecipientOutcome,
 } from "./campaigns.ts";
 
@@ -33,6 +34,8 @@ export {
   QueueMessageSchema,
   queueRetryDelaySeconds,
 } from "./queue.ts";
+
+export { BatchStillSending } from "./batch-still-sending.ts";
 
 export { Scheduler } from "./scheduler.ts";
 
