@@ -16,6 +16,7 @@ services:
   app:
     healthcheck:
       interval: 1s
+      retries: 30
   postgres:
     healthcheck:
       interval: 1s
