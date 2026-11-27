@@ -61,7 +61,7 @@ Anything else goes in one backlog issue, unless the maintainer asks for it.
 
 ## Before the pull request
 
-- Run `/code-review` once, when the work is finished, and the fresh design review (`docs/agents/design.md`, step 7) at the same time. Run either again only when the fixes changed more than the findings asked.
+- Run `/code-review` once, when the work is finished. For a change to the dashboard, run the fresh design review (`docs/agents/design.md`, step 7) at the same time. Run either again only when the fixes changed more than the findings asked.
 - Run the full test suite once before opening the pull request. It takes about a minute here, and a failure caught on your machine costs less than a failed CI run and another push.
 
 ## On a pull request
