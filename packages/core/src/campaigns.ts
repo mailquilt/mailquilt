@@ -749,9 +749,18 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
     });
 
     const now = batch.recipients.slice(0, limit);
-    const later = batch.recipients.length > now.length;
+    const rest = batch.recipients.slice(limit);
 
     yield* Effect.forEach(now, sendOnce, { discard: true });
+
+    // WARNING: once the server has failed for good, the rest of the batch is recorded with that failure here, without a request each, as decisions.md requires; queuing it again would give it fresh retries.
+    const failedForGood = Option.isSome(yield* Ref.get(serverFailure));
+
+    if (failedForGood) {
+      yield* Effect.forEach(rest, sendOnce, { discard: true });
+    }
+
+    const later = rest.length > 0 && !failedForGood;
 
     const unsettled = yield* settle;
 

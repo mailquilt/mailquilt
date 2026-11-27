@@ -1555,6 +1555,40 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
   );
 
   test.effect(
+    "records the rest of a batch moved to SES failed, untried, when SES puts off every email on its last delivery",
+    () =>
+      Effect.gen(function* movedToSesLastDelivery() {
+        const owner = yield* draftCampaign;
+
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `last-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+        yield* sendThroughSes(owner, Option.some(THOUSAND_A_SECOND));
+
+        const worker = yield* QueueWorker;
+        const [message] = yield* (yield* QueueInbox).takeAll;
+
+        yield* (yield* SesOutbox).failNextSend(SENDING_RATE_EXCEEDED);
+        yield* worker.deliver(message ?? assert.fail(), QUEUE_RETRIES + 1);
+
+        const queuedAgain = yield* (yield* QueueInbox).takeAll;
+
+        const done = yield* owner.client.campaigns.get({
+          params: owner.campaignParams,
+        });
+
+        assert.isEmpty(queuedAgain);
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: FORTY_ONE, sent: 0, total: FORTY_ONE }
+        );
+      }).pipe(Effect.scoped)
+  );
+
+  test.effect(
     "keeps an SES account to its own sending rate rather than the account's limit",
     () =>
       Effect.gen(function* ownRateOverSesLimit() {
