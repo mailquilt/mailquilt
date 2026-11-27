@@ -155,6 +155,30 @@ describe("one campaign's page", () => {
     ).toBeDefined();
   });
 
+  it("keeps asking for a paused campaign, so it shows sent once the email in flight when it paused is recorded", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api.use(
+      ...ready(),
+      http.get(
+        CAMPAIGN,
+        answering(
+          {
+            ...SENDING,
+            recipients: { failed: 0, sent: 2, total: 3 },
+            status: "paused",
+          },
+          { ...SENT, recipients: { failed: 0, sent: 3, total: 3 } }
+        )
+      )
+    );
+    renderPage();
+
+    await expect.poll(statusLine).toContain("Paused");
+    await act(() => vi.advanceTimersByTimeAsync(SENDING_POLL_MS));
+
+    await expect.poll(statusLine).toContain("Sent to 3 contacts");
+  });
+
   it("keeps the confirmation open to try again when the server can't be reached", async () => {
     api.use(
       ...ready(),

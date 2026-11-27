@@ -1,0 +1,1 @@
+ALTER TABLE "campaigns" DROP CONSTRAINT "campaigns_status_check", ADD CONSTRAINT "campaigns_status_check" CHECK ("status" in ('draft', 'scheduled', 'sending', 'paused', 'sent', 'cancelled'));

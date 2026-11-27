@@ -403,7 +403,7 @@ export const campaigns = pgTable(
     }).onDelete("set null"),
     check(
       "campaigns_status_check",
-      sql`${table.status} in ('draft', 'scheduled', 'sending', 'sent')`
+      sql`${table.status} in ('draft', 'scheduled', 'sending', 'paused', 'sent', 'cancelled')`
     ),
     check(
       "campaigns_schedule_check",

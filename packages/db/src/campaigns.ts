@@ -11,6 +11,7 @@ import {
   Campaign,
   CampaignNotDraft,
   CampaignNotFound,
+  CampaignNotSending,
   CampaignPage,
   ContactIdSchema,
   newCampaignId,
@@ -19,7 +20,7 @@ import {
   ProviderConnectionIdSchema,
   ProviderConnectionNotFound,
 } from "@repo/domain";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type { EffectPgDatabase } from "drizzle-orm/effect-postgres";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
@@ -281,7 +282,11 @@ export const CampaignsLive = Layer.effect(
           )
         );
 
-    const notDraftOrMissing = (organization: OrganizationId, id: CampaignId) =>
+    const refusedOrMissing = <E>(
+      organization: OrganizationId,
+      id: CampaignId,
+      refusal: E
+    ) =>
       db
         .select({ id: campaigns.id })
         .from(campaigns)
@@ -289,13 +294,64 @@ export const CampaignsLive = Layer.effect(
         .pipe(
           Effect.orDie,
           Effect.flatMap(([row]) =>
-            Effect.fail(
-              row === undefined
-                ? new CampaignNotFound()
-                : new CampaignNotDraft()
-            )
+            Effect.fail(row === undefined ? new CampaignNotFound() : refusal)
           )
         );
+
+    const notDraftOrMissing = (organization: OrganizationId, id: CampaignId) =>
+      refusedOrMissing(organization, id, new CampaignNotDraft());
+
+    // WARNING: run after the outcomes it counts commit, never in their transaction, or it would miss another batch's outcomes committing at the same time, and the Campaign would stay sending.
+    const finishIfDone = (organization: OrganizationId, id: CampaignId) =>
+      db
+        .update(campaigns)
+        .set({ sentAt: sql`now()`, status: "sent", updatedAt: sql`now()` })
+        .where(
+          and(
+            inOrganization(organization, id),
+            inArray(campaigns.status, ["sending", "paused"]),
+            sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} >= ${campaigns.recipientsTotal}`
+          )
+        );
+
+    // WARNING: moving to the status it's already in answers with the Campaign, so a second click, or two members at once, aren't refused. One whose every email was recorded is done though not yet marked sent, so it's marked sent and refused rather than paused or cancelled.
+    const moveSending = (
+      organization: OrganizationId,
+      id: CampaignId,
+      from: readonly string[],
+      to: "paused" | "cancelled"
+    ) =>
+      Effect.gen(function* moveSendingCampaign() {
+        const [moved] = yield* db
+          .update(campaigns)
+          .set({ status: to, updatedAt: sql`now()` })
+          .where(
+            and(
+              inOrganization(organization, id),
+              or(
+                eq(campaigns.status, to),
+                and(
+                  inArray(campaigns.status, from),
+                  sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} < ${campaigns.recipientsTotal}`
+                )
+              )
+            )
+          )
+          .returning({ id: campaigns.id })
+          .pipe(Effect.orDie);
+
+        if (moved === undefined) {
+          yield* finishIfDone(organization, id).pipe(Effect.orDie);
+
+          return yield* refusedOrMissing(
+            organization,
+            id,
+            new CampaignNotSending()
+          );
+        }
+
+        return yield* one(organization, id).pipe(Effect.orDie);
+      });
 
     return {
       create: (draft) =>
@@ -391,6 +447,82 @@ export const CampaignsLive = Layer.effect(
           )
           .pipe(Effect.catchTag("SqlError", Effect.die)),
 
+      pause: (id) =>
+        Effect.gen(function* pause() {
+          const organization = yield* currentOrganizationId;
+
+          return yield* moveSending(
+            organization,
+            id,
+            ["sending", "paused"],
+            "paused"
+          );
+        }),
+
+      cancel: (id) =>
+        Effect.gen(function* cancel() {
+          const organization = yield* currentOrganizationId;
+
+          return yield* moveSending(
+            organization,
+            id,
+            ["sending", "paused", "cancelled"],
+            "cancelled"
+          );
+        }),
+
+      resume: (id, enqueue) =>
+        db
+          .transaction(() =>
+            Effect.gen(function* resume() {
+              const organization = yield* currentOrganizationId;
+
+              const [resumed] = yield* db
+                .update(campaigns)
+                .set({ status: "sending", updatedAt: sql`now()` })
+                .where(
+                  and(
+                    inOrganization(organization, id),
+                    eq(campaigns.status, "paused")
+                  )
+                )
+                .returning({ id: campaigns.id })
+                .pipe(Effect.orDie);
+
+              if (resumed === undefined) {
+                const current = yield* one(organization, id);
+
+                if (current.status !== "sending") {
+                  return yield* new CampaignNotSending();
+                }
+
+                return current;
+              }
+
+              const unfinished = yield* db
+                .selectDistinct({ batch: campaignRecipients.batch })
+                .from(campaignRecipients)
+                .where(
+                  and(
+                    eq(campaignRecipients.organizationId, organization),
+                    eq(campaignRecipients.campaignId, id),
+                    inArray(campaignRecipients.status, ["queued", "sending"])
+                  )
+                )
+                .orderBy(asc(campaignRecipients.batch))
+                .pipe(Effect.orDie);
+
+              if (unfinished.length === 0) {
+                yield* finishIfDone(organization, id).pipe(Effect.orDie);
+              }
+
+              yield* enqueue(unfinished.map((row) => row.batch));
+
+              return yield* one(organization, id).pipe(Effect.orDie);
+            })
+          )
+          .pipe(Effect.catchTag("SqlError", Effect.die)),
+
       queuedBatch: (id, batch) =>
         Effect.gen(function* queuedBatch() {
           const organization = yield* currentOrganizationId;
@@ -462,19 +594,28 @@ export const CampaignsLive = Layer.effect(
           const organization = yield* currentOrganizationId;
 
           const { rows } = yield* db.execute<{
+            readonly sending: boolean;
             readonly claimed: boolean;
             readonly consents: boolean;
           }>(sql`
-            with claimed as (
+            with campaign as (
+              select exists (
+                select 1 from ${campaigns}
+                where organization_id = ${organization} and id = ${id} and status = 'sending'
+              ) as sending
+            ),
+            claimed as (
               update ${campaignRecipients}
               set status = 'sending', claimed_at = ${DateTime.formatIso(at)}::timestamptz
               where organization_id = ${organization}
                 and campaign_id = ${id}
                 and contact_id = ${contactId}
                 and status = 'queued'
+                and (select sending from campaign)
               returning contact_id
             )
-            select exists (select 1 from claimed) as claimed,
+            select (select sending from campaign) as sending,
+              exists (select 1 from claimed) as claimed,
               exists (
                 select 1
                 from (${recipientsOf(organization, targetedListsOfCampaign(organization, id))}) as r
@@ -484,7 +625,11 @@ export const CampaignsLive = Layer.effect(
 
           const [row] = rows;
 
-          if (row?.claimed !== true) {
+          if (row?.sending !== true) {
+            return "stopped" as const;
+          }
+
+          if (!row.claimed) {
             return "taken" as const;
           }
 
@@ -548,7 +693,6 @@ export const CampaignsLive = Layer.effect(
             );
         }).pipe(Effect.orDie),
 
-      // WARNING: the Campaign is marked sent in a statement after the cut-off claims commit; in their transaction, it would miss another batch's outcomes committing at the same time, and stay sending.
       settleBatch: (id, batch, claimedBefore, cutOff) =>
         Effect.gen(function* settleBatch() {
           const organization = yield* currentOrganizationId;
@@ -574,16 +718,7 @@ export const CampaignsLive = Layer.effect(
               and exists (select 1 from cut_off)
           `);
 
-          yield* db
-            .update(campaigns)
-            .set({ sentAt: sql`now()`, status: "sent", updatedAt: sql`now()` })
-            .where(
-              and(
-                inOrganization(organization, id),
-                eq(campaigns.status, "sending"),
-                sql`${campaigns.recipientsSent} + ${campaigns.recipientsFailed} >= ${campaigns.recipientsTotal}`
-              )
-            );
+          yield* finishIfDone(organization, id);
 
           // WARNING: a recipient another delivery put back in the queue after this one read the batch is unfinished too; counting only claims would let this delivery succeed and leave them queued with no delivery left to send them.
           const { rows } = yield* db.execute<{

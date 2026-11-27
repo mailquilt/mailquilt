@@ -61,8 +61,9 @@ const SCHEDULED_POLL_MAX_MS = 60 * 60 * 1000;
 const SCHEDULED_START_GRACE_MS = 15 * 60 * 1000;
 
 // WARNING: a timer can't wait longer than about 24 days, so a schedule further ahead is asked for again within the hour, and the wait shortens as its time comes.
+// WARNING: a paused Campaign is asked for too: an email being handed to the Provider when it paused still finishes and can leave it sent, and another member can resume or cancel it.
 const nextAsk = (campaign: Campaign | null | undefined) => {
-  if (campaign?.status === "sending") {
+  if (campaign?.status === "sending" || campaign?.status === "paused") {
     return SENDING_POLL_MS;
   }
 
@@ -82,7 +83,7 @@ const nextAsk = (campaign: Campaign | null | undefined) => {
 /**
  * One Campaign, or `null` when the Organization has no such Campaign: a
  * definite answer, so it isn't retried as a failure would be. While it is
- * sending, it is asked for again every couple of seconds until it's sent.
+ * sending or paused, it is asked for again every couple of seconds.
  * While it is scheduled, it is asked for again at its time, and then every
  * couple of seconds until it has started, for a quarter of an hour.
  */

@@ -5,7 +5,9 @@ export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
   draft: "Draft",
   scheduled: "Scheduled",
   sending: "Sending",
+  paused: "Paused",
   sent: "Sent",
+  cancelled: "Cancelled",
 };
 
 const Slot = () => (
@@ -60,6 +62,8 @@ const Placed = () => (
 
 const BLOCK = "block size-3 rounded-quilt";
 
+const GOING_OUT = new Set<CampaignStatus>(["sending", "paused"]);
+
 const LAYER =
   "absolute inset-0 transition-opacity duration-200 ease-out motion-reduce:transition-none";
 
@@ -67,7 +71,8 @@ const LAYER =
  * A Campaign's status in the logo's language: the dashed slot is a draft,
  * not sent yet; an ink block set in the slot is scheduled, waiting in place;
  * the orange envelope block is going out, the quilt's orange
- * column; the ink block is sent, as a done step. Decorative: the status is
+ * column, and held still while paused; the ink block is sent, or cancelled,
+ * as a done step. Decorative: the status is
  * always written beside it. With `live`, they are stacked and crossfade
  * as the status moves on, and the orange block pulses gently while it sends
  * (opacity only, and not with reduced motion), for the one Campaign whose
@@ -92,7 +97,7 @@ export const CampaignBlock = ({
     return (
       <span
         aria-hidden="true"
-        className={`${BLOCK} shrink-0 ${status === "sending" ? "bg-(--mq-accent)" : "bg-(--mq-block-ink)"}`}
+        className={`${BLOCK} shrink-0 ${GOING_OUT.has(status) ? "bg-(--mq-accent)" : "bg-(--mq-block-ink)"}`}
       />
     );
   }
@@ -111,7 +116,13 @@ export const CampaignBlock = ({
       <span className={`${LAYER} ${shown("sending")}`}>
         <span className={`${BLOCK} mq-pulse bg-(--mq-accent)`} />
       </span>
+      <span className={`${LAYER} ${shown("paused")}`}>
+        <span className={`${BLOCK} bg-(--mq-accent)`} />
+      </span>
       <span className={`${LAYER} ${shown("sent")}`}>
+        <span className={`${BLOCK} bg-(--mq-block-ink)`} />
+      </span>
+      <span className={`${LAYER} ${shown("cancelled")}`}>
         <span className={`${BLOCK} bg-(--mq-block-ink)`} />
       </span>
     </span>
