@@ -1,4 +1,4 @@
-import { Button, DropdownMenu, LinkButton } from "@cloudflare/kumo";
+import { Badge, Button, DropdownMenu, LinkButton } from "@cloudflare/kumo";
 import type {
   Organization,
   ProviderConnection,
@@ -10,17 +10,19 @@ import {
   tableFeatures,
   useTable,
 } from "@tanstack/react-table";
+import { Predicate } from "effect";
 import { useEffect, useRef, useState } from "react";
 
 import { loadingFirstTime } from "../api.ts";
 import { DataTable } from "../audience/data-table.tsx";
 import type { StackedArea } from "../audience/data-table.tsx";
-import { formatDay } from "../audience/format.ts";
+import { formatCount, formatDay } from "../audience/format.ts";
 import {
   DotsThreeIcon,
   EnvelopeSimpleIcon,
   LockSimpleIcon,
   LockSimpleOpenIcon,
+  MegaphoneIcon,
   PaperPlaneTiltIcon,
   PencilSimpleIcon,
   PlusIcon,
@@ -32,8 +34,12 @@ import { EmptyState, LoadFailed, SlotArt } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { TableRegion } from "../layout/table-region.tsx";
+import { useConfirmationToast, useProblemToast } from "../layout/toast.tsx";
 import { DeleteConnectionDialog } from "./delete-connection-dialog.tsx";
-import { useProviderConnections } from "./providers-api.ts";
+import {
+  useMakeCampaignDefault,
+  useProviderConnections,
+} from "./providers-api.ts";
 import { TestEmailDialog } from "./test-email-dialog.tsx";
 
 const ENCRYPTION_NAME: Record<SmtpSecurity, string> = {
@@ -60,14 +66,40 @@ const introFor = (
 
 const ConnectButton = () => (
   <LinkButton href="/providers/new" icon={PlusIcon} variant="primary">
-    Connect SMTP server
+    Connect a provider
   </LinkButton>
 );
+
+const PROVIDER_NAME: Record<ProviderConnection["provider"], string> = {
+  ses: "Amazon SES",
+  smtp: "SMTP server",
+};
+
+const rateOf = (connection: ProviderConnection) => {
+  if (connection.emailsPerMinute !== null) {
+    return `${formatCount(connection.emailsPerMinute)} emails a minute`;
+  }
+
+  return connection.provider === "ses"
+    ? "Your SES account’s limit"
+    : "No limit";
+};
+
+const makeDefaultProblem = (error: Error) => {
+  if (Predicate.isTagged(error, "SignInRequired")) {
+    return "You’ve been signed out. Sign in again, then try again.";
+  }
+
+  return Predicate.isTagged(error, "ProviderConnectionNotFound")
+    ? "It no longer exists. Someone may have deleted it."
+    : "Mailquilt couldn’t reach its server. Check your connection, then try again.";
+};
 
 const features = tableFeatures({});
 
 // WARNING: TanStack renders each cell as a component, so new columns remount every row's open dialog; rows carry what the actions need and COLUMNS stays module-level.
 interface ConnectionRow {
+  readonly canMakeDefault: boolean;
   readonly connection: ProviderConnection;
   readonly defaultTo: string;
   readonly intro?: string;
@@ -76,6 +108,7 @@ interface ConnectionRow {
 }
 
 const ConnectionActions = ({
+  canMakeDefault,
   connection,
   defaultTo,
   intro,
@@ -88,6 +121,24 @@ const ConnectionActions = ({
 
   const testing = useDialog(intro !== undefined);
   const [testIntro, setTestIntro] = useState(intro);
+  const makeDefault = useMakeCampaignDefault(organization.id);
+  const confirmations = useConfirmationToast();
+  const problem = useProblemToast(`make-default-${connection.id}`);
+
+  const makeItDefault = () =>
+    makeDefault.mutate(connection.id, {
+      onError: (error) =>
+        problem.show({
+          description: makeDefaultProblem(error),
+          title: `${connection.name} isn’t the default yet`,
+        }),
+      onSuccess: () => {
+        problem.clear();
+        confirmations.add({
+          title: `New Campaigns now start with ${connection.name}`,
+        });
+      },
+    });
 
   return (
     <span className="flex items-center justify-end gap-1">
@@ -114,14 +165,17 @@ const ConnectionActions = ({
           <DotsThreeIcon aria-hidden="true" className="size-5" weight="bold" />
         </DropdownMenu.Trigger>
         <DropdownMenu.Content align="end" className="min-w-44 rounded-xl">
-          {connection.provider === "smtp" && (
-            <DropdownMenu.Item
-              href={`/providers/${connection.id}/edit`}
-              icon={PencilSimpleIcon}
-            >
-              Edit
+          {canMakeDefault ? (
+            <DropdownMenu.Item icon={MegaphoneIcon} onClick={makeItDefault}>
+              Make default for new Campaigns
             </DropdownMenu.Item>
-          )}
+          ) : null}
+          <DropdownMenu.Item
+            href={`/providers/${connection.id}/edit`}
+            icon={PencilSimpleIcon}
+          >
+            Edit
+          </DropdownMenu.Item>
           <DropdownMenu.Item
             icon={TrashIcon}
             onClick={() => deleting.setOpen(true)}
@@ -173,12 +227,16 @@ const COLUMNS = helper.columns([
             {row.original.connection.name}
           </span>
           <span className="block text-sm text-kumo-subtle">
-            <span className="max-sm:hidden">SMTP server, connected</span>
-            <span className="sm:hidden">Connected</span>{" "}
+            {PROVIDER_NAME[row.original.connection.provider]}, connected{" "}
             <span className="whitespace-nowrap">
               {formatDay(row.original.connection.createdAt)}
             </span>
           </span>
+          {row.original.connection.defaultForCampaigns ? (
+            <span className="mt-1.5 block">
+              <Badge variant="secondary">Default for new Campaigns</Badge>
+            </span>
+          ) : null}
         </span>
       </span>
     ),
@@ -208,13 +266,20 @@ const COLUMNS = helper.columns([
       const connection = getValue();
 
       return (
-        <Breakable
-          value={
-            connection.provider === "ses"
-              ? `Amazon SES, ${connection.ses.region}`
-              : `${connection.smtp.host}:${connection.smtp.port}`
-          }
-        />
+        <span className="block py-2">
+          <span className="block">
+            <Breakable
+              value={
+                connection.provider === "ses"
+                  ? `Amazon SES, ${connection.ses.region}`
+                  : `${connection.smtp.host}:${connection.smtp.port}`
+              }
+            />
+          </span>
+          <span className="block text-sm text-kumo-subtle">
+            {rateOf(connection)}
+          </span>
+        </span>
       );
     },
     header: "Server",
@@ -367,7 +432,7 @@ export const ProvidersPage = ({
       return (
         <EmptyState
           actions={<ConnectButton />}
-          description="Connect the SMTP server you send with. Connecting Amazon SES and Cloudflare Email directly, without SMTP, arrives in a later Mailquilt update."
+          description="Connect your Amazon SES account, or the SMTP server you send with."
           title="No provider connected yet"
         />
       );
@@ -376,6 +441,7 @@ export const ProvidersPage = ({
     return (
       <ConnectionsTable
         rows={connected.map((connection) => ({
+          canMakeDefault: !connection.defaultForCampaigns,
           connection,
           defaultTo: testEmailTo,
           intro: introFor(connection, justConnected, justSaved),
@@ -406,10 +472,9 @@ export const ProvidersPage = ({
           </span>
           <span>
             <span className="font-medium text-kumo-default">
-              Amazon SES and Cloudflare Email
+              Cloudflare Email
             </span>{" "}
-            connect directly in a later Mailquilt update. Until then, connect
-            their SMTP settings here.
+            connects directly in a later Mailquilt update.
           </span>
         </p>
       )}

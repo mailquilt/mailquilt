@@ -3,6 +3,8 @@ import type {
   ProviderConnection,
   ProviderConnectionId,
   Sender,
+  SesAccount,
+  SesCredentials,
   SmtpCredentials,
   SmtpServer,
 } from "@repo/domain";
@@ -15,12 +17,28 @@ import { callApi, retryUnlessSignedOut } from "../api.ts";
 export const connectionsKey = (organizationId: OrganizationId) =>
   ["organizations", organizationId, "provider-connections"] as const;
 
-/** A Provider Connection's settings as the connect and edit forms send them. */
-export interface ConnectionSettings {
+/** A Provider Connection's settings as the connect and edit forms send them, without its credentials. */
+export type ConnectionSettings = {
   readonly name: string;
   readonly from: typeof Sender.Type;
-  readonly smtp: typeof SmtpServer.Type;
-}
+  /** Its sending rate; `null` for none. */
+  readonly emailsPerMinute: number | null;
+} & (
+  | { readonly provider: "smtp"; readonly smtp: typeof SmtpServer.Type }
+  | { readonly provider: "ses"; readonly ses: typeof SesAccount.Type }
+);
+
+/**
+ * A connection to save: its settings and credentials. Left out, the saved
+ * credentials are kept; `null` removes an SMTP server's.
+ */
+export type ConnectionToSave =
+  | (Extract<ConnectionSettings, { readonly provider: "smtp" }> & {
+      readonly credentials?: typeof SmtpCredentials.Type | null;
+    })
+  | (Extract<ConnectionSettings, { readonly provider: "ses" }> & {
+      readonly credentials?: typeof SesCredentials.Type;
+    });
 
 /**
  * Every Provider Connection in the Organization, oldest first. With
@@ -64,22 +82,37 @@ const useChangeConnections = (organizationId: OrganizationId) => {
   };
 };
 
-/** Connects an SMTP server, with its sign-in if it needs one. */
+// WARNING: SES always needs its access key, and a new SMTP server without a sign-in leaves `credentials` out rather than sending `null`, which create refuses.
+const newConnectionPayload = (connection: ConnectionToSave) => {
+  if (connection.provider === "ses") {
+    return connection.credentials === undefined
+      ? undefined
+      : { ...connection, credentials: connection.credentials };
+  }
+
+  const { credentials, ...settings } = connection;
+
+  return credentials === undefined || credentials === null
+    ? settings
+    : { ...settings, credentials };
+};
+
+/** Connects an SMTP server or an SES account, with its credentials. */
 export const useCreateConnection = (organizationId: OrganizationId) => {
   const changeConnections = useChangeConnections(organizationId);
 
   return useMutation({
-    mutationFn: (
-      connection: ConnectionSettings & {
-        readonly credentials?: typeof SmtpCredentials.Type;
-      }
-    ) =>
-      callApi((client) =>
-        client.providerConnections.create({
-          params: { organizationId },
-          payload: connection,
-        })
-      ),
+    mutationFn: (connection: ConnectionToSave) =>
+      callApi((client) => {
+        const payload = newConnectionPayload(connection);
+
+        return payload === undefined
+          ? Effect.die(new Error("An SES account needs its access key"))
+          : client.providerConnections.create({
+              params: { organizationId },
+              payload,
+            });
+      }),
     onSuccess: (created) =>
       changeConnections((connections) => [...connections, created]),
   });
@@ -96,11 +129,7 @@ export const useUpdateConnection = (
   const changeConnections = useChangeConnections(organizationId);
 
   return useMutation({
-    mutationFn: (
-      connection: ConnectionSettings & {
-        readonly credentials?: typeof SmtpCredentials.Type | null;
-      }
-    ) =>
+    mutationFn: (connection: ConnectionToSave) =>
       callApi((client) =>
         client.providerConnections.update({
           params: { organizationId, providerConnectionId },
@@ -135,6 +164,30 @@ export const useDeleteConnection = (organizationId: OrganizationId) => {
     onSuccess: (_, deleted) =>
       changeConnections((connections) =>
         connections.filter((connection) => connection.id !== deleted)
+      ),
+  });
+};
+
+/**
+ * Makes a connection the one new Campaigns start with, and every other
+ * not, in the cached list too.
+ */
+export const useMakeCampaignDefault = (organizationId: OrganizationId) => {
+  const changeConnections = useChangeConnections(organizationId);
+
+  return useMutation({
+    mutationFn: (providerConnectionId: ProviderConnectionId) =>
+      callApi((client) =>
+        client.providerConnections.makeCampaignDefault({
+          params: { organizationId, providerConnectionId },
+        })
+      ),
+    onSuccess: (made) =>
+      changeConnections((connections) =>
+        connections.map((connection) => ({
+          ...connection,
+          defaultForCampaigns: connection.id === made.id,
+        }))
       ),
   });
 };

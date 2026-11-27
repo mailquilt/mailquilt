@@ -36,6 +36,20 @@ const POSTMARK = {
   smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },
 };
 
+const SES = {
+  createdAt: "2026-11-27T09:00:00.000Z",
+  defaultForCampaigns: true,
+  emailsPerMinute: null,
+  from: { email: "news@acme.example" },
+  id: "pcn_01h455vb4pex5vsknk084sn02s",
+  name: "SES",
+  provider: "ses",
+  ses: { region: "eu-west-1" },
+};
+
+const missingFrom = (row: HTMLElement, texts: readonly string[]) =>
+  texts.filter((text) => !(row.textContent ?? "").includes(text));
+
 const TestEmailRequest = Schema.Struct({ to: Schema.String });
 
 const CONNECTIONS = "*/api/organizations/:organizationId/provider-connections";
@@ -87,7 +101,7 @@ describe("providers page", () => {
     ).resolves.toBeTruthy();
     expect(
       screen
-        .getByRole("link", { name: "Connect SMTP server" })
+        .getByRole("link", { name: "Connect a provider" })
         .getAttribute("href")
     ).toBe("/providers/new");
   });
@@ -132,6 +146,86 @@ describe("providers page", () => {
     expect(postmark.textContent).toContain("smtp.postmarkapp.com:587");
     expect(postmark.textContent).toContain("STARTTLS, with sign-in");
     expect(relay.textContent).toContain("Not encrypted, without sign-in");
+  });
+
+  it("shows an SES account, each connection's sending rate, and which one new Campaigns start with", async () => {
+    withConnections([{ ...POSTMARK, emailsPerMinute: 30 }, SES]);
+    renderPage();
+
+    const postmark = await screen.findByRole("row", { name: /^Postmark/u });
+    const ses = screen.getByRole("row", { name: /^SES/u });
+
+    expect(
+      missingFrom(postmark, ["SMTP server, connected", "30 emails a minute"])
+    ).toStrictEqual([]);
+    expect(postmark.textContent).not.toContain("Default for new Campaigns");
+    expect(
+      missingFrom(ses, [
+        "Amazon SES, connected",
+        "Amazon SES, eu-west-1",
+        "Your SES account’s limit",
+        "HTTPS, with an access key",
+        "Default for new Campaigns",
+      ])
+    ).toStrictEqual([]);
+  });
+
+  it("makes another connection the default for new Campaigns from its menu", async () => {
+    let made = "";
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () =>
+        HttpResponse.json(
+          [POSTMARK, SES].map((connection) => ({
+            ...connection,
+            defaultForCampaigns:
+              made === ""
+                ? connection.defaultForCampaigns
+                : connection.id === made,
+          }))
+        )
+      ),
+      http.put(
+        `${CONNECTIONS}/:providerConnectionId/campaign-default`,
+        ({ params }) => {
+          made = String(params.providerConnectionId);
+
+          return HttpResponse.json({ ...POSTMARK, defaultForCampaigns: true });
+        }
+      )
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for SES" })
+    );
+
+    expect(
+      screen.queryByRole("menuitem", {
+        name: "Make default for new Campaigns",
+      })
+    ).toBeNull();
+
+    fireEvent.keyDown(document.activeElement ?? document.body, {
+      key: "Escape",
+    });
+    fireEvent.click(screen.getByRole("button", { name: "More for Postmark" }));
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "Make default for new Campaigns",
+      })
+    );
+
+    await expect(
+      screen.findByText("New Campaigns now start with Postmark")
+    ).resolves.toBeTruthy();
+    expect(made).toBe(POSTMARK.id);
+    expect(
+      screen.getByRole("row", { name: /^Postmark/u }).textContent
+    ).toContain("Default for new Campaigns");
+    expect(
+      screen.getByRole("row", { name: /^SES/u }).textContent
+    ).not.toContain("Default for new Campaigns");
   });
 
   it("opens a connection's Edit page without reloading the app", async () => {
@@ -303,6 +397,80 @@ describe("providers page", () => {
 
     expect(alert.textContent).toContain("smtp.postmarkapp.com doesn’t exist");
     expect(alert.textContent).not.toContain("What the server said");
+  });
+
+  it("tells an SES account that couldn't be reached to check its Region, not a host and port", async () => {
+    withConnections([SES]);
+    api.use(
+      http.post(TEST_EMAILS, () =>
+        HttpResponse.json(
+          {
+            _tag: "SendFailed",
+            detail:
+              "SES didn't answer: getaddrinfo ENOTFOUND email.eu-west-1.amazonaws.com",
+            reason: "unreachable",
+          },
+          { status: 502 }
+        )
+      )
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: /^Send test for SES/u })
+    );
+    fireEvent.change(await screen.findByLabelText("Send to"), {
+      target: { value: "ada@acme.example" },
+    });
+    fireEvent.submit(
+      screen.getByLabelText("Send to").closest("form") ?? document.body
+    );
+
+    const alert = await screen.findByRole("alert");
+
+    expect(alert.textContent).toContain(
+      "Check the connection’s Region, and that this Mailquilt server can reach AWS."
+    );
+    expect(alert.textContent).not.toContain("host and port");
+  });
+
+  it("offers to make a sole connection the default for new Campaigns once the default was deleted", async () => {
+    withConnections([POSTMARK]);
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for Postmark" })
+    );
+
+    await expect(
+      screen.findByRole("menuitem", { name: "Make default for new Campaigns" })
+    ).resolves.toBeTruthy();
+  });
+
+  it("says a connection isn't the default yet when making it so failed", async () => {
+    withConnections([POSTMARK, SES]);
+    api.use(
+      http.put(`${CONNECTIONS}/:providerConnectionId/campaign-default`, () =>
+        HttpResponse.error()
+      )
+    );
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "More for Postmark" })
+    );
+    fireEvent.click(
+      await screen.findByRole("menuitem", {
+        name: "Make default for new Campaigns",
+      })
+    );
+
+    await expect(
+      screen.findByText("Postmark isn’t the default yet")
+    ).resolves.toBeTruthy();
+    expect(screen.getByRole("row", { name: /^SES/u }).textContent).toContain(
+      "Default for new Campaigns"
+    );
   });
 
   it("keeps the just-connected note after the page forgets the news", async () => {

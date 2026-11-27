@@ -112,16 +112,20 @@ const sendFailure = (
     return { ...byReason[reason], detail } satisfies Failure;
   }
 
-  const sesFailure =
-    reason === "auth"
-      ? {
-          ...byReason.auth,
-          fix: "Check the access key ID and secret access key in AWS IAM, that the key may send email through SES, and that sending isn’t paused in the SES console.",
-          title: "SES refused to send for this account",
-        }
-      : byReason[reason];
+  const sesByReason: typeof byReason = {
+    ...byReason,
+    auth: {
+      ...byReason.auth,
+      fix: "Check the access key ID and secret access key in AWS IAM, that the key may send email through SES, and that sending isn’t paused in the SES console.",
+      title: "SES refused to send for this account",
+    },
+    unreachable: {
+      ...byReason.unreachable,
+      fix: "Check the connection’s Region, and that this Mailquilt server can reach AWS.",
+    },
+  };
 
-  return { ...sesFailure, canEdit: false, detail } satisfies Failure;
+  return { ...sesByReason[reason], detail } satisfies Failure;
 };
 
 const failureOf = (connection: ProviderConnection, error: Error) => {

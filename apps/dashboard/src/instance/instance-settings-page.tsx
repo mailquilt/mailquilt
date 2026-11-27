@@ -194,22 +194,30 @@ const SystemMailerSection = ({
         busy={update.isPending}
         busyLabel="Saving…"
         connection={mailer ?? undefined}
-        failureMessage={mailerFailureMessage(update.error)}
+        failureMessage={() => mailerFailureMessage(update.error)}
         key={JSON.stringify(mailer)}
         named={false}
         nested
-        onSubmit={({ credentials, settings }) =>
+        onSubmit={(result) => {
+          if (result.provider !== "smtp") {
+            return;
+          }
+
+          const server = { from: result.from, smtp: result.smtp };
+
           update.mutate(
-            credentials === "keep"
-              ? { from: settings.from, smtp: settings.smtp }
-              : { credentials, from: settings.from, smtp: settings.smtp },
+            result.credentials === undefined
+              ? server
+              : { ...server, credentials: result.credentials },
             {
               onSuccess: () =>
                 toasts.add({ title: "Saved the account-email server" }),
             }
-          )
+          );
+        }}
+        senderDescription={() =>
+          "Use an address on a domain your server may send for."
         }
-        senderDescription="Use an address on a domain your server may send for."
         senderExample={{ email: "accounts@example.com", name: "Acme" }}
         submitLabel={mailer === null ? "Save server" : "Save changes"}
       />
