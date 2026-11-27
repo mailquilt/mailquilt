@@ -52,6 +52,13 @@ const CONNECTION_REFUSED = new SendDeferred({
   }),
 });
 
+const MAILBOX_BUSY = new SendDeferred({
+  failed: new SendFailed({
+    detail: "450 4.2.1 Mailbox busy, try again later",
+    reason: "rejected",
+  }),
+});
+
 const THREE_CONTACTS = [
   "ada@example.com",
   "alan@example.com",
@@ -799,14 +806,7 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         const [message] = yield* (yield* QueueInbox).takeAll;
         const batch = message ?? assert.fail();
 
-        yield* (yield* SmtpOutbox).failNextSend(
-          new SendDeferred({
-            failed: new SendFailed({
-              detail: "450 4.2.1 Mailbox busy, try again later",
-              reason: "rejected",
-            }),
-          })
-        );
+        yield* (yield* SmtpOutbox).failNextSend(MAILBOX_BUSY);
 
         const putOff = yield* Effect.exit(worker.deliver(batch));
 
@@ -832,6 +832,34 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
           "ada@example.com",
           "grace@example.com",
         ]);
+      })
+  );
+
+  test.effect(
+    "records an email the Provider puts off on the batch's last delivery as failed, though it's the first time that Contact was tried",
+    () =>
+      Effect.gen(function* putOffOnLastDelivery() {
+        const owner = yield* draftCampaign;
+        const { campaignParams, client, list } = owner;
+
+        yield* addContacts(owner, ["ada@example.com"], [list.id]);
+        yield* client.campaigns.send({ params: campaignParams });
+
+        const [message] = yield* (yield* QueueInbox).takeAll;
+
+        yield* (yield* SmtpOutbox).failNextSend(MAILBOX_BUSY);
+        yield* (yield* QueueWorker).deliver(
+          message ?? assert.fail(),
+          QUEUE_RETRIES + 1
+        );
+
+        const done = yield* client.campaigns.get({ params: campaignParams });
+
+        assert.strictEqual(done.status, "sent");
+        assert.deepStrictEqual(
+          { ...done.recipients },
+          { failed: 1, sent: 0, total: 1 }
+        );
       })
   );
 
@@ -889,11 +917,11 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         const batch = message ?? assert.fail();
 
         const deliveries = yield* pipe(
-          Arr.makeBy(QUEUE_RETRIES + 1, () => batch),
-          Effect.forEach((delivered) =>
+          Arr.makeBy(QUEUE_RETRIES + 1, (index) => index + 1),
+          Effect.forEach((attempt) =>
             outbox
               .failNextSend(CONNECTION_REFUSED)
-              .pipe(Effect.andThen(Effect.exit(worker.deliver(delivered))))
+              .pipe(Effect.andThen(Effect.exit(worker.deliver(batch, attempt))))
           )
         );
 

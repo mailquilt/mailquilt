@@ -139,9 +139,14 @@ const appWith = (
  * the same ports the app's requests use.
  */
 export const QueueWorker = Context.Service<{
-  /** Handles one message. It fails as the runtime's handler would, asking the queue to deliver it again. */
+  /**
+   * Handles one message, as its `attempt`-th delivery (the first by
+   * default). It fails as the runtime's handler would, asking the queue to
+   * deliver it again.
+   */
   readonly deliver: (
-    message: QueueMessage
+    message: QueueMessage,
+    attempt?: number
   ) => Effect.Effect<void, BatchDeferred | BatchStillSending>;
   /** Handles every queued message that's due by the `Clock`, and any they queue, until none are left. Returns what it handled. */
   readonly deliverAll: Effect.Effect<
@@ -151,8 +156,8 @@ export const QueueWorker = Context.Service<{
 }>("test/QueueWorker");
 
 const queueWorker = (ports: Context.Context<DatabasePorts | Fakes>) => {
-  const deliver = (message: QueueMessage) =>
-    handleQueueMessage(message).pipe(Effect.provideContext(ports));
+  const deliver = (message: QueueMessage, attempt = 1) =>
+    handleQueueMessage(message, attempt).pipe(Effect.provideContext(ports));
 
   const inbox = Context.get(ports, QueueInbox);
 
@@ -161,7 +166,10 @@ const queueWorker = (ports: Context.Context<DatabasePorts | Fakes>) => {
     let messages = yield* inbox.takeAll;
 
     while (messages.length > 0) {
-      yield* pipe(messages, Effect.forEach(deliver));
+      yield* pipe(
+        messages,
+        Effect.forEach((message) => deliver(message))
+      );
       handled.push(...messages);
       messages = yield* inbox.takeAll;
     }

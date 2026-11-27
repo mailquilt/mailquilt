@@ -181,7 +181,11 @@ export const QueueWorkersLive = Layer.effectDiscard(
           pipe(
             jobs,
             Effect.forEach((job) =>
-              decodeMessage(job.data).pipe(Effect.flatMap(handleQueueMessage))
+              decodeMessage(job.data).pipe(
+                Effect.flatMap((message) =>
+                  handleQueueMessage(message, job.retryCount + 1)
+                )
+              )
             )
           )
         )

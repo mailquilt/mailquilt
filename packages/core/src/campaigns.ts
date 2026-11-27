@@ -62,14 +62,10 @@ export interface CampaignFilter {
   readonly before?: CampaignId;
 }
 
-/**
- * A Contact a Campaign is still to be sent to, at the address they had when
- * it started sending, and how many times the Provider put off their email.
- */
+/** A Contact a Campaign is still to be sent to, at the address they had when it started sending. */
 export interface QueuedRecipient {
   readonly contactId: ContactId;
   readonly email: string;
-  readonly deferrals: number;
 }
 
 /** What one queue message sends: the Campaign's content, and its recipients in that batch still queued. */
@@ -233,9 +229,8 @@ export class Campaigns extends Context.Service<
       outcome: RecipientOutcome
     ) => Effect.Effect<void, never, CurrentOrganization>;
     /**
-     * Puts a recipient this delivery claimed back in the queue, counting
-     * one more time the Provider put off their email, for the batch's next
-     * delivery to try.
+     * Puts a recipient this delivery claimed back in the queue, for the
+     * batch's next delivery to try.
      */
     readonly putBack: (
       id: CampaignId,
@@ -439,10 +434,7 @@ const CUT_OFF = new SendFailed({
   reason: "failed",
 });
 
-// WARNING: each delivery of a batch tries a put-off recipient once, so their last try is on its last delivery; a put-off email left queued after that would never be sent or recorded, and the Campaign would never finish.
-const SEND_TRIES = QUEUE_RETRIES + 1;
-
-const sendCampaignBatch = (message: SendCampaignBatch) =>
+const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
   Effect.gen(function* sendBatch() {
     const campaigns = yield* Campaigns;
     const connections = yield* ProviderConnections;
@@ -534,6 +526,8 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
         return yield* sent;
       });
 
+    // WARNING: the queue drops a batch after its last delivery, so an email put off then would never be sent or recorded, and the Campaign would never finish; it's recorded failed instead.
+    const lastDelivery = attempt > QUEUE_RETRIES;
     const serverFailure = yield* Ref.make(Option.none<SendFailed>());
     const serverPutOff = yield* Ref.make(false);
     const anyPutOff = yield* Ref.make(false);
@@ -544,11 +538,7 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
           onNone: () =>
             sendTo(recipient).pipe(
               Effect.catchTag("SendDeferred", (deferred) =>
-                Effect.fail(
-                  recipient.deferrals + 1 < SEND_TRIES
-                    ? deferred
-                    : deferred.failed
-                )
+                Effect.fail(lastDelivery ? deferred.failed : deferred)
               ),
               Effect.tapError((notSent) => {
                 const failed =
@@ -634,14 +624,18 @@ const sendCampaignBatch = (message: SendCampaignBatch) =>
  * before their email and recorded right after it, so however often a batch
  * is delivered, no one is sent it twice (ADR 0014); a delivery that finds
  * someone claimed by another that may still be sending fails with
- * `BatchStillSending`, to be delivered again. For a scheduled Campaign that's due:
+ * `BatchStillSending`, to be delivered again. An email the Provider puts off
+ * goes back in the queue, and the delivery fails with `BatchDeferred`, to
+ * be delivered again, except on the queue's last delivery of the batch
+ * (`attempt`, counting from 1, is more than `QUEUE_RETRIES`), where it's
+ * recorded failed. For a scheduled Campaign that's due:
  * starts sending it if it's still scheduled for that time, as sending it
  * now would; if it can't, it becomes a draft again, saying why.
  */
-export const handleQueueMessage = (message: QueueMessage) =>
+export const handleQueueMessage = (message: QueueMessage, attempt: number) =>
   Effect.gen(function* handleMessage() {
     if (message._tag === "SendCampaignBatch") {
-      return yield* sendCampaignBatch(message);
+      return yield* sendCampaignBatch(message, attempt);
     }
 
     return yield* startScheduledCampaign(message);

@@ -420,7 +420,6 @@ export const CampaignsLive = Layer.effect(
           const recipients = yield* db
             .select({
               contactId: campaignRecipients.contactId,
-              deferrals: campaignRecipients.deferrals,
               email: campaignRecipients.email,
             })
             .from(campaignRecipients)
@@ -450,7 +449,6 @@ export const CampaignsLive = Layer.effect(
                   ),
             recipients: recipients.map((recipient) => ({
               contactId: ContactIdSchema.make(recipient.contactId),
-              deferrals: recipient.deferrals,
               email: recipient.email,
             })),
             replyTo: campaign.replyTo,
@@ -538,7 +536,6 @@ export const CampaignsLive = Layer.effect(
             .update(campaignRecipients)
             .set({
               claimedAt: null,
-              deferrals: sql`${campaignRecipients.deferrals} + 1`,
               status: "queued",
             })
             .where(

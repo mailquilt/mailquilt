@@ -452,7 +452,7 @@ export const campaignLists = pgTable(
  * (`sending`, at `claimed_at`) before handing its email to the Provider, so
  * only that delivery sends it, and then records it `sent`, with the
  * Provider's message ID, or `failed`, with why, or, when the Provider put
- * it off, puts it back `queued`, counting `deferrals`.
+ * it off, puts it back `queued`.
  */
 export const campaignRecipients = pgTable(
   "campaign_recipients",
@@ -467,7 +467,6 @@ export const campaignRecipients = pgTable(
     failureReason: text("failure_reason"),
     failureDetail: text("failure_detail"),
     claimedAt: timestamp("claimed_at", { withTimezone: true }),
-    deferrals: integer("deferrals").notNull().default(0),
     processedAt: timestamp("processed_at", { withTimezone: true }),
   },
   (table) => [
