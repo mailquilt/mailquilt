@@ -3,27 +3,17 @@
   "version": "10",
   "dialect": "postgres",
   "id": "8580aa7a-fa4c-471d-90f3-214243242ef3",
-  "prevIds": [
-    "c13902ac-3ce2-4120-8a0e-479acb7183ea"
-  ],
+  "prevIds": ["c13902ac-3ce2-4120-8a0e-479acb7183ea"],
   "footprints": [
     {
       "statementType": "add_column",
-      "statementTarget": [
-        "column",
-        "public",
-        "campaigns",
-        "scheduled_at"
-      ],
+      "statementTarget": ["column", "public", "campaigns", "scheduled_at"],
       "writes": [
         "s|col|public.campaigns.scheduled_at",
         "n|col|public.campaigns.scheduled_at",
         "e|col|public.campaigns.scheduled_at"
       ],
-      "reads": [
-        "n|tbl|public.campaigns",
-        "n|sch|public"
-      ]
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
     },
     {
       "statementType": "add_column",
@@ -38,54 +28,31 @@
         "n|col|public.campaigns.schedule_time_zone",
         "e|col|public.campaigns.schedule_time_zone"
       ],
-      "reads": [
-        "n|tbl|public.campaigns",
-        "n|sch|public"
-      ]
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
     },
     {
       "statementType": "add_column",
-      "statementTarget": [
-        "column",
-        "public",
-        "campaigns",
-        "schedule_missed"
-      ],
+      "statementTarget": ["column", "public", "campaigns", "schedule_missed"],
       "writes": [
         "s|col|public.campaigns.schedule_missed",
         "n|col|public.campaigns.schedule_missed",
         "e|col|public.campaigns.schedule_missed"
       ],
-      "reads": [
-        "n|tbl|public.campaigns",
-        "n|sch|public"
-      ]
+      "reads": ["n|tbl|public.campaigns", "n|sch|public"]
     },
     {
       "statementType": "add_column",
-      "statementTarget": [
-        "column",
-        "public",
-        "queue_outbox",
-        "deliver_after"
-      ],
+      "statementTarget": ["column", "public", "queue_outbox", "deliver_after"],
       "writes": [
         "s|col|public.queue_outbox.deliver_after",
         "n|col|public.queue_outbox.deliver_after",
         "e|col|public.queue_outbox.deliver_after"
       ],
-      "reads": [
-        "n|tbl|public.queue_outbox",
-        "n|sch|public"
-      ]
+      "reads": ["n|tbl|public.queue_outbox", "n|sch|public"]
     },
     {
       "statementType": "add_check",
-      "statementTarget": [
-        "table",
-        "public",
-        "campaigns"
-      ],
+      "statementTarget": ["table", "public", "campaigns"],
       "writes": [
         "s|ck|public.campaigns.campaigns_schedule_check",
         "n|ck|public.campaigns.campaigns_schedule_check",
@@ -103,11 +70,7 @@
     },
     {
       "statementType": "add_check",
-      "statementTarget": [
-        "table",
-        "public",
-        "campaigns"
-      ],
+      "statementTarget": ["table", "public", "campaigns"],
       "writes": [
         "s|ck|public.campaigns.campaigns_schedule_missed_check",
         "n|ck|public.campaigns.campaigns_schedule_missed_check",
@@ -122,14 +85,8 @@
     },
     {
       "statementType": "alter_check",
-      "statementTarget": [
-        "table",
-        "public",
-        "campaigns"
-      ],
-      "writes": [
-        "s|ck|public.campaigns.campaigns_status_check"
-      ],
+      "statementTarget": ["table", "public", "campaigns"],
+      "writes": ["s|ck|public.campaigns.campaigns_status_check"],
       "reads": [
         "n|tbl|public.campaigns",
         "n|sch|public",
