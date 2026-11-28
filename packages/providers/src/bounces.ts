@@ -3,9 +3,64 @@ import type { BounceKind, FailedDelivery } from "@repo/core";
 import { Effect, Layer, Option, Schema } from "effect";
 import PostalMime from "postal-mime";
 
+const REPORT_TYPES = new Set(["delivery-status", "global-delivery-status"]);
+
+// WARNING: split outside quotes, so a quoted value such as a boundary of `"report-type=delivery-status"` is never read as a parameter of its own.
+const splitOutsideQuotes = (value: string) => {
+  const parts = [""];
+  let quoted = false;
+
+  for (const character of value) {
+    if (character === '"') {
+      quoted = !quoted;
+    }
+
+    if (character === ";" && !quoted) {
+      parts.push("");
+    } else {
+      parts[parts.length - 1] += character;
+    }
+  }
+
+  return parts;
+};
+
 // WARNING: only a delivery status report counts; a feedback report (a complaint) or an auto-reply that quotes a status mustn't Suppress anyone.
-const DELIVERY_STATUS_REPORT =
-  /^multipart\/report\s*;.*\breport-type\s*=\s*"?(?:global-)?delivery-status"?/isu;
+const isDeliveryStatusReport = (contentType: string) => {
+  const [type = "", ...parameters] = splitOutsideQuotes(contentType);
+
+  const reportType = parameters
+    .map((parameter) => parameter.split("="))
+    .find(([name]) => name?.trim().toLowerCase() === "report-type")?.[1];
+
+  return (
+    type.trim().toLowerCase() === "multipart/report" &&
+    REPORT_TYPES.has(reportType?.trim().replaceAll('"', "").toLowerCase() ?? "")
+  );
+};
+
+// WARNING: RFC 3464's fields may carry comments in parentheses, such as `failed (permanent failure)`; they're left out before a value is read, except inside quotes.
+const withoutComments = (value: string) => {
+  let kept = "";
+  let depth = 0;
+  let quoted = false;
+
+  for (const character of value) {
+    if (character === '"' && depth === 0) {
+      quoted = !quoted;
+    }
+
+    if (!quoted && character === "(") {
+      depth += 1;
+    } else if (!quoted && character === ")" && depth > 0) {
+      depth -= 1;
+    } else if (depth === 0) {
+      kept += character;
+    }
+  }
+
+  return kept.trim();
+};
 
 const STATUS_TYPES = new Set([
   "message/delivery-status",
@@ -43,7 +98,12 @@ const fieldGroupsOf = (text: string) =>
 
             return field === undefined
               ? []
-              : [[field.name?.toLowerCase() ?? "", field.value?.trim() ?? ""]];
+              : [
+                  [
+                    field.name?.toLowerCase() ?? "",
+                    withoutComments(field.value ?? ""),
+                  ],
+                ];
           })
         )
     );
@@ -99,7 +159,7 @@ const read = (raw: Uint8Array) =>
         (header) => header.key === "content-type"
       );
 
-      if (!DELIVERY_STATUS_REPORT.test(contentType?.value ?? "")) {
+      if (!isDeliveryStatusReport(contentType?.value ?? "")) {
         return [];
       }
 

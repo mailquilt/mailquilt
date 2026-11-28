@@ -48,6 +48,15 @@ const CASES: readonly (readonly [string, string, Option.Option<BounceKind>])[] =
       Option.some("hard-bounce"),
     ],
     [
+      "a failure whose fields carry comments is still read",
+      deliveryStatusReport({
+        action: "failed",
+        comments: true,
+        status: "5.1.1",
+      }),
+      Option.some("hard-bounce"),
+    ],
+    [
       "a delay is no bounce",
       deliveryStatusReport({ action: "delayed", status: "4.4.7" }),
       Option.none(),
