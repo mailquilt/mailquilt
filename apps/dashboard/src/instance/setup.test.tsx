@@ -123,7 +123,9 @@ const renderAt = (path: string, queryClient = new QueryClient()) => {
 
 const answerStatus = (status: { setUp: boolean; signUp: string }) =>
   api.use(
-    http.get("*/api/instance", () => HttpResponse.json(status)),
+    http.get("*/api/instance", () =>
+      HttpResponse.json({ bounceDomain: null, ...status })
+    ),
     http.get("*/api/auth/get-session", () => HttpResponse.json(null))
   );
 
@@ -162,7 +164,11 @@ describe("first-run setup", () => {
       http.get("*/api/instance", async () => {
         await answered;
 
-        return HttpResponse.json({ setUp: true, signUp: "invite-only" });
+        return HttpResponse.json({
+          bounceDomain: null,
+          setUp: true,
+          signUp: "invite-only",
+        });
       })
     );
     renderAt("/sign-in");
@@ -240,7 +246,11 @@ describe("first-run setup", () => {
           await lateAnswer;
         }
 
-        return HttpResponse.json({ setUp: false, signUp: "invite-only" });
+        return HttpResponse.json({
+          bounceDomain: null,
+          setUp: false,
+          signUp: "invite-only",
+        });
       }),
       http.post(
         "*/api/instance/setup",

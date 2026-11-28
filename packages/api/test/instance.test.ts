@@ -18,6 +18,7 @@ import {
 import {
   ApiClient,
   APP_URL,
+  BOUNCE_DOMAIN,
   InstanceAdminCookie,
   makeTestApp,
   TRUSTED_IP_HEADER,
@@ -93,7 +94,7 @@ layer(makeTestApp({ install: "fresh", systemMailer: "smtp" }), {
 
         assert.deepStrictEqual(
           { ...(yield* client.instance.status()) },
-          { setUp: false, signUp: "invite-only" }
+          { bounceDomain: BOUNCE_DOMAIN, setUp: false, signUp: "invite-only" }
         );
 
         const refused = yield* signUp(uniqueEmail());

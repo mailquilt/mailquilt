@@ -1,5 +1,5 @@
 import type { Instance, SystemMailer } from "@repo/core";
-import { instanceStatus, RateLimiter, sendEmailVerification } from "@repo/core";
+import { RateLimiter, sendEmailVerification, setUpAndSignUp } from "@repo/core";
 import {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -129,7 +129,7 @@ export const makeAuth = Effect.gen(function* makeAuth() {
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
         if (ctx.path === "/sign-up/email") {
-          const status = await runPromise(instanceStatus);
+          const status = await runPromise(setUpAndSignUp);
 
           if (!status.setUp || status.signUp !== "open") {
             throw new APIError("FORBIDDEN", {
