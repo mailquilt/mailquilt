@@ -130,6 +130,7 @@ const sendFailure = (
       },
       failed: {
         ...byReason.failed,
+        detailLabel: "What went wrong",
         fix: "It may still arrive. Check the inbox before you send again.",
         title: "Cloudflare didn’t confirm it sent the email",
       },
