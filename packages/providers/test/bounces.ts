@@ -6,7 +6,7 @@ export interface ReportedDelivery {
   readonly recipient?: string;
   /** The address the email was sent to, when the server changed it, such as an alias (`Original-Recipient`). */
   readonly originalRecipient?: string;
-  /** Whether the server adds comments to the fields, as RFC 3464 allows, such as `failed (permanent failure)`. */
+  /** Whether the server adds comments to the fields, as RFC 3464 allows, such as `failed (permanent \) failure)`, with an escaped parenthesis. */
   readonly comments?: boolean;
 }
 
@@ -45,7 +45,7 @@ export const deliveryStatusReport = (
       ? []
       : [`Original-Recipient: rfc822;${delivery.originalRecipient}`]),
     `Final-Recipient: rfc822; ${delivery.recipient ?? "gone@example.com"}${delivery.comments === true ? " (the mailbox)" : ""}`,
-    `Action: ${delivery.action}${delivery.comments === true ? " (permanent failure)" : ""}`,
+    `Action: ${delivery.action}${delivery.comments === true ? " (permanent \\) failure)" : ""}`,
     `Status: ${delivery.status}`,
     `Diagnostic-Code: smtp; 550 ${delivery.status} the mailbox said no`,
     "",
@@ -72,14 +72,15 @@ export const AUTO_REPLY = [
 
 /**
  * A spam complaint in the Abuse Reporting Format, which is a report but not a
- * delivery status one, though its boundary quotes `report-type=delivery-status`
- * and it carries a delivery status part.
+ * delivery status one, though a quoted parameter with an escaped quote, and
+ * its boundary, both hold `report-type=delivery-status`, and it carries a
+ * delivery status part.
  */
 export const COMPLAINT_REPORT = [
   "From: abuse@mx.example.net",
   "Subject: Complaint",
   "MIME-Version: 1.0",
-  'Content-Type: multipart/report; report-type=feedback-report; boundary="report-type=delivery-status"',
+  'Content-Type: multipart/report; x-note="prefix\\";report-type=delivery-status;end"; report-type=feedback-report; boundary="report-type=delivery-status"',
   "",
   "--report-type=delivery-status",
   "Content-Type: text/plain",

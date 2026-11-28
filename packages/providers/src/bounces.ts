@@ -5,13 +5,18 @@ import PostalMime from "postal-mime";
 
 const REPORT_TYPES = new Set(["delivery-status", "global-delivery-status"]);
 
-// WARNING: split outside quotes, so a quoted value such as a boundary of `"report-type=delivery-status"` is never read as a parameter of its own.
+// WARNING: split outside quotes, and a backslash escapes the character after it inside them (RFC 822's quoted-pair), so a quoted value such as `"a\";report-type=delivery-status"` is never read as a parameter of its own.
 const splitOutsideQuotes = (value: string) => {
   const parts = [""];
   let quoted = false;
+  let escaped = false;
 
   for (const character of value) {
-    if (character === '"') {
+    if (escaped) {
+      escaped = false;
+    } else if (quoted && character === "\\") {
+      escaped = true;
+    } else if (character === '"') {
       quoted = !quoted;
     }
 
@@ -39,18 +44,30 @@ const isDeliveryStatusReport = (contentType: string) => {
   );
 };
 
-// WARNING: RFC 3464's fields may carry comments in parentheses, such as `failed (permanent failure)`; they're left out before a value is read, except inside quotes.
+// WARNING: RFC 3464's fields may carry comments in parentheses, such as `failed (permanent failure)`; they're left out before a value is read, except inside quotes, and a backslash escapes the character after it, as in `(permanent \\) failure)`.
 const withoutComments = (value: string) => {
   let kept = "";
   let depth = 0;
   let quoted = false;
+  let escaped = false;
 
   for (const character of value) {
-    if (character === '"' && depth === 0) {
-      quoted = !quoted;
-    }
+    if (escaped) {
+      escaped = false;
 
-    if (!quoted && character === "(") {
+      if (depth === 0) {
+        kept += character;
+      }
+    } else if ((quoted || depth > 0) && character === "\\") {
+      escaped = true;
+
+      if (depth === 0) {
+        kept += character;
+      }
+    } else if (character === '"' && depth === 0) {
+      quoted = !quoted;
+      kept += character;
+    } else if (!quoted && character === "(") {
       depth += 1;
     } else if (!quoted && character === ")" && depth > 0) {
       depth -= 1;
