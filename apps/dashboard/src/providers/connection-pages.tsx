@@ -23,11 +23,12 @@ import {
   useUpdateConnection,
 } from "./providers-api.ts";
 
-const SENDER_DESCRIPTION =
-  "Who email sent through this connection is from. Your provider must allow this address.";
-
-const SES_SENDER_DESCRIPTION =
-  "Who email sent through this connection is from. It must be an address or domain verified in SES.";
+const SENDER_DESCRIPTION = {
+  cloudflare:
+    "Who email sent through this connection is from. Its domain must be set up for Email Sending in Cloudflare.",
+  ses: "Who email sent through this connection is from. It must be an address or domain verified in SES.",
+  smtp: "Who email sent through this connection is from. Your provider must allow this address.",
+} as const;
 
 const SENDER_EXAMPLE = { email: "news@example.com", name: "Acme News" };
 
@@ -52,11 +53,11 @@ const FormPage = ({
   </PageFrame>
 );
 
-const senderDescription = (provider: "smtp" | "ses") =>
-  provider === "ses" ? SES_SENDER_DESCRIPTION : SENDER_DESCRIPTION;
+const senderDescription = (provider: keyof typeof SENDER_DESCRIPTION) =>
+  SENDER_DESCRIPTION[provider];
 
 /**
- * Connects an SMTP server or an SES account, then opens its test email on
+ * Connects an SMTP server, an SES account or a Cloudflare Email account, then opens its test email on
  * Providers. It waits for the install's status, which says whether an SMTP
  * server can use a bounce address, so the form never draws without its
  * Bounces part and then gains it.
@@ -137,7 +138,7 @@ const editDescription = (connection: ProviderConnection | undefined) => {
   }
 
   if (connection?.provider === "cloudflare") {
-    return "Cloudflare Email is in beta.";
+    return "Changing the account ID asks for the API token again.";
   }
 
   return connection?.signsIn === true
@@ -182,24 +183,6 @@ export const EditPage = ({
                   ? "The connection didn’t load"
                   : "The form didn’t load"
               }
-            />
-          </TableRegion>
-        </div>
-      );
-    }
-
-    if (connection?.provider === "cloudflare") {
-      return (
-        <div className="mq-capped">
-          <TableRegion label="Connection">
-            <EmptyState
-              actions={
-                <LinkButton href="/providers" variant="primary">
-                  Go to Providers
-                </LinkButton>
-              }
-              description="For now, Cloudflare Email connections are changed only through Mailquilt’s API."
-              title="This connection can’t be edited here yet"
             />
           </TableRegion>
         </div>

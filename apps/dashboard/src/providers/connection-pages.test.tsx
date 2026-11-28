@@ -60,6 +60,17 @@ const SES = {
   ses: { region: "eu-west-1" },
 };
 
+const CLOUDFLARE = {
+  cloudflare: { accountId: "023e105f4ecef8ad9ca31a8372d0c353" },
+  createdAt: "2026-11-28T09:00:00.000Z",
+  defaultForCampaigns: false,
+  emailsPerMinute: null,
+  from: { email: "orders@acme.example" },
+  id: "pcn_01h455vb4pex5vsknk084sn02s",
+  name: "Cloudflare",
+  provider: "cloudflare",
+};
+
 const CONNECTIONS = "*/api/organizations/:organizationId/provider-connections";
 
 const CONNECTION = `${CONNECTIONS}/:providerConnectionId`;
@@ -225,6 +236,59 @@ describe("connecting and editing an SMTP server", () => {
     });
   });
 
+  it("connects a Cloudflare Email account, labelled beta, with its account ID and API token", async () => {
+    const create = answerWith(201);
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK])),
+      http.post(CONNECTIONS, create.handler)
+    );
+    renderWithOrganizations(<ConnectPage organization={organization} />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: /Cloudflare Email Beta/u })
+    );
+    type("Name", "Cloudflare");
+    type("Account ID", " 023e105f4ecef8ad9ca31a8372d0c353 ");
+    fireEvent.change(
+      screen.getByLabelText("API token", { selector: "input" }),
+      {
+        target: { value: " the api token " },
+      }
+    );
+    type("From email", "orders@acme.example");
+    submit();
+
+    await expect(create.received).resolves.toStrictEqual({
+      cloudflare: { accountId: "023e105f4ecef8ad9ca31a8372d0c353" },
+      credentials: { apiToken: "the api token" },
+      emailsPerMinute: null,
+      from: { email: "orders@acme.example" },
+      name: "Cloudflare",
+      provider: "cloudflare",
+    });
+  });
+
+  it("refuses an account ID that isn't Cloudflare's 32 characters", async () => {
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK]))
+    );
+    renderWithOrganizations(<ConnectPage organization={organization} />);
+
+    fireEvent.click(
+      await screen.findByRole("radio", { name: /Cloudflare Email/u })
+    );
+    type("Account ID", "023e105f-4ece");
+    submit();
+
+    await expect(
+      screen.findByText(
+        "Enter the 32-character account ID from your Cloudflare dashboard."
+      )
+    ).resolves.toBeTruthy();
+  });
+
   it("refuses a sending rate that isn't a whole number from 10 to 60,000 a minute", async () => {
     api.use(http.get("*/api/organizations", () => HttpResponse.json([ACME])));
     renderWithOrganizations(<ConnectPage organization={organization} />);
@@ -386,6 +450,72 @@ describe("connecting and editing an SMTP server", () => {
         .getByRole("radio", { name: "Enter a new one" })
         .getAttribute("aria-checked")
     ).toBe("true");
+  });
+
+  it("keeps a Cloudflare Email account's saved API token when only its name changes", async () => {
+    const update = answerWith(200);
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([CLOUDFLARE])),
+      http.put(CONNECTION, update.handler)
+    );
+    renderEdit(CLOUDFLARE.id);
+
+    await screen.findByLabelText("Name");
+    type("Name", "Cloudflare (Acme)");
+    submit();
+
+    await expect(update.received).resolves.toStrictEqual({
+      cloudflare: { accountId: "023e105f4ecef8ad9ca31a8372d0c353" },
+      emailsPerMinute: null,
+      from: { email: "orders@acme.example" },
+      name: "Cloudflare (Acme)",
+      provider: "cloudflare",
+    });
+  });
+
+  it("asks for the API token again when a Cloudflare account's ID changes", async () => {
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([CLOUDFLARE]))
+    );
+    renderEdit(CLOUDFLARE.id);
+
+    await screen.findByLabelText("Name");
+    expect(
+      screen.queryByLabelText("API token", { selector: "input" })
+    ).toBeNull();
+
+    type("Account ID", "9a7806061c88ada191ed06f989cc3dac");
+
+    await expect(
+      screen.findByLabelText("API token", { selector: "input" })
+    ).resolves.toBeTruthy();
+    expect(
+      screen
+        .getByRole("radio", { name: "Enter a new one" })
+        .getAttribute("aria-checked")
+    ).toBe("true");
+  });
+
+  it("says to enter the API token again when the account ID changed while it was kept", async () => {
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([CLOUDFLARE])),
+      http.put(CONNECTION, () =>
+        HttpResponse.json({ _tag: "CredentialsRequired" }, { status: 422 })
+      )
+    );
+    renderEdit(CLOUDFLARE.id);
+
+    await screen.findByLabelText("Name");
+    submit();
+
+    await expect(
+      screen.findByText(
+        "You changed the account ID, so enter its API token again. Mailquilt only sends it to the account it was entered for."
+      )
+    ).resolves.toBeTruthy();
   });
 
   it("says so when the connection was deleted while being edited", async () => {

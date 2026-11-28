@@ -1,4 +1,6 @@
 import type {
+  CloudflareAccount,
+  CloudflareCredentials,
   OrganizationId,
   ProviderConnection,
   ProviderConnectionId,
@@ -26,6 +28,10 @@ export type ConnectionSettings = {
 } & (
   | { readonly provider: "smtp"; readonly smtp: typeof SmtpServer.Type }
   | { readonly provider: "ses"; readonly ses: typeof SesAccount.Type }
+  | {
+      readonly provider: "cloudflare";
+      readonly cloudflare: typeof CloudflareAccount.Type;
+    }
 );
 
 /**
@@ -40,6 +46,9 @@ export type ConnectionToSave =
     })
   | (Extract<ConnectionSettings, { readonly provider: "ses" }> & {
       readonly credentials?: typeof SesCredentials.Type;
+    })
+  | (Extract<ConnectionSettings, { readonly provider: "cloudflare" }> & {
+      readonly credentials?: typeof CloudflareCredentials.Type;
     });
 
 /**
@@ -84,8 +93,14 @@ const useChangeConnections = (organizationId: OrganizationId) => {
   };
 };
 
-// WARNING: SES always needs its access key, and a new SMTP server without a sign-in leaves `credentials` out rather than sending `null`, which create refuses.
+// WARNING: SES always needs its access key and Cloudflare Email its API token, and a new SMTP server without a sign-in leaves `credentials` out rather than sending `null`, which create refuses.
 const newConnectionPayload = (connection: ConnectionToSave) => {
+  if (connection.provider === "cloudflare") {
+    return connection.credentials === undefined
+      ? undefined
+      : { ...connection, credentials: connection.credentials };
+  }
+
   if (connection.provider === "ses") {
     return connection.credentials === undefined
       ? undefined
@@ -99,7 +114,7 @@ const newConnectionPayload = (connection: ConnectionToSave) => {
     : { ...settings, credentials };
 };
 
-/** Connects an SMTP server or an SES account, with its credentials. */
+/** Connects an SMTP server, an SES account or a Cloudflare Email account, with its credentials. */
 export const useCreateConnection = (organizationId: OrganizationId) => {
   const changeConnections = useChangeConnections(organizationId);
 
@@ -109,7 +124,7 @@ export const useCreateConnection = (organizationId: OrganizationId) => {
         const payload = newConnectionPayload(connection);
 
         return payload === undefined
-          ? Effect.die(new Error("An SES account needs its access key"))
+          ? Effect.die(new Error("A new connection needs its credentials"))
           : client.providerConnections.create({
               params: { organizationId },
               payload,

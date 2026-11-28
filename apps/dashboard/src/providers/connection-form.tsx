@@ -1,4 +1,5 @@
 import {
+  Badge,
   Banner,
   Button,
   Checkbox,
@@ -7,6 +8,7 @@ import {
   Select,
 } from "@cloudflare/kumo";
 import {
+  CloudflareAccountId,
   MailAddress,
   MAX_CREDENTIAL_LENGTH,
   MAX_EMAILS_PER_MINUTE,
@@ -17,6 +19,7 @@ import {
   SmtpSecuritySchema,
 } from "@repo/domain";
 import type {
+  CloudflareAccount,
   Sender,
   SesAccount,
   SmtpSecurity,
@@ -37,7 +40,7 @@ import { SES_REGIONS, sesRegionLabel } from "./ses-regions.ts";
 
 const SignInSchema = Schema.Literals(["keep", "new", "none"]);
 
-const ProviderSchema = Schema.Literals(["smtp", "ses"]);
+const ProviderSchema = Schema.Literals(["smtp", "ses", "cloudflare"]);
 
 const AccessKeySchema = Schema.Literals(["keep", "new"]);
 
@@ -56,6 +59,9 @@ const ConnectionFormValues = Schema.Struct({
   accessKey: AccessKeySchema,
   accessKeyId: Schema.String,
   secretAccessKey: Schema.String,
+  accountId: Schema.String,
+  apiTokenChoice: AccessKeySchema,
+  apiToken: Schema.String,
   emailsPerMinute: Schema.String,
   usesBounceAddress: Schema.Boolean,
 });
@@ -105,6 +111,9 @@ const SERVER_CHANGED_MESSAGE =
 const REGION_CHANGED_MESSAGE =
   "You changed the Region, so enter the access key again. Mailquilt only sends it to the account it was entered for.";
 
+const ACCOUNT_CHANGED_MESSAGE =
+  "You changed the account ID, so enter its API token again. Mailquilt only sends it to the account it was entered for.";
+
 const RATE_MESSAGE = `Enter a whole number of emails from ${MIN_EMAILS_PER_MINUTE} to ${MAX_EMAILS_PER_MINUTE.toLocaleString("en")} a minute.`;
 
 const FIELD = "w-full max-sm:h-11 pointer-coarse:h-11";
@@ -142,8 +151,19 @@ export interface SavedSesAccount {
   readonly emailsPerMinute: number | null;
 }
 
-/** A connection the form edits: an SMTP server or an SES account. */
-export type SavedConnection = SavedServer | SavedSesAccount;
+/** A Cloudflare Email account already saved, as the API shows it: its account ID, never its API token. */
+export interface SavedCloudflareAccount {
+  readonly name: string;
+  readonly from: typeof Sender.Type;
+  readonly cloudflare: typeof CloudflareAccount.Type;
+  readonly emailsPerMinute: number | null;
+}
+
+/** A connection the form edits: an SMTP server, an SES account or a Cloudflare Email account. */
+export type SavedConnection =
+  | SavedServer
+  | SavedSesAccount
+  | SavedCloudflareAccount;
 
 /**
  * What to say when saving an SMTP server failed: the message every server
@@ -181,9 +201,11 @@ export const connectionFailureMessage = (
     return;
   }
 
-  return Predicate.isTagged(failure, "CredentialsRequired")
-    ? REGION_CHANGED_MESSAGE
-    : otherConnectionFailure(failure);
+  if (!Predicate.isTagged(failure, "CredentialsRequired")) {
+    return otherConnectionFailure(failure);
+  }
+
+  return provider === "ses" ? REGION_CHANGED_MESSAGE : ACCOUNT_CHANGED_MESSAGE;
 };
 
 const decodeHost = Schema.decodeSync(SmtpHost);
@@ -196,10 +218,30 @@ const CHECKS = {
   name: { onSubmit: Schema.toStandardSchemaV1(ProviderConnectionName) },
 };
 
+const isAccountId = Schema.is(CloudflareAccountId);
+
 const isSes = (
   connection: SavedConnection | undefined
 ): connection is SavedSesAccount =>
   connection !== undefined && "ses" in connection;
+
+const isCloudflare = (
+  connection: SavedConnection | undefined
+): connection is SavedCloudflareAccount =>
+  connection !== undefined && "cloudflare" in connection;
+
+const isServer = (
+  connection: SavedConnection | undefined
+): connection is SavedServer =>
+  connection !== undefined && "smtp" in connection;
+
+const providerOf = (connection?: SavedConnection) => {
+  if (isSes(connection)) {
+    return "ses" satisfies Provider;
+  }
+
+  return isCloudflare(connection) ? "cloudflare" : "smtp";
+};
 
 const signInFor = (connection?: SavedServer) => {
   if (connection === undefined) {
@@ -216,11 +258,14 @@ const rateTextOf = (connection?: SavedConnection) =>
     : String(connection.emailsPerMinute);
 
 const defaultsFor = (connection?: SavedConnection) => {
-  const server = isSes(connection) ? undefined : connection;
+  const server = isServer(connection) ? connection : undefined;
 
   const values: typeof ConnectionFormValues.Encoded = {
     accessKey: isSes(connection) ? "keep" : "new",
     accessKeyId: "",
+    accountId: isCloudflare(connection) ? connection.cloudflare.accountId : "",
+    apiToken: "",
+    apiTokenChoice: isCloudflare(connection) ? "keep" : "new",
     emailsPerMinute: rateTextOf(connection),
     fromEmail: connection?.from.email ?? "",
     fromName: connection?.from.name ?? "",
@@ -228,7 +273,7 @@ const defaultsFor = (connection?: SavedConnection) => {
     name: connection?.name ?? "",
     password: "",
     port: String(server?.smtp.port ?? USUAL_PORT.starttls),
-    provider: isSes(connection) ? "ses" : "smtp",
+    provider: providerOf(connection),
     region: isSes(connection) ? connection.ses.region : "",
     secretAccessKey: "",
     security: server?.smtp.security ?? "starttls",
@@ -256,6 +301,23 @@ const resultFrom = (
       : Number(value.emailsPerMinute.trim());
 
   const basics = { emailsPerMinute, from, name: value.name };
+
+  if (value.provider === "cloudflare") {
+    const account = {
+      ...basics,
+      cloudflare: { accountId: value.accountId.trim() },
+      provider: "cloudflare" as const,
+    };
+
+    if (value.apiTokenChoice === "keep") {
+      return account satisfies ConnectionFormResult;
+    }
+
+    return {
+      ...account,
+      credentials: { apiToken: Redacted.make(value.apiToken.trim()) },
+    } satisfies ConnectionFormResult;
+  }
 
   if (value.provider === "ses") {
     const account = {
@@ -331,6 +393,19 @@ const rateIssue = (rate: string) => {
     : issue(RATE_MESSAGE);
 };
 
+const NAME_EXAMPLE: Record<Provider, string> = {
+  cloudflare: "Cloudflare",
+  ses: "SES",
+  smtp: "Postmark",
+};
+
+const RATE_DESCRIPTION: Record<Provider, string> = {
+  cloudflare:
+    "Leave it empty to send as fast as Cloudflare takes them. When Cloudflare asks Mailquilt to slow down, it waits and tries again.",
+  ses: "Leave it empty to keep to your SES account’s own limit, which Mailquilt reads from SES before each batch.",
+  smtp: "Leave it empty to send as fast as your server takes them. Set it if your provider limits you, such as Microsoft 365’s 30 a minute.",
+};
+
 const BOUNCES_ABOUT =
   "Where receiving servers send the emails they couldn’t deliver.";
 
@@ -395,13 +470,19 @@ const SignInChoice = ({
   );
 };
 
-const AccessKeyChoice = ({ field }: { field: AnyFieldApi }) => {
+const SavedSecretChoice = ({
+  field,
+  legend,
+}: {
+  field: AnyFieldApi;
+  legend: string;
+}) => {
   const { message } = useFieldError(field);
 
   return (
     <Radio.Group
       error={message}
-      legend="Saved access key"
+      legend={legend}
       name={field.name}
       onValueChange={(value) =>
         field.handleChange(Schema.decodeUnknownSync(AccessKeySchema)(value))
@@ -458,19 +539,31 @@ const PROVIDERS = [
     label: "SMTP server",
     value: "smtp",
   },
+  {
+    description:
+      "Cloudflare’s Email Sending, with an API token. Cloudflare describes it for transactional email, such as receipts, so Campaigns through it are in beta.",
+    label: (
+      <span className="inline-flex flex-wrap items-center gap-2">
+        Cloudflare Email <Badge variant="outline">Beta</Badge>
+      </span>
+    ),
+    value: "cloudflare",
+  },
 ] as const;
 
 /**
  * A Provider Connection's settings, or, without a name or Cancel, the System
  * Mailer's SMTP server. With `chooseProvider`, it first asks which Provider
  * the connection is, and the sections under the choice follow it: an SMTP
- * server's host, port, encryption and sign-in, or an SES account's Region and
- * access key. Editing one with saved credentials offers to keep them, unless
- * where they go changes (the server, or the Region): then they must be
- * entered again, as the API requires. With `sendingRate`, it asks for the
- * most emails a minute, empty for none. With `bounceDomain`, an SMTP server
- * can send its Campaign emails from a bounce address there, and the form says
- * what that changes. Fields are checked with the same rules the API uses.
+ * server's host, port, encryption and sign-in, an SES account's Region and
+ * access key, or a Cloudflare Email account's ID and API token (in beta, which
+ * its choice says). Editing one with saved credentials offers to keep them,
+ * unless where they go changes (the server, the Region or the account): then
+ * they must be entered again, as the API requires. With `sendingRate`, it
+ * asks for the most emails a minute, empty for none. With `bounceDomain`, an
+ * SMTP server can send its Campaign emails from a bounce address there, and
+ * the form says what that changes; a Cloudflare Email account says Cloudflare
+ * keeps its bounces. Fields are checked with the same rules the API uses.
  */
 export const ConnectionForm = ({
   bounceDomain,
@@ -521,7 +614,7 @@ export const ConnectionForm = ({
   sendingRate?: boolean;
   submitLabel: string;
 }) => {
-  const savedServer = isSes(connection) ? undefined : connection;
+  const savedServer = isServer(connection) ? connection : undefined;
   const saved = savedServer?.signsIn ?? false;
 
   const domain = bounceDomain ?? null;
@@ -561,6 +654,19 @@ export const ConnectionForm = ({
     }
   };
 
+  const accountChanged = (values: typeof form.state.values) =>
+    isCloudflare(connection) &&
+    values.accountId.trim() !== connection.cloudflare.accountId;
+
+  const requireNewTokenIfAccountChanged = () => {
+    if (
+      form.getFieldValue("apiTokenChoice") === "keep" &&
+      accountChanged(form.state.values)
+    ) {
+      form.setFieldValue("apiTokenChoice", "new");
+    }
+  };
+
   const requireNewKeyIfRegionChanged = () => {
     if (
       form.getFieldValue("accessKey") === "keep" &&
@@ -573,6 +679,19 @@ export const ConnectionForm = ({
   const serverListeners = { onChange: requireNewSignInIfServerChanged };
 
   const bouncesPart = (provider: Provider) => {
+    if (provider === "cloudflare") {
+      return (
+        <Part about={BOUNCES_ABOUT} nested={nested} title="Bounces">
+          <p className="text-sm leading-5 text-pretty text-kumo-subtle">
+            Cloudflare keeps them and sends Mailquilt no bounce reports. For a
+            while after an address bounces, Cloudflare won’t send to it, and
+            Mailquilt records those emails as failed. To stop Campaigns to an
+            address for good, Suppress it on the Suppressions page.
+          </p>
+        </Part>
+      );
+    }
+
     if (provider !== "smtp" || bounceDomain === undefined) {
       return null;
     }
@@ -792,7 +911,9 @@ export const ConnectionForm = ({
                   : undefined,
             }}
           >
-            {(field) => <AccessKeyChoice field={field} />}
+            {(field) => (
+              <SavedSecretChoice field={field} legend="Saved access key" />
+            )}
           </form.Field>
         ) : null}
         <form.Subscribe selector={(state) => state.values.accessKey}>
@@ -844,6 +965,95 @@ export const ConnectionForm = ({
     </>
   );
 
+  const cloudflareSections = (
+    <>
+      <Part
+        about="The Cloudflare account Mailquilt sends through. On a Workers Free plan, Cloudflare sends only to addresses verified in it."
+        nested={nested}
+        title="Account"
+      >
+        <form.Field
+          listeners={{ onChange: requireNewTokenIfAccountChanged }}
+          name="accountId"
+          validators={{
+            onSubmit: ({ value }) =>
+              isAccountId(value.trim())
+                ? undefined
+                : issue(
+                    "Enter the 32-character account ID from your Cloudflare dashboard."
+                  ),
+          }}
+        >
+          {(field) => (
+            <FormField
+              autoCapitalize="none"
+              autoComplete="off"
+              className={`${FIELD} font-mono`}
+              description="The 32 letters and numbers after dash.cloudflare.com/ in your browser’s address bar, once you’re signed in."
+              field={field}
+              label="Account ID"
+              placeholder="023e105f4ecef8ad9ca31a8372d0c353"
+              size="base"
+              spellCheck={false}
+            />
+          )}
+        </form.Field>
+      </Part>
+      <Part
+        about="With the Email Sending Write permission for this account. Stored encrypted. Mailquilt never shows it again, not even to you."
+        nested={nested}
+        title="API token"
+      >
+        {isCloudflare(connection) ? (
+          <form.Field
+            name="apiTokenChoice"
+            validators={{
+              onSubmit: ({ fieldApi, value }) =>
+                value === "keep" && accountChanged(fieldApi.form.state.values)
+                  ? issue(ACCOUNT_CHANGED_MESSAGE)
+                  : undefined,
+            }}
+          >
+            {(field) => (
+              <SavedSecretChoice field={field} legend="Saved API token" />
+            )}
+          </form.Field>
+        ) : null}
+        <form.Subscribe selector={(state) => state.values.apiTokenChoice}>
+          {(choice) =>
+            choice === "new" ? (
+              <form.Field
+                name="apiToken"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    credentialIssue(value, "Enter the API token."),
+                }}
+              >
+                {(field) => (
+                  <PasswordField
+                    autoComplete="new-password"
+                    className={FIELD}
+                    field={field}
+                    label="API token"
+                    size="base"
+                  />
+                )}
+              </form.Field>
+            ) : null
+          }
+        </form.Subscribe>
+      </Part>
+    </>
+  );
+
+  const sectionsFor = (provider: Provider) => {
+    if (provider === "cloudflare") {
+      return cloudflareSections;
+    }
+
+    return provider === "ses" ? sesSections : smtpSections;
+  };
+
   return (
     <form
       className={nested ? "flex flex-col gap-5" : "flex flex-col"}
@@ -878,12 +1088,6 @@ export const ConnectionForm = ({
                     value={option.value}
                   />
                 ))}
-                <Radio.Item
-                  description="Connects directly in a later Mailquilt update."
-                  disabled
-                  label="Cloudflare Email (soon)"
-                  value="cloudflare"
-                />
               </Radio.Group>
             )}
           </form.Field>
@@ -904,7 +1108,7 @@ export const ConnectionForm = ({
                     className={FIELD}
                     field={field}
                     label="Name"
-                    placeholder={provider === "ses" ? "SES" : "Postmark"}
+                    placeholder={NAME_EXAMPLE[provider]}
                     size="base"
                   />
                 )}
@@ -914,7 +1118,7 @@ export const ConnectionForm = ({
         </Part>
       ) : null}
       <form.Subscribe selector={(state) => state.values.provider}>
-        {(provider) => (provider === "ses" ? sesSections : smtpSections)}
+        {(provider) => sectionsFor(provider)}
       </form.Subscribe>
       {sendingRate ? (
         <Part
@@ -932,11 +1136,7 @@ export const ConnectionForm = ({
                   <FormField
                     autoComplete="off"
                     className={FIELD}
-                    description={
-                      provider === "ses"
-                        ? "Leave it empty to keep to your SES account’s own limit, which Mailquilt reads from SES before each batch."
-                        : "Leave it empty to send as fast as your server takes them. Set it if your provider limits you, such as Microsoft 365’s 30 a minute."
-                    }
+                    description={RATE_DESCRIPTION[provider]}
                     field={field}
                     inputMode="numeric"
                     label="Most emails a minute (optional)"

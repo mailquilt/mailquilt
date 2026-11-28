@@ -327,7 +327,7 @@ export const BouncesPage = ({
 
   const crumbs = [
     { href: "/providers", label: "Providers" },
-    ...(connection === undefined || connection.provider === "cloudflare"
+    ...(connection === undefined
       ? []
       : [
           {

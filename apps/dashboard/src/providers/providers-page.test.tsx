@@ -48,6 +48,17 @@ const SES = {
   ses: { region: "eu-west-1" },
 };
 
+const CLOUDFLARE = {
+  cloudflare: { accountId: "023e105f4ecef8ad9ca31a8372d0c353" },
+  createdAt: "2026-11-28T09:00:00.000Z",
+  defaultForCampaigns: false,
+  emailsPerMinute: null,
+  from: { email: "orders@acme.example" },
+  id: "pcn_01h455vb4pex5vsknk084sn02t",
+  name: "Cloudflare",
+  provider: "cloudflare",
+};
+
 const missingFrom = (row: HTMLElement, texts: readonly string[]) =>
   texts.filter((text) => !(row.textContent ?? "").includes(text));
 
@@ -169,6 +180,24 @@ describe("providers page", () => {
         "Default for new Campaigns",
       ])
     ).toStrictEqual([]);
+  });
+
+  it("labels a Cloudflare Email connection beta, and tells its account apart by the ends of its ID", async () => {
+    withConnections([POSTMARK, CLOUDFLARE]);
+    renderPage();
+
+    const cloudflare = await screen.findByRole("row", { name: /^Cloudflare/u });
+    const postmark = screen.getByRole("row", { name: /^Postmark/u });
+
+    expect(
+      missingFrom(cloudflare, [
+        "Cloudflare Email, connected",
+        "Beta",
+        "Cloudflare, 023e…c353",
+        "HTTPS, with an API token",
+      ])
+    ).toStrictEqual([]);
+    expect(postmark.textContent).not.toContain("Beta");
   });
 
   it("offers the steps for bounces and complaints in an SES connection's menu only", async () => {

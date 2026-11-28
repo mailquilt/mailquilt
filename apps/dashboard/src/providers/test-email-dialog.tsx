@@ -135,7 +135,7 @@ const sendFailure = (
       },
       rejected: {
         ...byReason.rejected,
-        fix: "On a Workers Free plan, Cloudflare sends only to addresses verified in your account. It also won’t send to an address on its suppression list.",
+        fix: "Check that the sender’s domain is set up for Email Sending in Cloudflare. On a Workers Free plan, Cloudflare sends only to addresses verified in your account, and it won’t send to an address on its suppression list.",
         title: "Cloudflare refused the email",
       },
       unreachable: {
@@ -144,12 +144,7 @@ const sendFailure = (
       },
     };
 
-    // WARNING: Cloudflare Email connections can't be edited in the dashboard yet, so no failure offers to edit one.
-    return {
-      ...cloudflareByReason[reason],
-      canEdit: false,
-      detail,
-    } satisfies Failure;
+    return { ...cloudflareByReason[reason], detail } satisfies Failure;
   }
 
   const sesByReason: typeof byReason = {
