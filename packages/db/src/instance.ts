@@ -1,7 +1,6 @@
 import { CredentialCipher, Instance } from "@repo/core";
 import type { SystemMailerChanges } from "@repo/core";
 import {
-  InstanceStatus,
   Sender,
   SetupClosed,
   SignUpPolicySchema,
@@ -214,10 +213,10 @@ export const InstanceLive = Layer.effect(
           .select({ signUp: instance.signUp })
           .from(instance);
 
-        return new InstanceStatus({
+        return {
           setUp: row !== undefined,
           signUp: yield* decodeSignUp(row?.signUp ?? SIGN_UP_BEFORE_SETUP),
-        });
+        };
       }).pipe(Effect.orDie),
 
       systemMailer: Effect.gen(function* systemMailer() {

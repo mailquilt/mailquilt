@@ -5,17 +5,18 @@ import type {
   SmtpCredentials,
   SmtpServer,
   UserId,
-  InstanceStatus,
   SetupClosed,
 } from "@repo/domain";
 import {
   InstanceAdminRequired,
   InstanceSettings,
+  InstanceStatus,
   SystemMailerFromEnvironment,
   SystemMailerSettings,
 } from "@repo/domain";
 import { Context, Effect, Option } from "effect";
 
+import { BounceDomain } from "./bounce-domain.ts";
 import { CurrentUser } from "./current-user.ts";
 import { InstanceAdmin } from "./instance-admin.ts";
 import { SystemMailerConfig } from "./system-mailer-config.ts";
@@ -51,7 +52,11 @@ export interface SystemMailerChanges {
 export class Instance extends Context.Service<
   Instance,
   {
-    readonly status: Effect.Effect<InstanceStatus>;
+    /** Whether first-run setup has made the instance admin, and who may sign up. */
+    readonly status: Effect.Effect<{
+      readonly setUp: boolean;
+      readonly signUp: SignUpPolicy;
+    }>;
     /**
      * Makes the instance admin and closes setup for good, in one
      * transaction, so of two setups at once only one succeeds. Fails with
@@ -84,11 +89,26 @@ export class Instance extends Context.Service<
   }
 >()("@repo/core/Instance") {}
 
-/** Whether setup has run, and who may sign up. Anyone may ask. */
-export const instanceStatus = Effect.gen(function* instanceStatus() {
+/** Whether setup has run, and who may sign up, for checks that need only that, such as sign-up's. */
+export const setUpAndSignUp = Effect.gen(function* setUpAndSignUp() {
   const instance = yield* Instance;
 
   return yield* instance.status;
+});
+
+/**
+ * Whether setup has run, who may sign up, and the domain the install
+ * receives bounces at, if any. Anyone may ask.
+ */
+export const instanceStatus = Effect.gen(function* instanceStatus() {
+  const instance = yield* Instance;
+  const { domain } = yield* BounceDomain;
+  const status = yield* instance.status;
+
+  return new InstanceStatus({
+    ...status,
+    bounceDomain: Option.getOrNull(domain),
+  });
 });
 
 /** First-run setup: makes the instance admin, once. */

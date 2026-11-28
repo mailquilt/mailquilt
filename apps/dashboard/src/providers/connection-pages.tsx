@@ -7,6 +7,7 @@ import type {
 import { useNavigate } from "@tanstack/react-router";
 
 import { loadingFirstTime } from "../api.ts";
+import { useInstanceStatus } from "../instance/instance-api.ts";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageHeader } from "../layout/page-header.tsx";
@@ -54,14 +55,43 @@ const FormPage = ({
 const senderDescription = (provider: "smtp" | "ses") =>
   provider === "ses" ? SES_SENDER_DESCRIPTION : SENDER_DESCRIPTION;
 
-/** Connects an SMTP server or an SES account, then opens its test email on Providers. */
+/**
+ * Connects an SMTP server or an SES account, then opens its test email on
+ * Providers. It waits for the install's status, which says whether an SMTP
+ * server can use a bounce address, so the form never draws without its
+ * Bounces part and then gains it.
+ */
 export const ConnectPage = ({
   organization,
 }: {
   organization: Organization;
 }) => {
   const create = useCreateConnection(organization.id);
+  const status = useInstanceStatus();
   const navigate = useNavigate();
+
+  if (loadingFirstTime(status)) {
+    return <PageAreaLoading label="Loading the form" />;
+  }
+
+  if (status.data === undefined) {
+    return (
+      <FormPage
+        description="You’ll send yourself a test email next, to check it works."
+        title="Connect a provider"
+      >
+        <div className="mq-capped">
+          <TableRegion label="Connect a provider">
+            <LoadFailed
+              onRetry={() => status.refetch()}
+              retrying={status.isFetching}
+              title="The form didn’t load"
+            />
+          </TableRegion>
+        </div>
+      </FormPage>
+    );
+  }
 
   return (
     <FormPage
@@ -69,6 +99,7 @@ export const ConnectPage = ({
       title="Connect a provider"
     >
       <ConnectionForm
+        bounceDomain={status.data.bounceDomain}
         busy={create.isPending}
         busyLabel="Connecting…"
         cancelHref="/providers"
@@ -119,10 +150,11 @@ export const EditPage = ({
   providerConnectionId: ProviderConnectionId;
 }) => {
   const connections = useProviderConnections(organization.id);
+  const status = useInstanceStatus();
   const update = useUpdateConnection(organization.id, providerConnectionId);
   const navigate = useNavigate();
 
-  if (loadingFirstTime(connections)) {
+  if (loadingFirstTime(connections) || loadingFirstTime(status)) {
     return <PageAreaLoading label="Loading the connection" />;
   }
 
@@ -131,14 +163,21 @@ export const EditPage = ({
   );
 
   const body = () => {
-    if (connections.data === undefined) {
+    if (connections.data === undefined || status.data === undefined) {
       return (
         <div className="mq-capped">
           <TableRegion label="Connection">
             <LoadFailed
-              onRetry={() => connections.refetch()}
-              retrying={connections.isFetching}
-              title="The connection didn’t load"
+              onRetry={() => {
+                connections.refetch();
+                status.refetch();
+              }}
+              retrying={connections.isFetching || status.isFetching}
+              title={
+                connections.data === undefined
+                  ? "The connection didn’t load"
+                  : "The form didn’t load"
+              }
             />
           </TableRegion>
         </div>
@@ -165,6 +204,7 @@ export const EditPage = ({
 
     return (
       <ConnectionForm
+        bounceDomain={status.data.bounceDomain}
         busy={update.isPending}
         key={providerConnectionId}
         busyLabel="Saving…"

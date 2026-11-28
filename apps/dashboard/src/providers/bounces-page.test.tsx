@@ -11,7 +11,18 @@ import {
 } from "../organizations/test-organizations.tsx";
 import { BouncesPage } from "./bounces-page.tsx";
 
-const api = setupServer();
+const STATUS = "*/api/instance";
+
+// WARNING: an SMTP connection's page asks the install's status; most tests are on an install that receives no bounces.
+const api = setupServer(
+  http.get(STATUS, () =>
+    HttpResponse.json({
+      bounceDomain: null,
+      setUp: true,
+      signUp: "invite-only",
+    })
+  )
+);
 
 const organization = Schema.decodeUnknownSync(Organization)(ACME);
 
@@ -175,9 +186,30 @@ describe("the steps for an SES connection's bounces and complaints", () => {
     renderBounces(POSTMARK.id);
 
     await screen.findByRole("heading", {
-      name: "Only Amazon SES reports bounces here",
+      name: "This page is for Amazon SES connections",
     });
 
     expect(asked).toBeFalsy();
+    expect(screen.queryByRole("link", { name: "Edit Postmark" })).toBeNull();
+  });
+
+  it("points an SMTP server to its settings on an install that receives bounces", async () => {
+    api.use(
+      http.get(STATUS, () =>
+        HttpResponse.json({
+          bounceDomain: "bounces.mail.example.com",
+          setUp: true,
+          signUp: "invite-only",
+        })
+      ),
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK]))
+    );
+    renderBounces(POSTMARK.id);
+
+    const edit = await screen.findByRole("link", { name: "Edit Postmark" });
+
+    expect(edit.getAttribute("href")).toBe(`/providers/${POSTMARK.id}/edit`);
+    expect(document.body.textContent).toContain("Send bounces to Mailquilt");
   });
 });

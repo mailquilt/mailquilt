@@ -22,7 +22,9 @@ import {
 
 /**
  * The install itself. `status` is public, so the dashboard knows whether to
- * show first-run setup and whether sign-up is open. `setUp` makes the
+ * show first-run setup, whether sign-up is open, and whether an SMTP
+ * connection can use a bounce address (`bounceDomain`, `null` when the
+ * install receives no bounces, ADR 0021). `setUp` makes the
  * instance admin, once: after it succeeds it answers `SetupClosed` (409)
  * forever. The settings endpoints answer only the instance admin. The
  * System Mailer's credentials are write-only, kept when left out and removed

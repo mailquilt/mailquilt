@@ -11,7 +11,28 @@ import {
 } from "../organizations/test-organizations.tsx";
 import { ConnectPage, EditPage } from "./connection-pages.tsx";
 
-const api = setupServer();
+const STATUS = "*/api/instance";
+
+const BOUNCE_DOMAIN = "bounces.mail.example.com";
+
+const installReceivingBounces = http.get(STATUS, () =>
+  HttpResponse.json({
+    bounceDomain: BOUNCE_DOMAIN,
+    setUp: true,
+    signUp: "invite-only",
+  })
+);
+
+// WARNING: the connection pages wait for the install's status; most tests are on an install that receives no bounces, so the form has no Bounces part.
+const api = setupServer(
+  http.get(STATUS, () =>
+    HttpResponse.json({
+      bounceDomain: null,
+      setUp: true,
+      signUp: "invite-only",
+    })
+  )
+);
 
 const organization = Schema.decodeUnknownSync(Organization)(ACME);
 
@@ -54,6 +75,12 @@ const submit = () =>
       .getByRole("button", { name: /^Connect$|^Save changes$/u })
       .closest("form") ?? document.body
   );
+
+const descriptionOf = (element: HTMLElement) =>
+  (element.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .map((id) => document.querySelector(`#${id}`)?.textContent ?? "")
+    .join(" ");
 
 const recordBody =
   (bodies: unknown[], status: number) =>
@@ -380,5 +407,106 @@ describe("connecting and editing an SMTP server", () => {
     const alert = await screen.findByRole("alert");
 
     expect(alert.textContent).toContain("This connection no longer exists");
+  });
+
+  it("offers a bounce address on an install that receives bounces, off until ticked, and says what it changes", async () => {
+    const update = answerWith(200);
+    api.use(
+      installReceivingBounces,
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK])),
+      http.put(CONNECTION, update.handler)
+    );
+    renderEdit();
+
+    const offer = await screen.findByRole("checkbox", {
+      name: "Send bounces to Mailquilt",
+    });
+
+    const before = screen.queryByText(/no longer passes SPF/u);
+    const describedBefore = descriptionOf(offer);
+
+    // WARNING: Kumo nests a labelled checkbox in its <label>, and happy-dom then toggles it twice for a click on the box itself; a click on the label toggles it once, as in a browser.
+    fireEvent.click(screen.getByText("Send bounces to Mailquilt"));
+    await screen.findByText(/no longer passes SPF/u);
+    const describedAfter = descriptionOf(offer);
+    submit();
+
+    expect(before).toBeNull();
+    expect(describedBefore).toContain("Your From address stays the same");
+    expect(describedAfter).toContain("no longer passes SPF");
+    expect(describedBefore).toContain(BOUNCE_DOMAIN);
+    await expect(update.received).resolves.toMatchObject({
+      usesBounceAddress: true,
+    });
+  });
+
+  it("turns off a bounce address the connection was saved with", async () => {
+    const update = answerWith(200);
+    api.use(
+      installReceivingBounces,
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () =>
+        HttpResponse.json([{ ...POSTMARK, usesBounceAddress: true }])
+      ),
+      http.put(CONNECTION, update.handler)
+    );
+    renderEdit();
+
+    await screen.findByText(/no longer passes SPF/u);
+    // WARNING: a click on the label, as in "off until ticked" above.
+    fireEvent.click(screen.getByText("Send bounces to Mailquilt"));
+    submit();
+
+    await expect(update.received).resolves.toMatchObject({
+      usesBounceAddress: false,
+    });
+  });
+
+  it("offers a bounce address to an SMTP server only, not an SES account", async () => {
+    api.use(
+      installReceivingBounces,
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () => HttpResponse.json([POSTMARK]))
+    );
+    renderWithOrganizations(<ConnectPage organization={organization} />);
+
+    const offered = await screen.findByRole("checkbox", {
+      name: "Send bounces to Mailquilt",
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: /Amazon SES/u }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("checkbox", { name: "Send bounces to Mailquilt" })
+      ).toBeNull()
+    );
+
+    expect(offered).toBeDefined();
+  });
+
+  it("says an install that receives no bounces can't see this server's, and leaves the saved choice as it is", async () => {
+    const update = answerWith(200);
+    api.use(
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () =>
+        HttpResponse.json([{ ...POSTMARK, usesBounceAddress: true }])
+      ),
+      http.put(CONNECTION, update.handler)
+    );
+    renderEdit();
+
+    await screen.findByDisplayValue("Postmark");
+    submit();
+
+    expect(
+      screen.queryByRole("checkbox", { name: "Send bounces to Mailquilt" })
+    ).toBeNull();
+    expect(document.body.textContent).toContain(
+      "This Mailquilt doesn’t receive bounces"
+    );
+    await expect(update.received).resolves.not.toHaveProperty(
+      "usesBounceAddress"
+    );
   });
 });

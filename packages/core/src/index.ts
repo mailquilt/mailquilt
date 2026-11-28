@@ -205,6 +205,7 @@ export {
   getInstanceSettings,
   Instance,
   instanceStatus,
+  setUpAndSignUp,
   setUpInstance,
   updateSignUp,
   updateSystemMailer,
