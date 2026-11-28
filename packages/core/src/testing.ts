@@ -25,6 +25,13 @@ export { RecordingSmtpProviderLive, SmtpOutbox } from "./smtp-outbox.ts";
 export type { RecordedSend } from "./smtp-outbox.ts";
 
 export {
+  CloudflareEmailOutbox,
+  RecordingCloudflareEmailProviderLive,
+} from "./cloudflare-email-outbox.ts";
+
+export type { RecordedCloudflareSend } from "./cloudflare-email-outbox.ts";
+
+export {
   RECORDING_SES_MAX_SEND_RATE,
   RecordingSesProviderLive,
   SesOutbox,

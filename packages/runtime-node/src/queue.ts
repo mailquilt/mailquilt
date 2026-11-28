@@ -1,6 +1,7 @@
 import type {
   BounceDomain,
   Campaigns,
+  CloudflareEmailProvider,
   DeliveryEventPartitions,
   ProviderConnections,
   PublicUrl,
@@ -166,6 +167,7 @@ export const PgBossLive = PgBossQueueLive.pipe(Layer.provideMerge(BossLive));
 type WorkerPorts =
   | BounceDomain
   | Campaigns
+  | CloudflareEmailProvider
   | DeliveryEventPartitions
   | Dns.Dns
   | ProviderConnections

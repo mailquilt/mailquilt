@@ -1,5 +1,9 @@
 import { assert, layer } from "@effect/vitest";
-import { SesOutbox, SmtpOutbox } from "@repo/core/testing";
+import {
+  CloudflareEmailOutbox,
+  SesOutbox,
+  SmtpOutbox,
+} from "@repo/core/testing";
 import type { ProviderConnection } from "@repo/domain";
 import {
   ProviderConnectionIdSchema,
@@ -70,6 +74,26 @@ const SES = {
   provider: "ses",
   ses: { region: "eu-west-1" },
 } as const;
+
+const CLOUDFLARE_ACCOUNT_ID = "023e105f4ecef8ad9ca31a8372d0c353";
+
+const CLOUDFLARE_API_TOKEN = "test-cloudflare-api-token";
+
+const CLOUDFLARE = {
+  cloudflare: { accountId: CLOUDFLARE_ACCOUNT_ID },
+  credentials: { apiToken: Redacted.make(CLOUDFLARE_API_TOKEN) },
+  from: FROM,
+  name: "Cloudflare",
+  provider: "cloudflare",
+} as const;
+
+const lastCloudflareSend = Effect.gen(function* lastRecordedCloudflareSend() {
+  const sent = yield* (yield* CloudflareEmailOutbox).sent;
+
+  return Arr.isReadonlyArrayNonEmpty(sent)
+    ? Arr.lastNonEmpty(sent)
+    : assert.fail("Nothing was sent through Cloudflare Email");
+});
 
 const lastSesSend = Effect.gen(function* lastRecordedSesSend() {
   const outbox = yield* SesOutbox;
@@ -753,6 +777,153 @@ layer(TestApp, { timeout: "2 minutes" })("Provider Connections", (test) => {
         assert.isTrue(first.defaultForCampaigns);
         assert.isFalse(second.defaultForCampaigns);
         assert.isTrue(afterDefaultDeleted.defaultForCampaigns);
+      })
+  );
+
+  test.effect(
+    "connects a Cloudflare Email account and lists it without its API token",
+    () =>
+      Effect.gen(function* createCloudflare() {
+        const { client, cookie, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: CLOUDFLARE,
+        });
+
+        const listed = yield* send(
+          "GET",
+          `/api/organizations/${params.organizationId}/provider-connections`,
+          { headers: { cookie } }
+        );
+
+        const body = yield* Effect.promise(() => listed.text());
+
+        assert.deepStrictEqual(
+          created.provider === "cloudflare"
+            ? { ...created.cloudflare }
+            : undefined,
+          { accountId: CLOUDFLARE_ACCOUNT_ID }
+        );
+        assert.deepStrictEqual(
+          yield* client.providerConnections.list({ params }),
+          [created]
+        );
+        assert.notInclude(body, CLOUDFLARE_API_TOKEN);
+      })
+  );
+
+  test.effect(
+    "sends a test email through the Cloudflare Email account with its API token",
+    () =>
+      Effect.gen(function* cloudflareTestEmail() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: CLOUDFLARE,
+        });
+
+        const sent = yield* client.providerConnections.sendTestEmail({
+          params: { ...params, providerConnectionId: created.id },
+          payload: { to: "ada@example.com" },
+        });
+
+        const { email, settings } = yield* lastCloudflareSend;
+
+        assert.match(sent.messageId, /^cloudflare-\d+$/u);
+        assert.strictEqual(email.to, "ada@example.com");
+        assert.include(email.text, "(Cloudflare Email)");
+        assert.deepStrictEqual(
+          { ...settings.account },
+          { accountId: CLOUDFLARE_ACCOUNT_ID }
+        );
+        assert.strictEqual(
+          Redacted.value(settings.credentials.apiToken),
+          CLOUDFLARE_API_TOKEN
+        );
+      })
+  );
+
+  test.effect(
+    "keeps a Cloudflare API token for the same account, and needs it entered again for another account",
+    () =>
+      Effect.gen(function* cloudflareTokenFollowsTheAccount() {
+        const { client, params } = yield* owner;
+
+        const created = yield* client.providerConnections.create({
+          params,
+          payload: CLOUDFLARE,
+        });
+
+        const { credentials: _entered, ...withoutToken } = CLOUDFLARE;
+
+        const connectionParams = {
+          ...params,
+          providerConnectionId: created.id,
+        };
+
+        const renamed = yield* client.providerConnections.update({
+          params: connectionParams,
+          payload: { ...withoutToken, name: "Cloudflare (Acme)" },
+        });
+
+        const error = yield* client.providerConnections
+          .update({
+            params: connectionParams,
+            payload: {
+              ...withoutToken,
+              cloudflare: { accountId: "f".repeat(32) },
+            },
+          })
+          .pipe(Effect.flip);
+
+        yield* client.providerConnections.sendTestEmail({
+          params: connectionParams,
+          payload: { to: "ada@example.com" },
+        });
+
+        const { settings } = yield* lastCloudflareSend;
+
+        assert.strictEqual(renamed.name, "Cloudflare (Acme)");
+        assert.strictEqual(error._tag, "CredentialsRequired");
+        assert.strictEqual(
+          Redacted.value(settings.credentials.apiToken),
+          CLOUDFLARE_API_TOKEN
+        );
+      })
+  );
+
+  test.effect(
+    "refuses a Cloudflare Email account without an API token, or with an account ID that isn't one",
+    () =>
+      Effect.gen(function* cloudflareRefused() {
+        const { cookie, params } = yield* owner;
+        const { credentials: _entered, ...withoutToken } = CLOUDFLARE;
+
+        const cloudflarePayload = {
+          ...CLOUDFLARE,
+          credentials: { apiToken: CLOUDFLARE_API_TOKEN },
+        };
+
+        const statuses = yield* Effect.forEach(
+          [
+            withoutToken,
+            {
+              ...cloudflarePayload,
+              cloudflare: { accountId: `${"0".repeat(29)}/..` },
+            },
+            cloudflarePayload,
+          ],
+          (body) =>
+            send(
+              "POST",
+              `/api/organizations/${params.organizationId}/provider-connections`,
+              { body, headers: { cookie } }
+            ).pipe(Effect.map((response) => response.status))
+        );
+
+        assert.deepStrictEqual(statuses, [400, 400, 201]);
       })
   );
 

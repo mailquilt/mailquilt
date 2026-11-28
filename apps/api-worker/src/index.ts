@@ -6,6 +6,7 @@ import {
 } from "@repo/core";
 import {
   BounceReportsLive,
+  CloudflareEmailProviderLive,
   consumeQueueBatch,
   DnsLive,
   emailLinksLive,
@@ -111,6 +112,7 @@ const makeApp = (env: Env) =>
           ),
           smtpProviderLive(env),
           SesProviderLive,
+          CloudflareEmailProviderLive,
           sesNotificationsLive(env),
           emailLinks(env),
           dnsLive(env)
@@ -135,6 +137,7 @@ const runWithPorts = <A, E>(
     | Layer.Success<ReturnType<typeof postgresPorts>>
     | Layer.Success<ReturnType<typeof smtpProviderLive>>
     | Layer.Success<typeof SesProviderLive>
+    | Layer.Success<typeof CloudflareEmailProviderLive>
     | Layer.Success<ReturnType<typeof emailLinks>>
     | Layer.Success<ReturnType<typeof dnsLive>>
     | Layer.Success<typeof BounceReportsLive>
@@ -147,6 +150,7 @@ const runWithPorts = <A, E>(
           postgresPorts(env),
           smtpProviderLive(env),
           SesProviderLive,
+          CloudflareEmailProviderLive,
           emailLinks(env),
           dnsLive(env),
           BounceReportsLive

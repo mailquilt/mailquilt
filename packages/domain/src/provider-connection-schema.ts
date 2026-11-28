@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 
+import { CloudflareConnection } from "./cloudflare-connection.ts";
 import { SesConnection } from "./ses-connection.ts";
 import { SmtpConnection } from "./smtp-connection.ts";
 
@@ -7,6 +8,7 @@ import { SmtpConnection } from "./smtp-connection.ts";
 export const ProviderConnectionSchema = Schema.Union([
   SmtpConnection,
   SesConnection,
+  CloudflareConnection,
 ]);
 
 export type ProviderConnection = typeof ProviderConnectionSchema.Type;

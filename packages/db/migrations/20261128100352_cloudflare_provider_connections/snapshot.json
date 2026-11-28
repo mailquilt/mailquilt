@@ -1,0 +1,58 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "b28d90c0-b030-457c-a794-c0c1bb17a01a",
+  "prevIds": ["9d6521d3-cde7-40c9-b76e-2ee08b3acc91"],
+  "footprints": [
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "provider_connections"],
+      "writes": [
+        "s|ck|public.provider_connections.provider_connections_cloudflare_credentials_check",
+        "n|ck|public.provider_connections.provider_connections_cloudflare_credentials_check",
+        "e|ck|public.provider_connections.provider_connections_cloudflare_credentials_check",
+        "n|con|public.provider_connections.provider_connections_cloudflare_credentials_check"
+      ],
+      "reads": [
+        "n|tbl|public.provider_connections",
+        "n|sch|public",
+        "n|col|public.provider_connections.provider",
+        "n|col|public.provider_connections.credentials"
+      ]
+    },
+    {
+      "statementType": "alter_check",
+      "statementTarget": ["table", "public", "provider_connections"],
+      "writes": [
+        "s|ck|public.provider_connections.provider_connections_provider_check"
+      ],
+      "reads": [
+        "n|tbl|public.provider_connections",
+        "n|sch|public",
+        "n|col|public.provider_connections.provider",
+        "e|col|public.provider_connections.provider"
+      ],
+      "sqlHash": "367d5b3bfbb4dada"
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "provider_connections",
+        "name": "provider_connections_cloudflare_credentials_check",
+        "value": "\"provider\" <> 'cloudflare' or \"credentials\" is not null",
+        "entityType": "checks"
+      }
+    },
+    {
+      "op": "alter",
+      "key": "checks\u0000[\"public\",\"provider_connections\",\"provider_connections_provider_check\"]",
+      "set": {
+        "value": "\"provider\" in ('smtp', 'ses', 'cloudflare')"
+      }
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import {
   SystemMailerLive,
 } from "@repo/core";
 import {
+  CloudflareEmailProviderLive,
   DnsFromEnv,
   EmailLinksFromEnv,
   migrateOnBoot,
@@ -51,6 +52,7 @@ const PortsLive = SystemMailerAfterResponding.pipe(
   Layer.provide(SystemMailerLive),
   Layer.provideMerge(
     Layer.mergeAll(
+      CloudflareEmailProviderLive,
       DnsFromEnv,
       EmailLinksFromEnv,
       PostgresPortsLive,

@@ -19,6 +19,7 @@ import type {
   QueueMessage,
   Scheduler,
   SesNotifications,
+  CloudflareEmailProvider,
   SesProvider,
   SmtpProvider,
   SystemMailer,
@@ -26,6 +27,7 @@ import type {
 } from "@repo/core";
 import type {
   DnsZone,
+  CloudflareEmailOutbox,
   SesOutbox,
   SmtpOutbox,
   SystemMailerOutbox,
@@ -33,6 +35,7 @@ import type {
 import {
   InProcessQueueLive,
   QueueInbox,
+  RecordingCloudflareEmailProviderLive,
   RecordingSesProviderLive,
   RecordingSmtpProviderLive,
   ScriptedDnsLive,
@@ -96,6 +99,8 @@ type Fakes =
   | SmtpOutbox
   | SesProvider
   | SesOutbox
+  | CloudflareEmailProvider
+  | CloudflareEmailOutbox
   | SesNotifications
   | Queue
   | QueueInbox
@@ -327,6 +332,7 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
           SystemMailerOutboxLive,
           RecordingSmtpProviderLive,
           RecordingSesProviderLive,
+          RecordingCloudflareEmailProviderLive,
           sesNotificationsFor(snsSigner),
           InProcessQueueLive,
           ScriptedDnsLive,

@@ -1,3 +1,5 @@
+export { CloudflareEmailProviderLive } from "./cloudflare-email.ts";
+
 export { DnsFromEnv } from "./dns.ts";
 
 export { EmailLinksFromEnv } from "./email-links.ts";

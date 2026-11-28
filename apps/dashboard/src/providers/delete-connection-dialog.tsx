@@ -14,6 +14,10 @@ const deletedDescription = (
     return `${organization} can’t send through it any more, and its saved access key is erased. This can’t be undone.`;
   }
 
+  if (connection.provider === "cloudflare") {
+    return `${organization} can’t send through it any more, and its saved API token is erased. This can’t be undone.`;
+  }
+
   return connection.signsIn
     ? `${organization} can’t send through it any more, and its saved username and password are erased. This can’t be undone.`
     : `${organization} can’t send through it any more. This can’t be undone.`;

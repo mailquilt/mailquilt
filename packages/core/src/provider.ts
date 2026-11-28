@@ -1,4 +1,6 @@
 import type {
+  CloudflareConnection,
+  CloudflareCredentials,
   SesConnection,
   SesCredentials,
   SmtpConnection,
@@ -6,6 +8,7 @@ import type {
 } from "@repo/domain";
 import { Effect, Option } from "effect";
 
+import { CloudflareEmailProvider } from "./cloudflare-email-provider.ts";
 import type { OutgoingEmail } from "./provider-port.ts";
 import { SesProvider } from "./ses-provider.ts";
 import { SmtpProvider } from "./smtp-provider.ts";
@@ -25,19 +28,36 @@ export type ProviderConnectionWithCredentials =
       readonly provider: "ses";
       readonly connection: SesConnection;
       readonly credentials: typeof SesCredentials.Type;
+    }
+  | {
+      readonly provider: "cloudflare";
+      readonly connection: CloudflareConnection;
+      readonly credentials: typeof CloudflareCredentials.Type;
     };
 
 /**
  * Sends one email through a Provider Connection, with the adapter for its
  * Provider. This is the one place that picks an adapter for a connection, so
- * a new Provider, such as Cloudflare Email (#20), adds its case here and the
- * use cases that send don't change (ADR 0015).
+ * a new Provider adds its case here and the use cases that send don't change
+ * (ADR 0015).
  */
 export const sendThrough = (
   opened: ProviderConnectionWithCredentials,
   email: OutgoingEmail
 ) =>
   Effect.gen(function* sendThroughConnection() {
+    if (opened.provider === "cloudflare") {
+      const cloudflare = yield* CloudflareEmailProvider;
+
+      return yield* cloudflare.send(
+        {
+          account: opened.connection.cloudflare,
+          credentials: opened.credentials,
+        },
+        email
+      );
+    }
+
     if (opened.provider === "ses") {
       const ses = yield* SesProvider;
 
@@ -64,13 +84,13 @@ const LOWEST_SES_RATE_PER_SECOND = 1;
  * The most emails a minute that go through a Provider Connection: its own
  * sending rate when it has one; for SES without one, the account's sending
  * limit, read now, or 1 a second when it can't be read; `None` for SMTP
- * without one.
+ * or Cloudflare Email without one, as Cloudflare publishes no sending rate.
  */
 export const sendingRateOf = (opened: ProviderConnectionWithCredentials) =>
   Effect.gen(function* sendingRateOfConnection() {
     const own = Option.fromNullishOr(opened.connection.emailsPerMinute);
 
-    if (Option.isSome(own) || opened.provider === "smtp") {
+    if (Option.isSome(own) || opened.provider !== "ses") {
       return own;
     }
 

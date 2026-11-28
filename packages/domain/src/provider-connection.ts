@@ -120,7 +120,7 @@ const Credential = (message: string) =>
     )
   );
 
-// WARNING: an AWS access key never has spaces, so a key pasted with one is trimmed rather than failing every request as a bad signature.
+// WARNING: an AWS access key or a Cloudflare API token never has spaces, so one pasted with them is trimmed rather than failing every request.
 const AccessKeyPart = (message: string) =>
   Schema.RedactedFromValue(
     Schema.Trim.check(
@@ -169,6 +169,35 @@ export const SesAccount = Schema.Struct({ region: SesRegion });
 export const SesCredentials = Schema.Struct({
   accessKeyId: AccessKeyPart("Enter the access key ID."),
   secretAccessKey: AccessKeyPart("Enter the secret access key."),
+});
+
+const CLOUDFLARE_ACCOUNT_ID = /^[\da-f]{32}$/u;
+
+/**
+ * The Cloudflare account a Cloudflare Email Provider Connection sends
+ * through: its 32-character ID, as the dashboard shows it. Spaces around it
+ * are trimmed. Mailquilt calls only Cloudflare's own API for it, so it's
+ * never a host a member chooses, and the check keeps it a plain path part.
+ */
+export const CloudflareAccountId = Schema.Trim.check(
+  Schema.isPattern(CLOUDFLARE_ACCOUNT_ID, {
+    message:
+      "Enter the 32-character account ID from your Cloudflare dashboard.",
+  })
+);
+
+/** Which Cloudflare account a Cloudflare Email Provider Connection sends through. Holds no credentials. */
+export const CloudflareAccount = Schema.Struct({
+  accountId: CloudflareAccountId,
+});
+
+/**
+ * The API token a Cloudflare Email Provider Connection sends with, which
+ * needs the "Email Sending Write" permission. Write-only, like `SmtpCredentials`,
+ * and held as `Redacted`. Trimmed, since a token never has spaces.
+ */
+export const CloudflareCredentials = Schema.Struct({
+  apiToken: AccessKeyPart("Enter the API token."),
 });
 
 /**

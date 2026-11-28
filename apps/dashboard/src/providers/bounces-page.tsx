@@ -327,7 +327,7 @@ export const BouncesPage = ({
 
   const crumbs = [
     { href: "/providers", label: "Providers" },
-    ...(connection === undefined
+    ...(connection === undefined || connection.provider === "cloudflare"
       ? []
       : [
           {
@@ -357,6 +357,15 @@ export const BouncesPage = ({
         <NotHere
           description={`${organization.name} has no such connection. Someone may have deleted it.`}
           title="This connection isn’t here"
+        />
+      );
+    }
+
+    if (connection.provider === "cloudflare") {
+      return (
+        <NotHere
+          description={`${connection.name} is a Cloudflare Email connection. Cloudflare sends Mailquilt no bounces or complaints: it keeps its own suppression list, and an email to an address on it is recorded as failed.`}
+          title="This page is for Amazon SES connections"
         />
       );
     }
