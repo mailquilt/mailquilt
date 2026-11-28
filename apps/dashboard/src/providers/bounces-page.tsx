@@ -9,6 +9,7 @@ import { useLayoutEffect, useRef } from "react";
 import { loadingFirstTime } from "../api.ts";
 import { StepBlock, StepSeam } from "../brand/quilt-block.tsx";
 import { ArrowSquareOutIcon, WarningCircleIcon } from "../icons/icons.tsx";
+import { useInstanceStatus } from "../instance/instance-api.ts";
 import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageFrame } from "../layout/page-frame.tsx";
 import { PageHeader } from "../layout/page-header.tsx";
@@ -254,17 +255,30 @@ const Steps = ({
 
 const NotHere = ({
   description,
+  edit,
   title,
 }: {
   description: string;
+  edit?: { readonly href: string; readonly name: string };
   title: string;
 }) => (
   <TableRegion label="Connection">
     <EmptyState
       actions={
-        <LinkButton href="/providers" variant="primary">
-          Go to Providers
-        </LinkButton>
+        edit === undefined ? (
+          <LinkButton href="/providers" variant="primary">
+            Go to Providers
+          </LinkButton>
+        ) : (
+          <>
+            <LinkButton href={edit.href} variant="primary">
+              Edit {edit.name}
+            </LinkButton>
+            <LinkButton href="/providers" variant="secondary">
+              Go to Providers
+            </LinkButton>
+          </>
+        )
       }
       description={description}
       title={title}
@@ -292,6 +306,8 @@ export const BouncesPage = ({
   );
 
   const isSes = connection?.provider === "ses";
+  const isSmtp = connection?.provider === "smtp";
+  const status = useInstanceStatus();
 
   const address = useSesNotificationsUrl(
     organization.id,
@@ -301,7 +317,11 @@ export const BouncesPage = ({
     }
   );
 
-  if (loadingFirstTime(connections) || (isSes && loadingFirstTime(address))) {
+  if (
+    loadingFirstTime(connections) ||
+    (isSes && loadingFirstTime(address)) ||
+    (isSmtp && loadingFirstTime(status))
+  ) {
     return <PageAreaLoading label="Loading the connection" />;
   }
 
@@ -341,8 +361,20 @@ export const BouncesPage = ({
       );
     }
 
+    // WARNING: only an install that receives bounces lets an SMTP server send them to Mailquilt; if its status didn't load, the page says only what's true either way.
     if (connection.provider !== "ses") {
-      return (
+      const receivesBounces = (status.data?.bounceDomain ?? null) !== null;
+
+      return receivesBounces ? (
+        <NotHere
+          description={`${connection.name} is an SMTP server. Its bounces come back to Mailquilt when “Send bounces to Mailquilt” is ticked in its settings.`}
+          edit={{
+            href: `/providers/${connection.id}/edit`,
+            name: connection.name,
+          }}
+          title="This page is for Amazon SES connections"
+        />
+      ) : (
         <NotHere
           description={`${connection.name} is an SMTP server. This page sets up the bounces and complaints Amazon SES reports.`}
           title="This page is for Amazon SES connections"

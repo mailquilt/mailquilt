@@ -441,6 +441,28 @@ describe("connecting and editing an SMTP server", () => {
     });
   });
 
+  it("turns off a bounce address the connection was saved with", async () => {
+    const update = answerWith(200);
+    api.use(
+      installReceivingBounces,
+      http.get("*/api/organizations", () => HttpResponse.json([ACME])),
+      http.get(CONNECTIONS, () =>
+        HttpResponse.json([{ ...POSTMARK, usesBounceAddress: true }])
+      ),
+      http.put(CONNECTION, update.handler)
+    );
+    renderEdit();
+
+    await screen.findByText(/no longer passes SPF/u);
+    // WARNING: a click on the label, as in "off until ticked" above.
+    fireEvent.click(screen.getByText("Send bounces to Mailquilt"));
+    submit();
+
+    await expect(update.received).resolves.toMatchObject({
+      usesBounceAddress: false,
+    });
+  });
+
   it("offers a bounce address to an SMTP server only, not an SES account", async () => {
     api.use(
       installReceivingBounces,
@@ -463,7 +485,7 @@ describe("connecting and editing an SMTP server", () => {
     expect(offered).toBeDefined();
   });
 
-  it("offers no bounce address on an install that receives no bounces, and leaves the saved one as it is", async () => {
+  it("says an install that receives no bounces can't see this server's, and leaves the saved choice as it is", async () => {
     const update = answerWith(200);
     api.use(
       http.get("*/api/organizations", () => HttpResponse.json([ACME])),
@@ -480,6 +502,9 @@ describe("connecting and editing an SMTP server", () => {
     expect(
       screen.queryByRole("checkbox", { name: "Send bounces to Mailquilt" })
     ).toBeNull();
+    expect(document.body.textContent).toContain(
+      "This Mailquilt doesn’t receive bounces"
+    );
     await expect(update.received).resolves.not.toHaveProperty(
       "usesBounceAddress"
     );

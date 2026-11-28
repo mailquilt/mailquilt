@@ -331,6 +331,9 @@ const rateIssue = (rate: string) => {
     : issue(RATE_MESSAGE);
 };
 
+const BOUNCES_ABOUT =
+  "Where receiving servers send the emails they couldn’t deliver.";
+
 const Part = ({
   about,
   children,
@@ -486,7 +489,12 @@ export const ConnectionForm = ({
   sendingRate = false,
   submitLabel,
 }: {
-  /** The domain the install receives bounces at, as its status says; without it, no bounce address is offered. */
+  /**
+   * The domain the install receives bounces at, as its status says, so an
+   * SMTP server can use a bounce address; `null` when it receives none, which
+   * the form says. Left out, as for the System Mailer, bounces aren't
+   * mentioned.
+   */
   bounceDomain?: string | null;
   busy: boolean;
   /** The submit button's label while saving, such as "Connecting…". */
@@ -565,16 +573,24 @@ export const ConnectionForm = ({
   const serverListeners = { onChange: requireNewSignInIfServerChanged };
 
   const bouncesPart = (provider: Provider) => {
-    if (domain === null || !offersBounceAddressFor(provider)) {
+    if (provider !== "smtp" || bounceDomain === undefined) {
       return null;
     }
 
+    if (domain === null) {
+      return (
+        <Part about={BOUNCES_ABOUT} nested={nested} title="Bounces">
+          <p className="text-sm leading-5 text-pretty text-kumo-subtle">
+            This Mailquilt doesn’t receive bounces, so it can’t see this
+            server’s. Suppress an address that bounces by hand, on the
+            Suppressions page.
+          </p>
+        </Part>
+      );
+    }
+
     return (
-      <Part
-        about="Where receiving servers send the emails they couldn’t deliver."
-        nested={nested}
-        title="Bounces"
-      >
+      <Part about={BOUNCES_ABOUT} nested={nested} title="Bounces">
         <form.Field name="usesBounceAddress">
           {(field) => (
             <BounceAddressChoice
