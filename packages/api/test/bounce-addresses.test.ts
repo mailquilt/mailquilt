@@ -21,7 +21,11 @@ const SERVER = {
 
 const HARD_BOUNCE = deliveryStatusReport({ action: "failed", status: "5.1.1" });
 
-const SOFT_BOUNCE = deliveryStatusReport({ action: "failed", status: "4.4.7" });
+const SOFT_BOUNCE = deliveryStatusReport({
+  action: "failed",
+  recipient: "full@example.com",
+  status: "4.4.7",
+});
 
 let campaigns = 0;
 
@@ -241,6 +245,29 @@ layer(TestApp, { timeout: "2 minutes" })("Bounce addresses", (test) => {
           "not-signed",
           "not-a-bounce",
         ]);
+        assert.deepStrictEqual(yield* suppressionsOf(owner), []);
+      })
+  );
+
+  test.effect(
+    "ignores a bounce about another address than the email went to, such as one member of an alias",
+    () =>
+      Effect.gen(function* aliasMember() {
+        const owner = yield* smtpOrganization(true);
+        const inbox = yield* BounceInbox;
+        const sent = yield* sendTo(owner, ["team@example.com"]);
+
+        const outcome = yield* inbox.receive(
+          sent.bounceAddressOf("team@example.com"),
+          deliveryStatusReport({
+            action: "failed",
+            originalRecipient: "team@example.com",
+            recipient: "bob@example.com",
+            status: "5.1.1",
+          })
+        );
+
+        assert.strictEqual(outcome, "not-its-address");
         assert.deepStrictEqual(yield* suppressionsOf(owner), []);
       })
   );

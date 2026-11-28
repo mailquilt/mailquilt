@@ -96,7 +96,7 @@ export const DeliveryFeedbackLive = Layer.effect(
       });
 
     return {
-      recordBounce: (email, kind) =>
+      recordBounce: (email, failed) =>
         db
           .transaction(() =>
             Effect.gen(function* recordBounce() {
@@ -112,7 +112,22 @@ export const DeliveryFeedbackLive = Layer.effect(
                 for update
               `);
 
-              yield* recordFor(organization, recipients[0], kind);
+              const [recipient] = recipients;
+
+              // WARNING: a report about another address, such as one member of an alias the email went to, says nothing about this one, and a Suppression can't be undone by hand.
+              const delivery = failed.find(
+                (candidate) =>
+                  candidate.recipient.toLowerCase() ===
+                  recipient?.email.toLowerCase()
+              );
+
+              if (recipient === undefined || delivery === undefined) {
+                return false;
+              }
+
+              yield* recordFor(organization, recipient, delivery.kind);
+
+              return true;
             })
           )
           .pipe(Effect.orDie),

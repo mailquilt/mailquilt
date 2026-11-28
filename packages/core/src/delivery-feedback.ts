@@ -18,6 +18,16 @@ export type SesFeedbackKind = "hard-bounce" | "soft-bounce" | "complaint";
  */
 export type BounceKind = Exclude<SesFeedbackKind, "complaint">;
 
+/**
+ * One recipient a delivery status report says couldn't be delivered to:
+ * how, and the address it names as `Final-Recipient`, the one the reporting
+ * server tried, after any alias or forward.
+ */
+export interface FailedDelivery {
+  readonly kind: BounceKind;
+  readonly recipient: string;
+}
+
 /** One bounce or complaint, about the email SES gave `providerMessageId`. */
 export interface SesFeedback {
   readonly kind: SesFeedbackKind;
@@ -49,13 +59,16 @@ export class DeliveryFeedback extends Context.Service<
     ) => Effect.Effect<void, never, CurrentOrganization>;
     /**
      * Records a bounce to a bounce address, about the Campaign email the
-     * Contact was sent, by the same rules as `record`. It's found by its
-     * Campaign and Contact, so one whose send was cut off counts too; one
-     * whose Campaign or Contact has gone is ignored.
+     * Contact was sent, by the same rules as `record`: the failed delivery
+     * whose recipient is the address that email went to, compared without
+     * regard to case. It's found by its Campaign and Contact, so one whose
+     * send was cut off counts too. Says whether it was recorded: not when no
+     * failed delivery names that address, such as one member of an alias
+     * bouncing, nor when the Campaign or Contact has gone.
      */
     readonly recordBounce: (
       email: { readonly campaignId: CampaignId; readonly contactId: ContactId },
-      kind: BounceKind
-    ) => Effect.Effect<void, never, CurrentOrganization>;
+      failed: readonly FailedDelivery[]
+    ) => Effect.Effect<boolean, never, CurrentOrganization>;
   }
 >()("@repo/core/DeliveryFeedback") {}

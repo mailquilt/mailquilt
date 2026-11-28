@@ -66,10 +66,35 @@ const CASES: readonly (readonly [string, string, Option.Option<BounceKind>])[] =
   ];
 
 describe("delivery status reports", () => {
+  it.effect(
+    "names a failed delivery by the address the server tried, after an alias",
+    () =>
+      Effect.gen(function* aliasMember() {
+        const failed = yield* read(
+          deliveryStatusReport({
+            action: "failed",
+            originalRecipient: "team@example.com",
+            recipient: "bob@example.com",
+            status: "5.1.1",
+          })
+        );
+
+        assert.deepStrictEqual(failed, [
+          { kind: "hard-bounce", recipient: "bob@example.com" },
+        ]);
+      })
+  );
+
   for (const [name, raw, expected] of CASES) {
     it.effect(name, () =>
       Effect.gen(function* classify() {
-        assert.deepStrictEqual(yield* read(raw), expected);
+        assert.deepStrictEqual(
+          yield* read(raw),
+          Option.match(expected, {
+            onNone: () => [],
+            onSome: (kind) => [{ kind, recipient: "gone@example.com" }],
+          })
+        );
       })
     );
   }

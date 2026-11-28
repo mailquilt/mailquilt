@@ -109,7 +109,7 @@ SES's bounces and complaints arrive through SNS at a URL per SES Provider Connec
 Bounces to an SMTP connection's bounce address arrive by email, through Email Routing on `BOUNCE_DOMAIN`, at the Worker's `email()` handler (#21, [ADR 0021](adr/0021-a-bounce-address-carries-a-compact-signed-token-naming-the-email.md)).
 
 - The address's token names the Organization, Campaign and Contact, signed for the purpose `bounce`. It's the only credential: an address that's forged, unsigned or at another domain changes nothing.
-- Only a delivery status report saying delivery failed counts. Auto-replies, delay reports and anything else are ignored, and so is any email over 1 MiB, unread.
+- Only a delivery status report saying delivery failed counts, and only for a recipient whose `Final-Recipient` is the address the email went to, so one member of an alias bouncing doesn't Suppress the alias. Auto-replies, delay reports and anything else are ignored, and so is any email over 1 MiB, unread.
 - A bounce records one event per email and kind, so a copy changes nothing, and acts only on the email its address names.
 - The handler logs what it did with each email, never the address, which holds the token.
 

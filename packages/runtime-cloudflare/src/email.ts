@@ -12,6 +12,8 @@ const LOGGED: Record<ReceivedEmailOutcome, string> = {
   bounce: "Recorded a bounce sent to a bounce address",
   "not-a-bounce":
     "Ignored an email to a bounce address that isn't a failed delivery's report",
+  "not-its-address":
+    "Ignored a bounce about another address than its email went to, or about an email that has gone",
   "not-signed":
     "Ignored an email to an address this install didn't sign as a bounce address",
   "too-large": "Ignored an email to the bounce domain larger than any bounce",

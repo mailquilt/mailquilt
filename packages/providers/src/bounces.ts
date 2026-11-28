@@ -1,5 +1,5 @@
 import { BounceReports } from "@repo/core";
-import type { BounceKind } from "@repo/core";
+import type { BounceKind, FailedDelivery } from "@repo/core";
 import { Effect, Layer, Option, Schema } from "effect";
 import PostalMime from "postal-mime";
 
@@ -64,13 +64,28 @@ const kindOf = (status: string) => {
   );
 };
 
-const bounceKindOf = (statusText: string) => {
-  const failed = fieldGroupsOf(statusText).find(
-    (fields) => fields.get("action")?.toLowerCase() === "failed"
-  );
+// WARNING: an address type such as `rfc822;` comes first, and some servers wrap the address in angle brackets.
+const ADDRESS = /;\s*<?(?<address>[^<>\s]+)>?\s*$/u;
 
-  return Option.flatMap(Option.fromUndefinedOr(failed?.get("status")), kindOf);
-};
+const failedDeliveriesOf = (statusText: string) =>
+  fieldGroupsOf(statusText).flatMap((fields) => {
+    if (fields.get("action")?.toLowerCase() !== "failed") {
+      return [];
+    }
+
+    const recipient = ADDRESS.exec(fields.get("final-recipient") ?? "")?.groups
+      ?.address;
+
+    const kind = kindOf(fields.get("status") ?? "");
+
+    if (recipient === undefined || Option.isNone(kind)) {
+      return [];
+    }
+
+    return [{ kind: kind.value, recipient } satisfies FailedDelivery];
+  });
+
+const NO_FAILED_DELIVERIES: readonly FailedDelivery[] = [];
 
 const read = (raw: Uint8Array) =>
   Effect.tryPromise(() =>
@@ -85,7 +100,7 @@ const read = (raw: Uint8Array) =>
       );
 
       if (!DELIVERY_STATUS_REPORT.test(contentType?.value ?? "")) {
-        return Option.none<BounceKind>();
+        return [];
       }
 
       const part = email.attachments.find((attachment) =>
@@ -93,20 +108,23 @@ const read = (raw: Uint8Array) =>
       );
 
       if (part === undefined) {
-        return Option.none<BounceKind>();
+        return [];
       }
 
-      return Option.flatMap(decodeText(part.content), bounceKindOf);
+      return Option.match(decodeText(part.content), {
+        onNone: () => [],
+        onSome: failedDeliveriesOf,
+      });
     }),
-    Effect.orElseSucceed(() => Option.none<BounceKind>())
+    Effect.orElseSucceed(() => NO_FAILED_DELIVERIES)
   );
 
 /**
  * Reads bounces with `postal-mime`: a `multipart/report` whose report type
- * is `delivery-status`, classified by its first failed recipient. Action
- * `failed` with a 5.x.x status is a hard bounce, except 5.2.2 (mailbox
- * full) and 5.7.x (refused by policy); with 4.x.x, 5.2.2 or 5.7.x, a soft
- * bounce. A message that doesn't parse
- * is `None`.
+ * is `delivery-status`, giving each recipient with Action `failed`, by its
+ * `Final-Recipient`. A 5.x.x status is a hard bounce, except 5.2.2 (mailbox
+ * full) and 5.7.x (refused by policy); 4.x.x, 5.2.2 or 5.7.x is a soft
+ * bounce. A recipient without an address or a status, and a message that
+ * doesn't parse, give none.
  */
 export const BounceReportsLive = Layer.succeed(BounceReports, { read });

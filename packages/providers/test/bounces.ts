@@ -2,6 +2,10 @@
 export interface ReportedDelivery {
   readonly action: "failed" | "delayed" | "delivered";
   readonly status: string;
+  /** Who the report is about (`Final-Recipient`); `gone@example.com` unless given. */
+  readonly recipient?: string;
+  /** The address the email was sent to, when the server changed it, such as an alias (`Original-Recipient`). */
+  readonly originalRecipient?: string;
 }
 
 const BOUNDARY = "report-boundary";
@@ -35,7 +39,10 @@ export const deliveryStatusReport = (
     "",
     "Reporting-MTA: dns; mx.example.net",
     "",
-    "Final-Recipient: rfc822; gone@example.com",
+    ...(delivery.originalRecipient === undefined
+      ? []
+      : [`Original-Recipient: rfc822;${delivery.originalRecipient}`]),
+    `Final-Recipient: rfc822; ${delivery.recipient ?? "gone@example.com"}`,
     `Action: ${delivery.action}`,
     `Status: ${delivery.status}`,
     `Diagnostic-Code: smtp; 550 ${delivery.status} the mailbox said no`,

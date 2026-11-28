@@ -241,6 +241,7 @@ export type { BounceOutcome, BounceTarget } from "./bounce-addresses.ts";
 
 export type {
   BounceKind,
+  FailedDelivery,
   ReceivedSnsMessage,
   SesFeedback,
   SesFeedbackKind,

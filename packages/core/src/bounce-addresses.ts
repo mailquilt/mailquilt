@@ -97,9 +97,15 @@ const targetOf = (to: string) =>
 
 /**
  * What became of an email to the bounce domain: a `bounce` recorded, an
- * address this install didn't sign, or an email that isn't a bounce.
+ * address this install didn't sign, an email that isn't a bounce, or a
+ * bounce about another address than the email went to, or about an email
+ * that has gone.
  */
-export type BounceOutcome = "bounce" | "not-signed" | "not-a-bounce";
+export type BounceOutcome =
+  | "bounce"
+  | "not-signed"
+  | "not-a-bounce"
+  | "not-its-address";
 
 // WARNING: the bounce address's token is the only check of whose bounce this is, as an unsubscribe link's is (ADR 0016, 0021): only this install can sign one, for one Contact and Campaign.
 const inOrganizationOf =
@@ -114,7 +120,9 @@ const inOrganizationOf =
  * report to an address this install signed records its bounce for that
  * Contact and Campaign, with the same Suppression rules as SES's (ADR 0019).
  * Anything else changes nothing: an address that's forged, unsigned or at
- * another domain, and an email that isn't a failed delivery's report.
+ * another domain, an email that isn't a failed delivery's report, and a
+ * report about another recipient than the email's, as when one member of an
+ * alias bounces.
  */
 export const receiveBounce = (to: string, raw: Uint8Array) =>
   Effect.gen(function* receive() {
@@ -125,17 +133,19 @@ export const receiveBounce = (to: string, raw: Uint8Array) =>
     }
 
     const reports = yield* BounceReports;
-    const kind = yield* reports.read(raw);
+    const failed = yield* reports.read(raw);
 
-    if (Option.isNone(kind)) {
+    if (failed.length === 0) {
       return "not-a-bounce" satisfies BounceOutcome;
     }
 
     const feedback = yield* DeliveryFeedback;
 
-    yield* feedback
-      .recordBounce(target.value, kind.value)
+    const recorded = yield* feedback
+      .recordBounce(target.value, failed)
       .pipe(inOrganizationOf(target.value));
 
-    return "bounce" satisfies BounceOutcome;
+    return recorded
+      ? ("bounce" satisfies BounceOutcome)
+      : ("not-its-address" satisfies BounceOutcome);
   });
