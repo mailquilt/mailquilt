@@ -83,7 +83,7 @@ Backends are listed in [architecture.md](architecture.md#deployment-targets).
 
 ### Public endpoints
 
-- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe and preferences links use it now (#12, #13), and so do SES notifications URLs (#19); tracking and bounce (VERP) tokens will (#21, #23).
+- **Signed tokens:** a link in an email carries a token signed with HMAC-SHA-256 under a key derived from `ENCRYPTION_KEYS` for its purpose, so it rotates with that setting (ADR 0016). Its payload holds IDs only, never an address, and IDs aren't sequential. Unsubscribe and preferences links use it now (#12, #13), and so do SES notifications URLs (#19) and bounce addresses (#21), whose compact form is lowercase with an 80-bit tag (ADR 0021); tracking tokens will (#23).
 - **Unsubscribe and preferences pages** send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and a Content Security Policy that loads nothing from elsewhere, because the token is in the address. They escape every value they show.
 
 Planned, with the features they protect.
@@ -105,6 +105,13 @@ SES's bounces and complaints arrive through SNS at a URL per SES Provider Connec
 - Replay protection: a message SNS first sent more than an hour ago is refused, and each SNS message ID is recorded for that hour, so a copy changes nothing.
 - A message's ID, delivery event and Suppression are written in one transaction, so a failure leaves nothing and SNS's next try records it whole.
 - A bounce or complaint acts only on an email the Organization sent, found by the message ID SES gave it.
+
+Bounces to an SMTP connection's bounce address arrive by email, through Email Routing on `BOUNCE_DOMAIN`, at the Worker's `email()` handler (#21, [ADR 0021](adr/0021-a-bounce-address-carries-a-compact-signed-token-naming-the-email.md)).
+
+- The address's token names the Organization, Campaign and Contact, signed for the purpose `bounce`. It's the only credential: an address that's forged, unsigned or at another domain changes nothing.
+- Only a delivery status report saying delivery failed counts, and only for a recipient whose `Final-Recipient` is the address the email went to, so one member of an alias bouncing doesn't Suppress the alias. Auto-replies, delay reports and anything else are ignored, and so is any email over 1 MiB, unread.
+- A bounce records one event per email and kind, so a copy changes nothing, and acts only on the email its address names.
+- The handler logs what it did with each email, never the address, which holds the token.
 
 ### Outbound requests (SSRF)
 

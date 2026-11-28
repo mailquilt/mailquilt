@@ -48,6 +48,13 @@
   // AUTH_SECRET`, or `.dev.vars` for `wrangler dev`. So is
   // SYSTEM_MAILER_SMTP_PASSWORD, when the System Mailer is set here rather
   // than on the instance settings page (see `Env` in src/index.ts).
+  // BOUNCE_DOMAIN, optional, is where SMTP connections that use a bounce
+  // address have their bounces sent (ADR 0021), such as
+  // "bounces.mail.example.com". Add it to this account, turn on its Email
+  // Routing, and make its catch-all rule "Send to a Worker", this one. Bounces
+  // then reach the `email` handler in src/index.ts. Its SPF record doesn't
+  // list the customers' SMTP servers, so emails sent from a bounce address
+  // get an SPF softfail and pass DMARC only through DKIM (ADR 0021).
   "vars": {
     "APP_URL": "http://localhost:8787",
   },

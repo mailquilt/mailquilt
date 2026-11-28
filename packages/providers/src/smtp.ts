@@ -241,6 +241,11 @@ const messageFor = (email: OutgoingEmail) => {
     message.headers = { ...email.headers };
   }
 
+  // WARNING: the bounce address is only the envelope sender (MAIL FROM), never a header; the receiving server writes it as Return-Path.
+  if (email.bounceAddress !== undefined) {
+    message.envelope = { from: email.bounceAddress, to: email.to };
+  }
+
   return message;
 };
 

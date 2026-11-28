@@ -36,6 +36,7 @@ const NewSmtpConnection = Schema.Struct({
   ...connectionBasics,
   smtp: SmtpServer,
   credentials: Schema.optionalKey(SmtpCredentials),
+  usesBounceAddress: Schema.optionalKey(Schema.Boolean),
 });
 
 const NewSesConnection = Schema.Struct({
@@ -50,6 +51,7 @@ const SmtpConnectionChanges = Schema.Struct({
   ...connectionBasics,
   smtp: SmtpServer,
   credentials: Schema.optionalKey(Schema.NullOr(SmtpCredentials)),
+  usesBounceAddress: Schema.optionalKey(Schema.Boolean),
 });
 
 const SesConnectionChanges = Schema.Struct({
@@ -82,7 +84,12 @@ const connectionParams = {
  * limit, read before each batch of a Campaign. `makeCampaignDefault` makes
  * a connection the one new Campaigns start with, in place of any other
  * (`defaultForCampaigns`); one created while there's none becomes it. A
- * Campaign keeps the connection it was given. `sesNotificationsUrl` is the
+ * Campaign keeps the connection it was given. `usesBounceAddress` makes an
+ * SMTP connection send each Campaign email from a signed bounce address, so
+ * its bounces come back to an install that receives them (ADR 0021); it's
+ * off unless `create` turns it on, and `update` without it keeps it. An
+ * install without a bounce domain sends without one either way.
+ * `sesNotificationsUrl` is the
  * URL an SES connection's SNS topic posts bounces and complaints to, whose
  * signed token is its only credential (ADR 0019); an SMTP connection has
  * none, and is answered `ProviderConnectionNotFound`. `sendTestEmail` sends a short email through a

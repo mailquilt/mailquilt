@@ -1,5 +1,6 @@
 import { assert, describe, it } from "@effect/vitest";
 import {
+  BounceDomain,
   Campaigns,
   ProviderConnections,
   PublicUrl,
@@ -52,7 +53,8 @@ const ports = (campaigns: Layer.Layer<Campaigns>) =>
     Layer.mock(SendingDomains, {}),
     Layer.mock(SesProvider, {}),
     Layer.mock(SignedTokens, {}),
-    Layer.mock(SmtpProvider, {})
+    Layer.mock(SmtpProvider, {}),
+    Layer.succeed(BounceDomain, { domain: Option.none() })
   );
 
 const CampaignGone = Layer.mock(Campaigns, {

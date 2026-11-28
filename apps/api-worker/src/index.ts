@@ -5,12 +5,14 @@ import {
   SystemMailerLive,
 } from "@repo/core";
 import {
+  BounceReportsLive,
   consumeQueueBatch,
   DnsLive,
   emailLinksLive,
   forwardOutboxTo,
   postgresPortsLive,
   providePerRequest,
+  receiveEmail,
   SesNotificationsLive,
   SesProviderLive,
   SmtpProviderLive,
@@ -32,6 +34,13 @@ interface Env {
   readonly ENCRYPTION_KEYS?: string;
   /** `true` stops SMTP connections and SNS fetches to private networks and loopback too (ADR 0010). */
   readonly BLOCK_PRIVATE_NETWORKS?: string;
+  /**
+   * The domain this install receives bounces at, optional, such as
+   * `bounces.mail.example.com`: a domain on this Cloudflare account whose
+   * Email Routing catch-all rule sends to this Worker. Unset, SMTP
+   * connections send without a bounce address (ADR 0021).
+   */
+  readonly BOUNCE_DOMAIN?: string;
   /** For development and the smoke test only: DNS answers Sending Domain checks read instead of real DNS (`dnsWithDevRecords` in core). */
   readonly DEV_DNS_RECORDS?: string;
   /**
@@ -74,7 +83,11 @@ const postgresPorts = (env: Env) =>
   );
 
 const emailLinks = (env: Env) =>
-  emailLinksLive(env.APP_URL, Redacted.make(env.ENCRYPTION_KEYS ?? ""));
+  emailLinksLive(
+    env.APP_URL,
+    Redacted.make(env.ENCRYPTION_KEYS ?? ""),
+    env.BOUNCE_DOMAIN
+  );
 
 // WARNING: trust only `cf-connecting-ip`, which Cloudflare sets itself; a client can forge any other IP header.
 const authConfigLive = (env: Env) =>
@@ -124,6 +137,7 @@ const runWithPorts = <A, E>(
     | Layer.Success<typeof SesProviderLive>
     | Layer.Success<ReturnType<typeof emailLinks>>
     | Layer.Success<ReturnType<typeof dnsLive>>
+    | Layer.Success<typeof BounceReportsLive>
   >
 ) =>
   Effect.runPromise(
@@ -134,7 +148,8 @@ const runWithPorts = <A, E>(
           smtpProviderLive(env),
           SesProviderLive,
           emailLinks(env),
-          dnsLive(env)
+          dnsLive(env),
+          BounceReportsLive
         )
       )
     )
@@ -152,6 +167,10 @@ export default {
 
   async queue(batch, env) {
     await runWithPorts(env, consumeQueueBatch(batch));
+  },
+
+  async email(message, env) {
+    await runWithPorts(env, receiveEmail(message));
   },
 
   async scheduled(controller, env) {

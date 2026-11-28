@@ -27,3 +27,4 @@ The HMAC keys are derived from `ENCRYPTION_KEYS` with HKDF-SHA-256, one per key 
 - A token's payload is readable by whoever has the link. It holds IDs, never an email address or other personal data. IDs are TypeIDs (ADR 0006), not sequential.
 - Removing a key version from `ENCRYPTION_KEYS` breaks every link signed with it, including unsubscribe links in emails already sent. Keep an old version for as long as its links should work.
 - An unsubscribe token has no expiry: a link in an old email must keep working, and it can only unsubscribe. A preferences token has none either, for the same reason (#13). Tokens for other purposes choose an expiry when they're added.
+- A bounce address can't hold a token this long or let its case change, so it uses a compact form with the same keys: lowercase, an 80-bit tag and no expiry (ADR 0021).

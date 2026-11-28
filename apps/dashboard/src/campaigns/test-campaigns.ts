@@ -19,6 +19,7 @@ export const POSTMARK = {
   name: "Postmark",
   provider: "smtp",
   signsIn: true,
+  usesBounceAddress: false,
   emailsPerMinute: null,
   defaultForCampaigns: false,
   smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },

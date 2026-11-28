@@ -5,8 +5,10 @@ import type { SendDeferred } from "./send-deferred.ts";
 
 /**
  * One email to hand to a Provider: its plain text, its HTML, or both, where
- * replies go when that isn't the sender, and any headers of its own, such as
- * `List-Unsubscribe`.
+ * replies go when that isn't the sender, any headers of its own, such as
+ * `List-Unsubscribe`, and the bounce address its bounces go to, when it has
+ * one (ADR 0021). A Provider that reports bounces another way, such as SES,
+ * ignores the bounce address.
  */
 export interface OutgoingEmail {
   readonly from: typeof Sender.Type;
@@ -16,6 +18,7 @@ export interface OutgoingEmail {
   readonly text?: string;
   readonly html?: string;
   readonly headers?: Readonly<Record<string, string>>;
+  readonly bounceAddress?: string;
 }
 
 /** An email the Provider accepted, with the ID it gave the message. */

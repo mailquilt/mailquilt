@@ -115,3 +115,88 @@ describe("signed tokens", () => {
       })
   );
 });
+
+const COMPACT_PAYLOAD =
+  "01h455vb4pex5vsknk084sn02q01h455vb4pex5vsknk084sn02r01h455vb4pex5vsknk084sn02s";
+
+const signCompact = Effect.gen(function* signCompactPayload() {
+  const tokens = yield* SignedTokens;
+
+  return yield* tokens.signCompact("bounce", COMPACT_PAYLOAD);
+});
+
+const verifyCompact = (token: string) =>
+  Effect.gen(function* verifyCompactToken() {
+    const tokens = yield* SignedTokens;
+
+    return yield* tokens.verifyCompact("bounce", token).pipe(Effect.exit);
+  });
+
+const swapLowercase = (text: string, index: number) =>
+  `${text.slice(0, index)}${text[index] === "a" ? "b" : "a"}${text.slice(index + 1)}`;
+
+describe("compact signed tokens", () => {
+  it.effect(
+    "gives back the payload in lowercase letters and digits, whatever case the token comes back in",
+    () =>
+      Effect.gen(function* roundTrip() {
+        const token = yield* signCompact;
+
+        assert.match(token, /^[0-9a-z-]+$/u);
+        assert.deepStrictEqual(
+          yield* verifyCompact(token),
+          Exit.succeed(COMPACT_PAYLOAD)
+        );
+        assert.deepStrictEqual(
+          yield* verifyCompact(token.toUpperCase()),
+          Exit.succeed(COMPACT_PAYLOAD)
+        );
+      }).pipe(Effect.provide(tokensWith(KEY_1)))
+  );
+
+  it.effect(
+    "refuses a compact token with any part changed, or made for another purpose",
+    () =>
+      Effect.gen(function* tampered() {
+        const tokens = yield* SignedTokens;
+        const token = yield* signCompact;
+        const [payload = "", version = "", tag = ""] = token.split("-");
+
+        const forOtherPurpose = yield* tokens.signCompact(
+          "unsubscribe",
+          COMPACT_PAYLOAD
+        );
+
+        const changed = [
+          `${swapLowercase(payload, 30)}-${version}-${tag}`,
+          `${payload}-${version === "1" ? "2" : "1"}-${tag}`,
+          `${payload}-${version}-${swapLowercase(tag, 4)}`,
+          `${payload}-${version}-${tag.slice(1)}`,
+          `${payload}-${tag}`,
+          `${token}-extra`,
+          forOtherPurpose,
+          "",
+        ];
+
+        for (const candidate of changed) {
+          const result = yield* verifyCompact(candidate);
+
+          assert.deepStrictEqual(result, REFUSED, candidate);
+        }
+      }).pipe(Effect.provide(tokensWith(`${KEY_1},${KEY_2}`)))
+  );
+
+  it.effect("refuses a compact token signed by another install's keys", () =>
+    Effect.gen(function* otherKeys() {
+      const token = yield* signCompact.pipe(
+        Effect.provide(tokensWith(ANOTHER_INSTALLS_KEY_1))
+      );
+
+      const result = yield* verifyCompact(token).pipe(
+        Effect.provide(tokensWith(KEY_1))
+      );
+
+      assert.deepStrictEqual(result, REFUSED);
+    })
+  );
+});

@@ -25,6 +25,6 @@ The signing certificate and the subscription's `SubscribeURL` are fetched throug
 
 - The URL is a secret, as an unsubscribe link is: anyone who has it can post messages SNS signed to it, from any topic. A member who leaks it can only delete the connection and make a new one, since the token doesn't change. Even then, such messages act only on emails the Organization sent.
 - Removing the key version a URL was signed with from `ENCRYPTION_KEYS` breaks the URL, and bounces stop arriving until the member gives the topic the new one.
-- A route that changes data without a session takes its Organization from a signed token. Later Provider webhooks (P2), and bounce addresses (#21), follow this pattern with their own purposes.
+- A route that changes data without a session takes its Organization from a signed token. Later Provider webhooks (P2), and bounce addresses (#21, ADR 0021), follow this pattern with their own purposes.
 - Feedback about emails sent outside Mailquilt through the same SES account, such as by another app, suppresses no one here.
 - A Suppression from a bounce or complaint keeps any Suppression the address already has, and its reason, as adding one by hand does (#14).

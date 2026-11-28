@@ -1,0 +1,68 @@
+{
+  "type": "diff",
+  "version": "10",
+  "dialect": "postgres",
+  "id": "9d6521d3-cde7-40c9-b76e-2ee08b3acc91",
+  "prevIds": ["c13ffdb9-d94b-45c3-a265-5b0c797a7803"],
+  "footprints": [
+    {
+      "statementType": "add_column",
+      "statementTarget": [
+        "column",
+        "public",
+        "provider_connections",
+        "uses_bounce_address"
+      ],
+      "writes": [
+        "s|col|public.provider_connections.uses_bounce_address",
+        "n|col|public.provider_connections.uses_bounce_address",
+        "e|col|public.provider_connections.uses_bounce_address"
+      ],
+      "reads": ["n|tbl|public.provider_connections", "n|sch|public"]
+    },
+    {
+      "statementType": "add_check",
+      "statementTarget": ["table", "public", "provider_connections"],
+      "writes": [
+        "s|ck|public.provider_connections.provider_connections_bounce_address_check",
+        "n|ck|public.provider_connections.provider_connections_bounce_address_check",
+        "e|ck|public.provider_connections.provider_connections_bounce_address_check",
+        "n|con|public.provider_connections.provider_connections_bounce_address_check"
+      ],
+      "reads": [
+        "n|tbl|public.provider_connections",
+        "n|sch|public",
+        "n|col|public.provider_connections.provider",
+        "n|col|public.provider_connections.uses_bounce_address"
+      ]
+    }
+  ],
+  "deltas": [
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "provider_connections",
+        "name": "uses_bounce_address",
+        "type": "boolean",
+        "typeSchema": null,
+        "notNull": true,
+        "dimensions": 0,
+        "default": "false",
+        "generated": null,
+        "identity": null,
+        "entityType": "columns"
+      }
+    },
+    {
+      "op": "create",
+      "row": {
+        "schema": "public",
+        "table": "provider_connections",
+        "name": "provider_connections_bounce_address_check",
+        "value": "\"provider\" = 'smtp' or not \"uses_bounce_address\"",
+        "entityType": "checks"
+      }
+    }
+  ]
+}

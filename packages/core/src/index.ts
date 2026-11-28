@@ -231,7 +231,17 @@ export type { SnsMessage } from "./ses-notifications.ts";
 
 export { DeliveryFeedback } from "./delivery-feedback.ts";
 
+export { bounceAddressFor, receiveBounce } from "./bounce-addresses.ts";
+
+export { BounceDomain } from "./bounce-domain.ts";
+
+export { BounceReports } from "./bounce-reports.ts";
+
+export type { BounceOutcome, BounceTarget } from "./bounce-addresses.ts";
+
 export type {
+  BounceKind,
+  FailedDelivery,
   ReceivedSnsMessage,
   SesFeedback,
   SesFeedbackKind,

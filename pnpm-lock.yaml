@@ -147,6 +147,9 @@ catalogs:
     pg-boss:
       specifier: 12.38.2
       version: 12.38.2
+    postal-mime:
+      specifier: 4.2.1
+      version: 4.2.1
     react:
       specifier: 19.3.1
       version: 19.3.1
@@ -590,6 +593,9 @@ importers:
       nodemailer:
         specifier: 'catalog:'
         version: 10.5.0
+      postal-mime:
+        specifier: 'catalog:'
+        version: 4.2.1
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
@@ -6643,6 +6649,10 @@ packages:
 
   points-on-path@0.2.1:
     resolution: {integrity: sha512-25ClnWWuw7JbWZcgqY/gJ4FQWadKxGWk+3kR/7kD0tCaDtPPMj7oHu2ToLaVhfpnHrZzYby2w6tUA0eOIuUg8g==}
+
+  postal-mime@4.2.1:
+    resolution: {integrity: sha512-uFQnu6TPJe5IGzj3ZIjzAYCk7qnVYM3KFvo0JpRFftJKtxJcUSMgTaWsIXDakTKfN71fUULhjNNVbNonim5f0Q==}
+    engines: {node: '>=20'}
 
   postcss-selector-parser@6.1.6:
     resolution: {integrity: sha512-BK87/Qgti3DIcgS2PaCVoteFIkjIFvCJBizZDIVSjdlFNg4Jv+SRqbN2JONb/qQUH4ZFqfXYF+izg15W2HVRvA==}
@@ -13583,6 +13593,8 @@ snapshots:
     dependencies:
       path-data-parser: 0.1.0
       points-on-curve: 0.2.0
+
+  postal-mime@4.2.1: {}
 
   postcss-selector-parser@6.1.6:
     dependencies:
