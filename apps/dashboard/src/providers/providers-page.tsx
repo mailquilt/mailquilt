@@ -31,7 +31,7 @@ import {
 } from "../icons/icons.tsx";
 import { useDialog } from "../layout/action-dialog.tsx";
 import { Breakable } from "../layout/breakable.tsx";
-import { EmptyState, LoadFailed, SlotArt } from "../layout/empty-state.tsx";
+import { EmptyState, LoadFailed } from "../layout/empty-state.tsx";
 import { PageAreaLoading } from "../layout/page-states.tsx";
 import { TablePage } from "../layout/table-page.tsx";
 import { TableRegion } from "../layout/table-region.tsx";
@@ -97,9 +97,13 @@ const rateOf = (connection: ProviderConnection) => {
     : "No limit";
 };
 
+const ACCOUNT_ID_ENDS = 4;
+
 const sendsThrough = (connection: ProviderConnection) => {
   if (connection.provider === "cloudflare") {
-    return "Cloudflare Email";
+    const { accountId } = connection.cloudflare;
+
+    return `Cloudflare, ${accountId.slice(0, ACCOUNT_ID_ENDS)}…${accountId.slice(-ACCOUNT_ID_ENDS)}`;
   }
 
   return connection.provider === "ses"
@@ -200,14 +204,12 @@ const ConnectionActions = ({
               Bounces and complaints
             </DropdownMenu.Item>
           ) : null}
-          {connection.provider === "cloudflare" ? null : (
-            <DropdownMenu.Item
-              href={`/providers/${connection.id}/edit`}
-              icon={PencilSimpleIcon}
-            >
-              Edit
-            </DropdownMenu.Item>
-          )}
+          <DropdownMenu.Item
+            href={`/providers/${connection.id}/edit`}
+            icon={PencilSimpleIcon}
+          >
+            Edit
+          </DropdownMenu.Item>
           <DropdownMenu.Item
             icon={TrashIcon}
             onClick={() => deleting.setOpen(true)}
@@ -242,6 +244,28 @@ const ConnectionActions = ({
   );
 };
 
+const ConnectionBadges = ({
+  connection,
+}: {
+  connection: ProviderConnection;
+}) => {
+  const isDefault = connection.defaultForCampaigns;
+  const inBeta = connection.provider === "cloudflare";
+
+  if (!(isDefault || inBeta)) {
+    return null;
+  }
+
+  return (
+    <span className="mt-1.5 flex flex-wrap gap-1.5">
+      {isDefault ? (
+        <Badge variant="secondary">Default for new Campaigns</Badge>
+      ) : null}
+      {inBeta ? <Badge variant="outline">Beta</Badge> : null}
+    </span>
+  );
+};
+
 const helper = createColumnHelper<typeof features, ConnectionRow>();
 
 const COLUMNS = helper.columns([
@@ -264,11 +288,7 @@ const COLUMNS = helper.columns([
               {formatDay(row.original.connection.createdAt)}
             </span>
           </span>
-          {row.original.connection.defaultForCampaigns ? (
-            <span className="mt-1.5 block">
-              <Badge variant="secondary">Default for new Campaigns</Badge>
-            </span>
-          ) : null}
+          <ConnectionBadges connection={row.original.connection} />
         </span>
       </span>
     ),
@@ -456,7 +476,7 @@ export const ProvidersPage = ({
       return (
         <EmptyState
           actions={<ConnectButton />}
-          description="Connect your Amazon SES account, or the SMTP server you send with."
+          description="Connect your Amazon SES or Cloudflare Email account, or the SMTP server you send with."
           title="No provider connected yet"
         />
       );
@@ -489,19 +509,6 @@ export const ProvidersPage = ({
       <TableRegion bordered label="Providers">
         {body()}
       </TableRegion>
-      {connected.length === 0 ? null : (
-        <p className="mt-4 flex items-center gap-3 text-sm text-pretty text-kumo-subtle">
-          <span className="shrink-0">
-            <SlotArt size={20} />
-          </span>
-          <span>
-            <span className="font-medium text-kumo-default">
-              Cloudflare Email
-            </span>{" "}
-            connects directly in a later Mailquilt update.
-          </span>
-        </p>
-      )}
     </TablePage>
   );
 };
