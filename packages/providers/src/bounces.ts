@@ -16,10 +16,13 @@ const FIELD = /^(?<name>[\w-]+)\s*:\s*(?<value>.*)$/u;
 
 const FOLDED = /\r?\n[ \t]+/gu;
 
-const STATUS = /^(?<kind>[45])\.\d{1,3}\.\d{1,3}\b/u;
+const STATUS = /^(?<kind>[45])\.(?<subject>\d{1,3})\.\d{1,3}\b/u;
 
 // WARNING: a full mailbox is reported as permanent (5.2.2), but it empties; most senders treat it as a soft bounce, and so does Mailquilt.
 const MAILBOX_FULL = "5.2.2";
+
+// WARNING: a 5.7.x status is a refusal by security or policy (RFC 3463), such as a block on the sending server's reputation, not a sign the address is gone; as a hard bounce it would Suppress every recipient at that provider for good.
+const POLICY = "7";
 
 // WARNING: with `attachmentEncoding: "utf8"` postal-mime gives a part's content as text, though its type also allows bytes.
 const decodeText = Schema.decodeUnknownOption(Schema.String);
@@ -53,7 +56,9 @@ const kindOf = (status: string) => {
   }
 
   return Option.some<BounceKind>(
-    code.groups?.kind === "5" && !status.startsWith(MAILBOX_FULL)
+    code.groups?.kind === "5" &&
+      code.groups.subject !== POLICY &&
+      !status.startsWith(MAILBOX_FULL)
       ? "hard-bounce"
       : "soft-bounce"
   );
@@ -100,7 +105,8 @@ const read = (raw: Uint8Array) =>
  * Reads bounces with `postal-mime`: a `multipart/report` whose report type
  * is `delivery-status`, classified by its first failed recipient. Action
  * `failed` with a 5.x.x status is a hard bounce, except 5.2.2 (mailbox
- * full); with 4.x.x, or 5.2.2, a soft bounce. A message that doesn't parse
+ * full) and 5.7.x (refused by policy); with 4.x.x, 5.2.2 or 5.7.x, a soft
+ * bounce. A message that doesn't parse
  * is `None`.
  */
 export const BounceReportsLive = Layer.succeed(BounceReports, { read });

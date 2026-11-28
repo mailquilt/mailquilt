@@ -35,6 +35,11 @@ const CASES: readonly (readonly [string, string, Option.Option<BounceKind>])[] =
       Option.some("soft-bounce"),
     ],
     [
+      "a refusal by policy, such as a block on the sending server, is a soft bounce",
+      deliveryStatusReport({ action: "failed", status: "5.7.1" }),
+      Option.some("soft-bounce"),
+    ],
+    [
       "an internationalized report is read too",
       deliveryStatusReport(
         { action: "failed", status: "5.1.1" },
