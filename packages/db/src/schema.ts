@@ -341,16 +341,16 @@ export const sendingDomains = pgTable(
 
 /**
  * An Organization's configured sending service (`pcn_…`). `settings` holds
- * where it sends, an SMTP server's host, port and encryption or an SES
- * account's Region, and never a secret. `credentials` is sealed with
+ * where it sends, an SMTP server's host, port and encryption, an SES
+ * account's Region or a Cloudflare account's ID, and never a secret. `credentials` is sealed with
  * AES-256-GCM under the key numbered `credentials_key_version`, bound to
  * this row's Organization and
  * ID (ADR 0009); both are null for an SMTP server that needs no sign-in,
- * and never for SES.
+ * and never for SES or Cloudflare Email.
  * `emails_per_minute` is its sending rate, null when it has none.
  * `default_for_campaigns` marks the one a new Campaign starts with, at most
  * one per Organization. `uses_bounce_address` sends an SMTP connection's
- * Campaign emails from a signed bounce address (ADR 0021); never for SES.
+ * Campaign emails from a signed bounce address (ADR 0021); only for SMTP.
  */
 export const providerConnections = pgTable(
   "provider_connections",
@@ -381,11 +381,15 @@ export const providerConnections = pgTable(
     ),
     check(
       "provider_connections_provider_check",
-      sql`${table.provider} in ('smtp', 'ses')`
+      sql`${table.provider} in ('smtp', 'ses', 'cloudflare')`
     ),
     check(
       "provider_connections_ses_credentials_check",
       sql`${table.provider} <> 'ses' or ${table.credentials} is not null`
+    ),
+    check(
+      "provider_connections_cloudflare_credentials_check",
+      sql`${table.provider} <> 'cloudflare' or ${table.credentials} is not null`
     ),
     check(
       "provider_connections_credentials_check",

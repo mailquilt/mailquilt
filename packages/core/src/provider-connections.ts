@@ -1,4 +1,6 @@
 import type {
+  CloudflareAccount,
+  CloudflareCredentials,
   CredentialsRequired,
   ProviderConnection,
   ProviderConnectionId,
@@ -40,8 +42,19 @@ interface NewSesTarget {
   readonly credentials: typeof SesCredentials.Type;
 }
 
+/** Which Cloudflare account a new Cloudflare Email Provider Connection sends through, and its API token. */
+interface NewCloudflareTarget {
+  readonly provider: "cloudflare";
+  readonly cloudflare: typeof CloudflareAccount.Type;
+  readonly credentials: typeof CloudflareCredentials.Type;
+}
+
 /** What a new Provider Connection is made from. */
-export type NewProviderConnection = (NewSmtpTarget | NewSesTarget) & {
+export type NewProviderConnection = (
+  | NewSmtpTarget
+  | NewSesTarget
+  | NewCloudflareTarget
+) & {
   readonly name: string;
   readonly from: typeof Sender.Type;
   /** Its sending rate, if it has one. */
@@ -63,6 +76,9 @@ export type ProviderConnectionChanges = (
     })
   | (Omit<NewSesTarget, "credentials"> & {
       readonly credentials: "keep" | typeof SesCredentials.Type;
+    })
+  | (Omit<NewCloudflareTarget, "credentials"> & {
+      readonly credentials: "keep" | typeof CloudflareCredentials.Type;
     })
 ) & {
   readonly name: string;
@@ -90,7 +106,8 @@ export class ProviderConnections extends Context.Service<
     /**
      * Changes a connection. Keeping its saved credentials (`"keep"`) while
      * its Provider, or where it sends (an SMTP server's host, port or
-     * encryption, an SES account's Region), changes fails with
+     * encryption, an SES account's Region, a Cloudflare account's ID),
+     * changes fails with
      * `CredentialsRequired`, checked in the same statement as the write, so
      * a concurrent change can't slip between the check and the write.
      */
@@ -143,7 +160,7 @@ const TEST_EMAIL_RULE = {
   window: Duration.minutes(TEST_EMAIL_LIMIT.minutes),
 };
 
-/** Connects an SMTP server or an SES account to the Organization this request acts in. */
+/** Connects an SMTP server, an SES account or a Cloudflare Email account to the Organization this request acts in. */
 export const createProviderConnection = (connection: NewProviderConnection) =>
   Effect.gen(function* createOrganizationProviderConnection() {
     const connections = yield* ProviderConnections;
@@ -163,8 +180,8 @@ export const listProviderConnections = Effect.gen(
 /**
  * Changes a Provider Connection's settings. Saved credentials are only ever
  * sent where they were entered for: keeping them while changing the
- * Provider, an SMTP server's host, port or encryption, or an SES account's
- * Region fails with `CredentialsRequired`, so a member can't point someone
+ * Provider, an SMTP server's host, port or encryption, an SES account's
+ * Region or a Cloudflare account's ID fails with `CredentialsRequired`, so a member can't point someone
  * else's password at a server they control, or send it unencrypted.
  */
 export const updateProviderConnection = (
@@ -193,10 +210,15 @@ export const deleteProviderConnection = (id: ProviderConnectionId) =>
     yield* connections.remove(id);
   });
 
-const sendsThrough = (opened: ProviderConnectionWithCredentials) =>
-  opened.provider === "ses"
+const sendsThrough = (opened: ProviderConnectionWithCredentials) => {
+  if (opened.provider === "cloudflare") {
+    return "Cloudflare Email";
+  }
+
+  return opened.provider === "ses"
     ? `Amazon SES, ${opened.connection.ses.region}`
     : `${opened.connection.smtp.host}:${opened.connection.smtp.port}`;
+};
 
 /**
  * Sends a short plain-text email to `to` through a Provider Connection, from

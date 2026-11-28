@@ -1,3 +1,5 @@
+export { CloudflareEmailProviderLive } from "./cloudflare-email.ts";
+
 export { DnsLive } from "./dns.ts";
 
 export { BounceReportsLive } from "@repo/providers/bounces";

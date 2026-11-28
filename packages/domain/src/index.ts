@@ -144,6 +144,9 @@ export type { Role } from "./organization.ts";
 export { ProviderConnectionNotFound } from "./provider-connection-not-found.ts";
 
 export {
+  CloudflareAccount,
+  CloudflareAccountId,
+  CloudflareCredentials,
   EmailsPerMinute,
   MailAddress,
   MAX_CREDENTIAL_LENGTH,
@@ -167,6 +170,8 @@ export type { SmtpSecurity } from "./provider-connection.ts";
 export { ProviderConnectionSchema } from "./provider-connection-schema.ts";
 
 export type { ProviderConnection } from "./provider-connection-schema.ts";
+
+export { CloudflareConnection } from "./cloudflare-connection.ts";
 
 export { SesConnection } from "./ses-connection.ts";
 

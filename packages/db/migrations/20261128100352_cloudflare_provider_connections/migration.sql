@@ -1,0 +1,2 @@
+ALTER TABLE "provider_connections" ADD CONSTRAINT "provider_connections_cloudflare_credentials_check" CHECK ("provider" <> 'cloudflare' or "credentials" is not null);--> statement-breakpoint
+ALTER TABLE "provider_connections" DROP CONSTRAINT "provider_connections_provider_check", ADD CONSTRAINT "provider_connections_provider_check" CHECK ("provider" in ('smtp', 'ses', 'cloudflare'));

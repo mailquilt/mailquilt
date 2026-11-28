@@ -49,6 +49,16 @@ const ENCRYPTION_NAME: Record<SmtpSecurity, string> = {
   tls: "TLS",
 };
 
+const securityOf = (connection: ProviderConnection, signIn: string) => {
+  if (connection.provider === "cloudflare") {
+    return "HTTPS, with an API token";
+  }
+
+  return connection.provider === "ses"
+    ? "HTTPS, with an access key"
+    : `${ENCRYPTION_NAME[connection.smtp.security]}, ${signIn}`;
+};
+
 const focusOnMount = (element: HTMLElement | null) => element?.focus();
 
 const introFor = (
@@ -72,6 +82,7 @@ const ConnectButton = () => (
 );
 
 const PROVIDER_NAME: Record<ProviderConnection["provider"], string> = {
+  cloudflare: "Cloudflare Email",
   ses: "Amazon SES",
   smtp: "SMTP server",
 };
@@ -84,6 +95,16 @@ const rateOf = (connection: ProviderConnection) => {
   return connection.provider === "ses"
     ? "Your SES account’s limit"
     : "No limit";
+};
+
+const sendsThrough = (connection: ProviderConnection) => {
+  if (connection.provider === "cloudflare") {
+    return "Cloudflare Email";
+  }
+
+  return connection.provider === "ses"
+    ? `Amazon SES, ${connection.ses.region}`
+    : `${connection.smtp.host}:${connection.smtp.port}`;
 };
 
 const makeDefaultProblem = (error: Error) => {
@@ -179,12 +200,14 @@ const ConnectionActions = ({
               Bounces and complaints
             </DropdownMenu.Item>
           ) : null}
-          <DropdownMenu.Item
-            href={`/providers/${connection.id}/edit`}
-            icon={PencilSimpleIcon}
-          >
-            Edit
-          </DropdownMenu.Item>
+          {connection.provider === "cloudflare" ? null : (
+            <DropdownMenu.Item
+              href={`/providers/${connection.id}/edit`}
+              icon={PencilSimpleIcon}
+            >
+              Edit
+            </DropdownMenu.Item>
+          )}
           <DropdownMenu.Item
             icon={TrashIcon}
             onClick={() => deleting.setOpen(true)}
@@ -277,13 +300,7 @@ const COLUMNS = helper.columns([
       return (
         <span className="block py-2">
           <span className="block">
-            <Breakable
-              value={
-                connection.provider === "ses"
-                  ? `Amazon SES, ${connection.ses.region}`
-                  : `${connection.smtp.host}:${connection.smtp.port}`
-              }
-            />
+            <Breakable value={sendsThrough(connection)} />
           </span>
           <span className="block text-sm text-kumo-subtle">
             {rateOf(connection)}
@@ -308,10 +325,7 @@ const COLUMNS = helper.columns([
           ? "with sign-in"
           : "without sign-in";
 
-      const security =
-        connection.provider === "ses"
-          ? "HTTPS, with an access key"
-          : `${ENCRYPTION_NAME[connection.smtp.security]}, ${signIn}`;
+      const security = securityOf(connection, signIn);
 
       return (
         <span className="inline-flex items-center gap-1.5">

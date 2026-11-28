@@ -10,6 +10,8 @@ import type {
 } from "@repo/core";
 import type { OrganizationId } from "@repo/domain";
 import {
+  CloudflareAccount,
+  CloudflareCredentials,
   CredentialsRequired,
   newProviderConnectionId,
   ProviderConnectionSchema,
@@ -44,6 +46,8 @@ const SmtpCredentialsJson = Schema.fromJsonString(SmtpCredentials);
 
 const SesCredentialsJson = Schema.fromJsonString(SesCredentials);
 
+const CloudflareCredentialsJson = Schema.fromJsonString(CloudflareCredentials);
+
 const encodeSmtpCredentials = Schema.encodeEffect(SmtpCredentialsJson);
 
 const decodeSmtpCredentials = Schema.decodeEffect(SmtpCredentialsJson);
@@ -52,9 +56,19 @@ const encodeSesCredentials = Schema.encodeEffect(SesCredentialsJson);
 
 const decodeSesCredentials = Schema.decodeEffect(SesCredentialsJson);
 
+const encodeCloudflareCredentials = Schema.encodeEffect(
+  CloudflareCredentialsJson
+);
+
+const decodeCloudflareCredentials = Schema.decodeEffect(
+  CloudflareCredentialsJson
+);
+
 const encodeServer = Schema.encodeEffect(SmtpServer);
 
 const encodeAccount = Schema.encodeEffect(SesAccount);
+
+const encodeCloudflareAccount = Schema.encodeEffect(CloudflareAccount);
 
 // WARNING: a Schema error quotes the value it failed on, here the credentials; replace it before it can reach a log.
 const withoutCredentials = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -75,9 +89,22 @@ type NewCredentials =
   | {
       readonly provider: "ses";
       readonly credentials: typeof SesCredentials.Type;
+    }
+  | {
+      readonly provider: "cloudflare";
+      readonly credentials: typeof CloudflareCredentials.Type;
     };
 
 const enteredCredentials = (changes: ProviderConnectionChanges) => {
+  if (changes.provider === "cloudflare") {
+    return changes.credentials === "keep"
+      ? Option.none<NewCredentials>()
+      : Option.some<NewCredentials>({
+          credentials: changes.credentials,
+          provider: "cloudflare",
+        });
+  }
+
   if (changes.provider === "ses") {
     return changes.credentials === "keep"
       ? Option.none<NewCredentials>()
@@ -97,6 +124,10 @@ const enteredCredentials = (changes: ProviderConnectionChanges) => {
 
 const settingsOf = (target: Target) =>
   Effect.gen(function* settingsOfTarget() {
+    if (target.provider === "cloudflare") {
+      return yield* encodeCloudflareAccount(target.cloudflare);
+    }
+
     if (target.provider === "ses") {
       return yield* encodeAccount(target.ses);
     }
@@ -108,6 +139,12 @@ const settingsOf = (target: Target) =>
 const credentialsJsonOf = (target: NewCredentials) =>
   withoutCredentials(
     Effect.gen(function* credentialsJson() {
+      if (target.provider === "cloudflare") {
+        return Option.some(
+          yield* encodeCloudflareCredentials(target.credentials)
+        );
+      }
+
       if (target.provider === "ses") {
         return Option.some(yield* encodeSesCredentials(target.credentials));
       }
@@ -122,9 +159,9 @@ const credentialsJsonOf = (target: NewCredentials) =>
     })
   );
 
-// WARNING: only SMTP uses a bounce address, so a move to SES turns it off.
+// WARNING: only SMTP uses a bounce address, so a move to another Provider turns it off.
 const bounceAddressOf = (changes: ProviderConnectionChanges) => {
-  if (changes.provider === "ses") {
+  if (changes.provider !== "smtp") {
     return { usesBounceAddress: false };
   }
 
@@ -190,6 +227,10 @@ const toConnection = (row: ConnectionRow) => {
     name: row.name,
     provider: row.provider,
   };
+
+  if (row.provider === "cloudflare") {
+    return { ...basics, cloudflare: row.settings };
+  }
 
   return row.provider === "ses"
     ? { ...basics, ses: row.settings }
@@ -509,6 +550,21 @@ export const ProviderConnectionsLive = Layer.effect(
                       .pipe(Effect.orDie)
                   )
                 );
+
+          if (connection.provider === "cloudflare") {
+            const credentials = yield* withoutCredentials(
+              Effect.flatMap(
+                Effect.fromOption(json),
+                decodeCloudflareCredentials
+              )
+            );
+
+            return {
+              connection,
+              credentials,
+              provider: "cloudflare",
+            } satisfies ProviderConnectionWithCredentials;
+          }
 
           if (connection.provider === "ses") {
             const credentials = yield* withoutCredentials(

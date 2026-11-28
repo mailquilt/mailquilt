@@ -136,6 +136,10 @@ const editDescription = (connection: ProviderConnection | undefined) => {
     return "Changing the Region asks for the access key again.";
   }
 
+  if (connection?.provider === "cloudflare") {
+    return "Cloudflare Email is in beta.";
+  }
+
   return connection?.signsIn === true
     ? "Changing the host, port or encryption asks for the username and password again."
     : "Change where and how this connection sends.";
@@ -178,6 +182,24 @@ export const EditPage = ({
                   ? "The connection didn’t load"
                   : "The form didn’t load"
               }
+            />
+          </TableRegion>
+        </div>
+      );
+    }
+
+    if (connection?.provider === "cloudflare") {
+      return (
+        <div className="mq-capped">
+          <TableRegion label="Connection">
+            <EmptyState
+              actions={
+                <LinkButton href="/providers" variant="primary">
+                  Go to Providers
+                </LinkButton>
+              }
+              description="For now, Cloudflare Email connections are changed only through Mailquilt’s API."
+              title="This connection can’t be edited here yet"
             />
           </TableRegion>
         </div>

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./ses": "./src/ses.ts",
+    "./cloudflare-email": "./src/cloudflare-email.ts",
     "./sns": "./src/sns.ts",
     "./bounces": "./src/bounces.ts",
     "./testing": "./test/sns.ts",

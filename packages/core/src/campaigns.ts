@@ -13,6 +13,7 @@ import type {
   NoSubscribedContacts,
   OrganizationId,
   PostalAddressRequired,
+  ProviderConnection,
   ProviderConnectionId,
   ProviderConnectionNotFound,
   ScheduleRequest,
@@ -41,6 +42,7 @@ import type { Types } from "effect";
 import { BatchDeferred } from "./batch-deferred.ts";
 import { BatchStillSending } from "./batch-still-sending.ts";
 import { bounceAddressFor } from "./bounce-addresses.ts";
+import type { CloudflareEmailProvider } from "./cloudflare-email-provider.ts";
 import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
 import { preferencesUrl } from "./preferences-link.ts";
@@ -61,11 +63,11 @@ import { unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe.ts";
 /** How many of a Campaign's recipients one queue message sends to. */
 export const SEND_BATCH_SIZE = 100;
 
-// WARNING: each email through SES is one `fetch`, and a Workers Free invocation may make 50; a batch of 40, with its `GetAccount` read, leaves room to spare, where 100 would run out partway and fail the rest.
-const SES_SEND_BATCH_SIZE = 40;
+// WARNING: each email through SES or Cloudflare Email is one `fetch`, and a Workers Free invocation may make 50; a batch of 40, with SES's `GetAccount` read, leaves room to spare, where 100 would run out partway and fail the rest.
+const API_SEND_BATCH_SIZE = 40;
 
-const sendBatchSizeFor = (provider: "smtp" | "ses") =>
-  provider === "ses" ? SES_SEND_BATCH_SIZE : SEND_BATCH_SIZE;
+const sendBatchSizeFor = (provider: ProviderConnection["provider"]) =>
+  provider === "smtp" ? SEND_BATCH_SIZE : API_SEND_BATCH_SIZE;
 
 /** Which page of Campaigns to list (ADR 0008). */
 export interface CampaignFilter {
@@ -159,7 +161,7 @@ export class Campaigns extends Context.Service<
      */
     readonly startSending: (
       id: CampaignId,
-      batchSize: (provider: "smtp" | "ses") => number,
+      batchSize: (provider: ProviderConnection["provider"]) => number,
       enqueue: (batches: number) => Effect.Effect<void>,
       scheduledAt?: DateTime.Utc
     ) => Effect.Effect<
@@ -691,7 +693,7 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
         const sent: Effect.Effect<
           SentEmail,
           SendFailed | SendDeferred,
-          SmtpProvider | SesProvider
+          SmtpProvider | SesProvider | CloudflareEmailProvider
         > = Option.match(connection, {
           onNone: () => Effect.fail(NO_CONNECTION),
           onSome: (opened) => sendThrough(opened, email),

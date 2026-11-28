@@ -2,6 +2,7 @@ import { assert, describe, it } from "@effect/vitest";
 import {
   BounceDomain,
   Campaigns,
+  CloudflareEmailProvider,
   ProviderConnections,
   PublicUrl,
   Queue,
@@ -46,6 +47,7 @@ const delivered = (body: Message["body"], attempts = 1) => {
 const ports = (campaigns: Layer.Layer<Campaigns>) =>
   Layer.mergeAll(
     campaigns,
+    Layer.mock(CloudflareEmailProvider, {}),
     Layer.mock(ProviderConnections, {}),
     Layer.succeed(PublicUrl, { origin: "https://mail.example.com" }),
     Layer.mock(Queue, {}),

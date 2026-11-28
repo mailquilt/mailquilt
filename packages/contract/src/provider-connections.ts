@@ -1,4 +1,6 @@
 import {
+  CloudflareAccount,
+  CloudflareCredentials,
   EmailsPerMinute,
   MailAddress,
   ProviderConnectionSchema,
@@ -46,6 +48,13 @@ const NewSesConnection = Schema.Struct({
   credentials: SesCredentials,
 });
 
+const NewCloudflareConnection = Schema.Struct({
+  provider: Schema.Literal("cloudflare"),
+  ...connectionBasics,
+  cloudflare: CloudflareAccount,
+  credentials: CloudflareCredentials,
+});
+
 const SmtpConnectionChanges = Schema.Struct({
   provider: Schema.optionalKey(Schema.Literal("smtp")),
   ...connectionBasics,
@@ -61,6 +70,13 @@ const SesConnectionChanges = Schema.Struct({
   credentials: Schema.optionalKey(SesCredentials),
 });
 
+const CloudflareConnectionChanges = Schema.Struct({
+  provider: Schema.Literal("cloudflare"),
+  ...connectionBasics,
+  cloudflare: CloudflareAccount,
+  credentials: Schema.optionalKey(CloudflareCredentials),
+});
+
 const connectionParams = {
   ...organizationParams,
   providerConnectionId: ProviderConnectionIdSchema,
@@ -68,13 +84,16 @@ const connectionParams = {
 
 /**
  * An Organization's Provider Connections: SMTP servers (`provider` `smtp`,
- * or left out) and SES accounts (`ses`). Credentials are write-only: `create`
- * accepts them and no endpoint returns them; an SES account always needs its
- * access key. `update` keeps the saved credentials when it leaves them out,
- * and for SMTP removes them when they are `null`; a change of Provider, of an
- * SMTP server's host, port or encryption, or of an SES account's Region
- * needs them entered again (`CredentialsRequired`), so saved credentials only
- * ever go where they were entered for. `emailsPerMinute` is the rate a
+ * or left out), SES accounts (`ses`) and Cloudflare Email accounts
+ * (`cloudflare`, in beta: Cloudflare describes it for transactional email).
+ * Credentials are write-only: `create` accepts them and no endpoint returns
+ * them; an SES account always needs its access key, and a Cloudflare Email
+ * account its API token. `update` keeps the saved credentials when it leaves
+ * them out, and for SMTP removes them when they are `null`; a change of
+ * Provider, of an SMTP server's host, port or encryption, of an SES
+ * account's Region or of a Cloudflare account's ID needs them entered again
+ * (`CredentialsRequired`), so saved credentials only ever go where they were
+ * entered for. `emailsPerMinute` is the rate a
  * connection sends at, across every Campaign sending through it: each
  * email's send slot starts one interval after the last one's, and emails
  * leave just after their slots, so a few can leave closer together, most
@@ -91,7 +110,7 @@ const connectionParams = {
  * install without a bounce domain sends without one either way.
  * `sesNotificationsUrl` is the
  * URL an SES connection's SNS topic posts bounces and complaints to, whose
- * signed token is its only credential (ADR 0019); an SMTP connection has
+ * signed token is its only credential (ADR 0019); any other connection has
  * none, and is answered `ProviderConnectionNotFound`. `sendTestEmail` sends a short email through a
  * connection, at most 10 every 10 minutes per person; when the Provider
  * refuses it, `SendFailed` (502) says why in the Provider's words.
@@ -117,7 +136,11 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
       {
         error: [SignInRequiredError, OrganizationNotFoundError],
         params: organizationParams,
-        payload: Schema.Union([NewSmtpConnection, NewSesConnection]),
+        payload: Schema.Union([
+          NewSmtpConnection,
+          NewSesConnection,
+          NewCloudflareConnection,
+        ]),
         success: ProviderConnectionSchema.pipe(HttpApiSchema.status(201)),
       }
     )
@@ -134,7 +157,11 @@ export class ProviderConnectionsApi extends HttpApiGroup.make(
           CredentialsRequiredError,
         ],
         params: connectionParams,
-        payload: Schema.Union([SmtpConnectionChanges, SesConnectionChanges]),
+        payload: Schema.Union([
+          SmtpConnectionChanges,
+          SesConnectionChanges,
+          CloudflareConnectionChanges,
+        ]),
         success: ProviderConnectionSchema,
       }
     )

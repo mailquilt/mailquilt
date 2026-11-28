@@ -4,6 +4,7 @@ import { assert, layer } from "@effect/vitest";
 import { QUEUE_RETRIES, SendDeferred } from "@repo/core";
 import type { OutgoingEmail } from "@repo/core";
 import {
+  CloudflareEmailOutbox,
   QueueInbox,
   RECORDING_SES_MAX_SEND_RATE,
   SesOutbox,
@@ -1523,6 +1524,48 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
 
         assert.lengthOf(batches, 2);
       }).pipe(Effect.scoped)
+  );
+
+  test.effect(
+    "sends a Campaign through Cloudflare Email in batches of 40, so each fits a Workers Free invocation's 50 requests",
+    () =>
+      Effect.gen(function* cloudflareBatches() {
+        const owner = yield* draftCampaign;
+
+        yield* owner.client.providerConnections.update({
+          params: {
+            ...owner.params,
+            providerConnectionId: owner.connection.id,
+          },
+          payload: {
+            cloudflare: { accountId: "023e105f4ecef8ad9ca31a8372d0c353" },
+            credentials: { apiToken: Redacted.make("a Cloudflare API token") },
+            from: owner.connection.from,
+            name: owner.connection.name,
+            provider: "cloudflare",
+          },
+        });
+        yield* addContacts(
+          owner,
+          Arr.makeBy(FORTY_ONE, (index) => `cloudflare-${index}@example.com`),
+          [owner.list.id]
+        );
+        yield* owner.client.campaigns.send({ params: owner.campaignParams });
+
+        const batches = yield* (yield* QueueWorker).deliverAll;
+
+        const sent = (yield* (yield* CloudflareEmailOutbox).sent).filter(
+          ({ email }) => email.subject === owner.campaign.subject
+        );
+
+        assert.lengthOf(batches, 2);
+        assert.lengthOf(sent, FORTY_ONE);
+        assert.strictEqual(
+          (yield* owner.client.campaigns.get({ params: owner.campaignParams }))
+            .status,
+          "sent"
+        );
+      })
   );
 
   test.effect(

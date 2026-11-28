@@ -47,20 +47,28 @@ interface Failure {
 
 const SERVER_SAID = "What the server said";
 
+const whereItSends = (connection: ProviderConnection) => {
+  if (connection.provider === "cloudflare") {
+    return { host: "api.cloudflare.com", server: "Cloudflare Email" };
+  }
+
+  return connection.provider === "ses"
+    ? {
+        host: `email.${connection.ses.region}.amazonaws.com`,
+        server: `Amazon SES in ${connection.ses.region}`,
+      }
+    : {
+        host: connection.smtp.host,
+        server: `${connection.smtp.host}:${connection.smtp.port}`,
+      };
+};
+
 const sendFailure = (
   connection: ProviderConnection,
   reason: SendFailureReason,
   detail: string
 ) => {
-  const host =
-    connection.provider === "ses"
-      ? `email.${connection.ses.region}.amazonaws.com`
-      : connection.smtp.host;
-
-  const server =
-    connection.provider === "ses"
-      ? `Amazon SES in ${connection.ses.region}`
-      : `${connection.smtp.host}:${connection.smtp.port}`;
+  const { host, server } = whereItSends(connection);
 
   const byReason: Record<SendFailureReason, Omit<Failure, "detail">> = {
     auth: {
@@ -110,6 +118,33 @@ const sendFailure = (
 
   if (connection.provider === "smtp") {
     return { ...byReason[reason], detail } satisfies Failure;
+  }
+
+  if (connection.provider === "cloudflare") {
+    const cloudflareByReason: typeof byReason = {
+      ...byReason,
+      auth: {
+        ...byReason.auth,
+        fix: "Check the account ID, and that the API token is for that account and has the Email Sending Write permission.",
+        title: "Cloudflare refused to send for this account",
+      },
+      rejected: {
+        ...byReason.rejected,
+        fix: "On a Workers Free plan, Cloudflare sends only to addresses verified in your account. It also won’t send to an address on its suppression list.",
+        title: "Cloudflare refused the email",
+      },
+      unreachable: {
+        ...byReason.unreachable,
+        fix: "Check that this Mailquilt server can reach api.cloudflare.com.",
+      },
+    };
+
+    // WARNING: Cloudflare Email connections can't be edited in the dashboard yet, so no failure offers to edit one.
+    return {
+      ...cloudflareByReason[reason],
+      canEdit: false,
+      detail,
+    } satisfies Failure;
   }
 
   const sesByReason: typeof byReason = {

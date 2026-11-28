@@ -32,4 +32,4 @@ The Worker acts on an email only when it's sent to the bounce domain, at an addr
 - Removing a key version from `ENCRYPTION_KEYS` drops the bounces of every email sent with it, as it breaks its links.
 - Nodemailer also takes the Message-ID's domain from the envelope sender, so these emails' Message-IDs end in the bounce domain.
 - A bounce is matched by the Campaign and Contact its address names, not by message ID as SES's are, so one about an email whose send was cut off, which has no message ID, still counts. One whose Contact or Campaign has gone is ignored.
-- Cloudflare Email (#20) adds its envelope sender in its own adapter; SES ignores the bounce address.
+- SES and Cloudflare Email ignore the bounce address. Cloudflare Email's REST API has no envelope sender and sets `Return-Path` itself, so it can't carry one; Cloudflare keeps its own suppression list instead (#20).

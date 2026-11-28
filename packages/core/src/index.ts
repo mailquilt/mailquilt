@@ -149,6 +149,10 @@ export { sendingRateOf, sendThrough } from "./provider.ts";
 
 export type { ProviderConnectionWithCredentials } from "./provider.ts";
 
+export { CloudflareEmailProvider } from "./cloudflare-email-provider.ts";
+
+export type { CloudflareEmailSettings } from "./cloudflare-email-provider.ts";
+
 export { SesProvider } from "./ses-provider.ts";
 
 export type { SesSettings } from "./ses-provider.ts";

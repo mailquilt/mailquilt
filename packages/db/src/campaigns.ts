@@ -41,6 +41,10 @@ const decodeCampaign = Schema.decodeUnknownEffect(Campaign);
 
 const decodePage = Schema.decodeUnknownEffect(CampaignPage);
 
+const decodeProvider = Schema.decodeUnknownEffect(
+  Schema.Literals(["smtp", "ses", "cloudflare"])
+);
+
 const summaryColumns = {
   createdAt: campaigns.createdAt,
   failed: campaigns.recipientsFailed,
@@ -795,7 +799,7 @@ export const CampaignsLive = Layer.effect(
               }
 
               const size = batchSize(
-                connection.provider === "ses" ? "ses" : "smtp"
+                yield* decodeProvider(connection.provider).pipe(Effect.orDie)
               );
 
               yield* requirePostalAddress(db, organization);

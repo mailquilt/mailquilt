@@ -27,28 +27,39 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
           signedIn
         )
       )
-      .handle("create", ({ params, payload }) =>
-        createProviderConnection(
-          payload.provider === "ses"
-            ? {
-                credentials: payload.credentials,
-                emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
-                from: payload.from,
-                name: payload.name,
-                provider: "ses",
-                ses: payload.ses,
-              }
-            : {
-                credentials: Option.fromUndefinedOr(payload.credentials),
-                emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
-                from: payload.from,
-                name: payload.name,
-                provider: "smtp",
-                smtp: payload.smtp,
-                usesBounceAddress: payload.usesBounceAddress ?? false,
-              }
-        ).pipe(asMemberOf(params.organizationId), signedIn)
-      )
+      .handle("create", ({ params, payload }) => {
+        const basics = {
+          emailsPerMinute: Option.fromNullishOr(payload.emailsPerMinute),
+          from: payload.from,
+          name: payload.name,
+        };
+
+        if (payload.provider === "cloudflare") {
+          return createProviderConnection({
+            ...basics,
+            cloudflare: payload.cloudflare,
+            credentials: payload.credentials,
+            provider: "cloudflare",
+          }).pipe(asMemberOf(params.organizationId), signedIn);
+        }
+
+        if (payload.provider === "ses") {
+          return createProviderConnection({
+            ...basics,
+            credentials: payload.credentials,
+            provider: "ses",
+            ses: payload.ses,
+          }).pipe(asMemberOf(params.organizationId), signedIn);
+        }
+
+        return createProviderConnection({
+          ...basics,
+          credentials: Option.fromUndefinedOr(payload.credentials),
+          provider: "smtp",
+          smtp: payload.smtp,
+          usesBounceAddress: payload.usesBounceAddress ?? false,
+        }).pipe(asMemberOf(params.organizationId), signedIn);
+      })
       .handle("update", ({ params, payload }) => {
         const basics = {
           emailsPerMinute:
@@ -58,6 +69,15 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
           from: payload.from,
           name: payload.name,
         };
+
+        if (payload.provider === "cloudflare") {
+          return updateProviderConnection(params.providerConnectionId, {
+            ...basics,
+            cloudflare: payload.cloudflare,
+            credentials: payload.credentials ?? "keep",
+            provider: "cloudflare",
+          }).pipe(asMemberOf(params.organizationId), signedIn);
+        }
 
         if (payload.provider === "ses") {
           return updateProviderConnection(params.providerConnectionId, {

@@ -5,12 +5,13 @@ import { SendFailed } from "@repo/domain";
 import { AwsV4Signer } from "aws4fetch";
 import { Duration, Effect, Layer, Option, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
-import type { HttpClientError } from "effect/http";
 import {
   encodeWord,
   isPlainText,
   quoteString,
 } from "nodemailer/lib/mime-funcs";
+
+import { unanswered } from "./unanswered.ts";
 
 const REQUEST_TIMEOUT = Duration.seconds(30);
 
@@ -150,37 +151,6 @@ const FORBIDDEN = 403;
 
 const SERVER_ERROR = 500;
 
-const CONNECT_FAILURE_CODES = new Set([
-  "EAI_AGAIN",
-  "ECONNREFUSED",
-  "EHOSTUNREACH",
-  "ENETUNREACH",
-  "ENOTFOUND",
-  "UND_ERR_CONNECT_TIMEOUT",
-]);
-
-const MAX_CAUSE_DEPTH = 5;
-
-const ErrorWithCause = Schema.Struct({
-  code: Schema.optionalKey(Schema.String),
-  message: Schema.optionalKey(Schema.String),
-  cause: Schema.optionalKey(Schema.Unknown),
-});
-
-const decodeErrorWithCause = Schema.decodeUnknownOption(ErrorWithCause);
-
-const causesOf = (error: HttpClientError.HttpClientError) => {
-  const causes: (typeof ErrorWithCause.Type)[] = [];
-  let next = decodeErrorWithCause(error.reason);
-
-  while (Option.isSome(next) && causes.length < MAX_CAUSE_DEPTH) {
-    causes.push(next.value);
-    next = decodeErrorWithCause(next.value.cause);
-  }
-
-  return causes;
-};
-
 const errorTypeOf = (
   header: string | undefined,
   body: Option.Option<typeof ErrorBody.Type>
@@ -232,23 +202,6 @@ const refusal = (response: HttpClientResponse.HttpClientResponse) =>
       reason: response.status >= SERVER_ERROR ? "failed" : "rejected",
     });
   });
-
-// WARNING: a request that got no answer may have reached SES and been sent, so it's failed, never retried; only one that never connected, such as a failed host lookup, is put off.
-const unanswered = (error: HttpClientError.HttpClientError) => {
-  const causes = causesOf(error);
-  const deepest = causes.at(-1);
-
-  const detail = `SES didn't answer: ${deepest?.message ?? error.message}`;
-
-  if (causes.some(({ code = "" }) => CONNECT_FAILURE_CODES.has(code))) {
-    return new SendDeferred({
-      everyEmail: true,
-      failed: new SendFailed({ detail, reason: "unreachable" }),
-    });
-  }
-
-  return new SendFailed({ detail, reason: "failed" });
-};
 
 const TIMED_OUT = new SendFailed({
   detail: `SES didn't answer within ${Duration.format(REQUEST_TIMEOUT)}.`,
@@ -329,7 +282,7 @@ export const sesProviderLayer = Layer.effect(
             sendEmailRequest(email)
           ).pipe(
             Effect.catchTag("HttpClientError", (error) =>
-              Effect.fail(unanswered(error))
+              Effect.fail(unanswered("SES", error))
             )
           );
 
