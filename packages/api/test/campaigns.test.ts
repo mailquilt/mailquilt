@@ -1552,7 +1552,13 @@ layer(TestApp, { timeout: "2 minutes" })("Campaigns", (test) => {
         );
         yield* owner.client.campaigns.send({ params: owner.campaignParams });
 
-        const batches = yield* (yield* QueueWorker).deliverAll;
+        const batches = yield* (yield* QueueInbox).takeAll;
+        const worker = yield* QueueWorker;
+
+        yield* Effect.forEach(batches, (batch) => worker.deliver(batch), {
+          discard: true,
+        });
+        yield* worker.deliverAll;
 
         const sent = (yield* (yield* CloudflareEmailOutbox).sent).filter(
           ({ email }) => email.subject === owner.campaign.subject

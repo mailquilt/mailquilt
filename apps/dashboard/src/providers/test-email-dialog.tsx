@@ -128,6 +128,11 @@ const sendFailure = (
         fix: "Check the account ID, and that the API token is for that account and has the Email Sending Write permission.",
         title: "Cloudflare refused to send for this account",
       },
+      failed: {
+        ...byReason.failed,
+        fix: "It may still arrive. Check the inbox before you send again.",
+        title: "Cloudflare didn’t confirm it sent the email",
+      },
       rejected: {
         ...byReason.rejected,
         fix: "On a Workers Free plan, Cloudflare sends only to addresses verified in your account. It also won’t send to an address on its suppression list.",
