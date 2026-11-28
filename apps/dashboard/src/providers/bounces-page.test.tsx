@@ -175,7 +175,7 @@ describe("the steps for an SES connection's bounces and complaints", () => {
     renderBounces(POSTMARK.id);
 
     await screen.findByRole("heading", {
-      name: "Only Amazon SES reports bounces here",
+      name: "This page is for Amazon SES connections",
     });
 
     expect(asked).toBeFalsy();

@@ -35,6 +35,8 @@ export type ConnectionSettings = {
 export type ConnectionToSave =
   | (Extract<ConnectionSettings, { readonly provider: "smtp" }> & {
       readonly credentials?: typeof SmtpCredentials.Type | null;
+      /** Whether its Campaign emails go from a bounce address; left out, the saved choice is kept. */
+      readonly usesBounceAddress?: boolean;
     })
   | (Extract<ConnectionSettings, { readonly provider: "ses" }> & {
       readonly credentials?: typeof SesCredentials.Type;

@@ -344,8 +344,8 @@ export const BouncesPage = ({
     if (connection.provider !== "ses") {
       return (
         <NotHere
-          description={`${connection.name} is an SMTP server. Mailquilt hears about bounces and complaints from Amazon SES connections.`}
-          title="Only Amazon SES reports bounces here"
+          description={`${connection.name} is an SMTP server. This page sets up the bounces and complaints Amazon SES reports.`}
+          title="This page is for Amazon SES connections"
         />
       );
     }

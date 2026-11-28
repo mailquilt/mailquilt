@@ -31,6 +31,7 @@ import { useFieldError } from "../forms/field-error.tsx";
 import { FormField } from "../forms/form-field.tsx";
 import { submitForm } from "../forms/submit-form.ts";
 import { SettingsSection } from "../layout/settings-section.tsx";
+import { BounceAddressChoice } from "./bounce-address-choice.tsx";
 import type { ConnectionToSave } from "./providers-api.ts";
 import { SES_REGIONS, sesRegionLabel } from "./ses-regions.ts";
 
@@ -56,6 +57,7 @@ const ConnectionFormValues = Schema.Struct({
   accessKeyId: Schema.String,
   secretAccessKey: Schema.String,
   emailsPerMinute: Schema.String,
+  usesBounceAddress: Schema.Boolean,
 });
 
 type SignIn = typeof SignInSchema.Type;
@@ -129,6 +131,7 @@ export interface SavedServer {
   readonly smtp: typeof SmtpServer.Type;
   readonly signsIn: boolean;
   readonly emailsPerMinute?: number | null;
+  readonly usesBounceAddress?: boolean;
 }
 
 /** An SES account already saved, as the API shows it: its Region, never its access key. */
@@ -206,17 +209,19 @@ const signInFor = (connection?: SavedServer) => {
   return (connection.signsIn ? "keep" : "none") satisfies SignIn;
 };
 
+const rateTextOf = (connection?: SavedConnection) =>
+  connection?.emailsPerMinute === undefined ||
+  connection.emailsPerMinute === null
+    ? ""
+    : String(connection.emailsPerMinute);
+
 const defaultsFor = (connection?: SavedConnection) => {
   const server = isSes(connection) ? undefined : connection;
 
   const values: typeof ConnectionFormValues.Encoded = {
     accessKey: isSes(connection) ? "keep" : "new",
     accessKeyId: "",
-    emailsPerMinute:
-      connection?.emailsPerMinute === undefined ||
-      connection.emailsPerMinute === null
-        ? ""
-        : String(connection.emailsPerMinute),
+    emailsPerMinute: rateTextOf(connection),
     fromEmail: connection?.from.email ?? "",
     fromName: connection?.from.name ?? "",
     host: server?.smtp.host ?? "",
@@ -229,12 +234,17 @@ const defaultsFor = (connection?: SavedConnection) => {
     security: server?.smtp.security ?? "starttls",
     signIn: signInFor(server),
     username: "",
+    usesBounceAddress: server?.usesBounceAddress ?? false,
   };
 
   return values;
 };
 
-const resultFrom = (value: typeof ConnectionFormValues.Type) => {
+// WARNING: the choice is sent only when the form offered it, so saving on an install that receives no bounces keeps a connection's saved one.
+const resultFrom = (
+  value: typeof ConnectionFormValues.Type,
+  offersBounceAddress: boolean
+) => {
   const from =
     value.fromName === ""
       ? { email: value.fromEmail }
@@ -267,7 +277,7 @@ const resultFrom = (value: typeof ConnectionFormValues.Type) => {
     } satisfies ConnectionFormResult;
   }
 
-  const server = {
+  const smtp = {
     ...basics,
     provider: "smtp" as const,
     smtp: {
@@ -276,6 +286,10 @@ const resultFrom = (value: typeof ConnectionFormValues.Type) => {
       security: value.security,
     },
   };
+
+  const server = offersBounceAddress
+    ? { ...smtp, usesBounceAddress: value.usesBounceAddress }
+    : smtp;
 
   const credentials = {
     keep: undefined,
@@ -451,10 +465,12 @@ const PROVIDERS = [
  * access key. Editing one with saved credentials offers to keep them, unless
  * where they go changes (the server, or the Region): then they must be
  * entered again, as the API requires. With `sendingRate`, it asks for the
- * most emails a minute, empty for none. Fields are checked with the same
- * rules the API uses.
+ * most emails a minute, empty for none. With `bounceDomain`, an SMTP server
+ * can send its Campaign emails from a bounce address there, and the form says
+ * what that changes. Fields are checked with the same rules the API uses.
  */
 export const ConnectionForm = ({
+  bounceDomain,
   busy,
   busyLabel,
   cancelHref,
@@ -470,6 +486,8 @@ export const ConnectionForm = ({
   sendingRate = false,
   submitLabel,
 }: {
+  /** The domain the install receives bounces at, as its status says; without it, no bounce address is offered. */
+  bounceDomain?: string | null;
   busy: boolean;
   /** The submit button's label while saving, such as "Connecting…". */
   busyLabel: string;
@@ -498,11 +516,21 @@ export const ConnectionForm = ({
   const savedServer = isSes(connection) ? undefined : connection;
   const saved = savedServer?.signsIn ?? false;
 
+  const domain = bounceDomain ?? null;
+
+  const offersBounceAddressFor = (provider: Provider) =>
+    provider === "smtp" && domain !== null;
+
   const form = useForm({
     defaultValues: defaultsFor(connection),
     onSubmit: ({ value }) => {
       if (!busy) {
-        onSubmit(resultFrom(Schema.decodeSync(ConnectionFormValues)(value)));
+        onSubmit(
+          resultFrom(
+            Schema.decodeSync(ConnectionFormValues)(value),
+            offersBounceAddressFor(value.provider)
+          )
+        );
       }
     },
   });
@@ -535,6 +563,30 @@ export const ConnectionForm = ({
   };
 
   const serverListeners = { onChange: requireNewSignInIfServerChanged };
+
+  const bouncesPart = (provider: Provider) => {
+    if (domain === null || !offersBounceAddressFor(provider)) {
+      return null;
+    }
+
+    return (
+      <Part
+        about="Where receiving servers send the emails they couldn’t deliver."
+        nested={nested}
+        title="Bounces"
+      >
+        <form.Field name="usesBounceAddress">
+          {(field) => (
+            <BounceAddressChoice
+              checked={field.state.value}
+              domain={domain}
+              onCheckedChange={(checked) => field.handleChange(checked)}
+            />
+          )}
+        </form.Field>
+      </Part>
+    );
+  };
 
   const submit = (
     <Button aria-busy={busy} type="submit" variant="primary">
@@ -883,6 +935,9 @@ export const ConnectionForm = ({
           </form.Subscribe>
         </Part>
       ) : null}
+      <form.Subscribe selector={(state) => state.values.provider}>
+        {(provider) => bouncesPart(provider)}
+      </form.Subscribe>
       <form.Subscribe selector={(state) => state.values.provider}>
         {(provider) => (
           <Part
