@@ -1,0 +1,2 @@
+ALTER TABLE "provider_connections" ADD COLUMN "uses_bounce_address" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "provider_connections" ADD CONSTRAINT "provider_connections_bounce_address_check" CHECK ("provider" = 'smtp' or not "uses_bounce_address");

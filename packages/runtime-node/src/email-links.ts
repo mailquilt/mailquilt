@@ -1,10 +1,11 @@
-import { PublicUrl, signedTokensLayer } from "@repo/core";
-import { Config, Effect, Layer } from "effect";
+import { BounceDomain, PublicUrl, signedTokensLayer } from "@repo/core";
+import { Config, Effect, Layer, Option } from "effect";
 
 /**
  * What links in emails need: `SignedTokens` keyed from `ENCRYPTION_KEYS`
  * (ADR 0016), and `PublicUrl` from `APP_URL`. The app doesn't start without
- * both.
+ * both. Docker receives no bounces yet, so it has no `BounceDomain` (ADR
+ * 0021).
  */
 export const EmailLinksFromEnv = Layer.unwrap(
   Effect.gen(function* emailLinksFromEnv() {
@@ -20,9 +21,10 @@ export const EmailLinksFromEnv = Layer.unwrap(
       );
     }
 
-    return Layer.merge(
+    return Layer.mergeAll(
       signedTokensLayer(keys),
-      Layer.succeed(PublicUrl, { origin: appUrl.origin })
+      Layer.succeed(PublicUrl, { origin: appUrl.origin }),
+      Layer.succeed(BounceDomain, { domain: Option.none() })
     );
   })
 );

@@ -122,6 +122,19 @@ const credentialsJsonOf = (target: NewCredentials) =>
     })
   );
 
+// WARNING: only SMTP uses a bounce address, so a move to SES turns it off.
+const bounceAddressOf = (changes: ProviderConnectionChanges) => {
+  if (changes.provider === "ses") {
+    return { usesBounceAddress: false };
+  }
+
+  if (changes.usesBounceAddress === "keep") {
+    return {};
+  }
+
+  return { usesBounceAddress: changes.usesBounceAddress };
+};
+
 const inOrganization = (organization: OrganizationId, id: string) =>
   and(
     eq(providerConnections.organizationId, organization),
@@ -146,6 +159,7 @@ interface ConnectionRow {
   readonly signsIn: boolean;
   readonly emailsPerMinute: number | null;
   readonly defaultForCampaigns: boolean;
+  readonly usesBounceAddress: boolean;
   readonly createdAt: Date;
 }
 
@@ -160,6 +174,7 @@ const connectionColumns = {
   provider: providerConnections.provider,
   settings: providerConnections.settings,
   signsIn: sql<boolean>`${providerConnections.credentials} is not null`,
+  usesBounceAddress: providerConnections.usesBounceAddress,
 };
 
 const toConnection = (row: ConnectionRow) => {
@@ -178,7 +193,12 @@ const toConnection = (row: ConnectionRow) => {
 
   return row.provider === "ses"
     ? { ...basics, ses: row.settings }
-    : { ...basics, signsIn: row.signsIn, smtp: row.settings };
+    : {
+        ...basics,
+        signsIn: row.signsIn,
+        smtp: row.settings,
+        usesBounceAddress: row.usesBounceAddress,
+      };
 };
 
 /**
@@ -276,6 +296,9 @@ export const ProviderConnectionsLive = Layer.effect(
               )`,
                   provider: connection.provider,
                   settings: yield* settingsOf(connection),
+                  usesBounceAddress:
+                    connection.provider === "smtp" &&
+                    connection.usesBounceAddress,
                 })
                 .returning(connectionColumns);
 
@@ -389,6 +412,8 @@ export const ProviderConnectionsLive = Layer.effect(
               ? {}
               : { emailsPerMinute: Option.getOrNull(changes.emailsPerMinute) };
 
+          const bounceAddress = bounceAddressOf(changes);
+
           const sameServer = sql`${providerConnections.settings} = ${JSON.stringify(settings)}::jsonb`;
 
           // WARNING: an SMTP server with no saved sign-in has nothing to keep, so it may move anywhere; anything else keeps its credentials only for the same Provider and the same settings.
@@ -410,6 +435,7 @@ export const ProviderConnectionsLive = Layer.effect(
             .set({
               ...credentials,
               ...emailsPerMinute,
+              ...bounceAddress,
               fromEmail: changes.from.email,
               fromName: changes.from.name ?? null,
               name: changes.name,

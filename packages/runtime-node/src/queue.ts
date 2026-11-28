@@ -1,4 +1,5 @@
 import type {
+  BounceDomain,
   Campaigns,
   DeliveryEventPartitions,
   ProviderConnections,
@@ -163,6 +164,7 @@ const PgBossQueueLive = Layer.effectContext(
 export const PgBossLive = PgBossQueueLive.pipe(Layer.provideMerge(BossLive));
 
 type WorkerPorts =
+  | BounceDomain
   | Campaigns
   | DeliveryEventPartitions
   | Dns.Dns

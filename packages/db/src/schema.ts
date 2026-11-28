@@ -349,7 +349,8 @@ export const sendingDomains = pgTable(
  * and never for SES.
  * `emails_per_minute` is its sending rate, null when it has none.
  * `default_for_campaigns` marks the one a new Campaign starts with, at most
- * one per Organization.
+ * one per Organization. `uses_bounce_address` sends an SMTP connection's
+ * Campaign emails from a signed bounce address (ADR 0021); never for SES.
  */
 export const providerConnections = pgTable(
   "provider_connections",
@@ -369,6 +370,7 @@ export const providerConnections = pgTable(
     defaultForCampaigns: boolean("default_for_campaigns")
       .notNull()
       .default(false),
+    usesBounceAddress: boolean("uses_bounce_address").notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -395,6 +397,10 @@ export const providerConnections = pgTable(
     check(
       "provider_connections_emails_per_minute_check",
       sql`${table.emailsPerMinute} between 10 and 60000`
+    ),
+    check(
+      "provider_connections_bounce_address_check",
+      sql`${table.provider} = 'smtp' or not ${table.usesBounceAddress}`
     ),
   ]
 );

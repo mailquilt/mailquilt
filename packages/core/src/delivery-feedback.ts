@@ -1,3 +1,4 @@
+import type { CampaignId, ContactId } from "@repo/domain";
 import type { DateTime, Effect } from "effect";
 import { Context } from "effect";
 
@@ -9,6 +10,13 @@ import type { CurrentOrganization } from "./current-organization.ts";
  * a spam report a complaint.
  */
 export type SesFeedbackKind = "hard-bounce" | "soft-bounce" | "complaint";
+
+/**
+ * What a delivery status report sent to a bounce address says happened to
+ * an email: a hard bounce when the server gave up for good, a soft bounce
+ * when it gave up on a failure that might have passed (ADR 0021).
+ */
+export type BounceKind = Exclude<SesFeedbackKind, "complaint">;
 
 /** One bounce or complaint, about the email SES gave `providerMessageId`. */
 export interface SesFeedback {
@@ -38,6 +46,16 @@ export class DeliveryFeedback extends Context.Service<
     readonly record: (
       message: ReceivedSnsMessage,
       feedback: SesFeedback
+    ) => Effect.Effect<void, never, CurrentOrganization>;
+    /**
+     * Records a bounce to a bounce address, about the Campaign email the
+     * Contact was sent, by the same rules as `record`. It's found by its
+     * Campaign and Contact, so one whose send was cut off counts too; one
+     * whose Campaign or Contact has gone is ignored.
+     */
+    readonly recordBounce: (
+      email: { readonly campaignId: CampaignId; readonly contactId: ContactId },
+      kind: BounceKind
     ) => Effect.Effect<void, never, CurrentOrganization>;
   }
 >()("@repo/core/DeliveryFeedback") {}

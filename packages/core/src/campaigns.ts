@@ -40,6 +40,7 @@ import type { Types } from "effect";
 
 import { BatchDeferred } from "./batch-deferred.ts";
 import { BatchStillSending } from "./batch-still-sending.ts";
+import { bounceAddressFor } from "./bounce-addresses.ts";
 import { CurrentOrganization } from "./current-organization.ts";
 import { plainTextOf } from "./plain-text.ts";
 import { preferencesUrl } from "./preferences-link.ts";
@@ -667,6 +668,24 @@ const sendCampaignBatch = (message: SendCampaignBatch, attempt: number) =>
 
         if (batch.replyTo !== null) {
           email.replyTo = batch.replyTo;
+        }
+
+        const usesBounceAddress = Option.exists(
+          connection,
+          (opened) =>
+            opened.provider === "smtp" && opened.connection.usesBounceAddress
+        );
+
+        if (usesBounceAddress) {
+          const bounceAddress = yield* bounceAddressFor({
+            campaignId: message.campaignId,
+            contactId: recipient.contactId,
+            organizationId: message.organizationId,
+          });
+
+          if (Option.isSome(bounceAddress)) {
+            email.bounceAddress = bounceAddress.value;
+          }
         }
 
         const sent: Effect.Effect<

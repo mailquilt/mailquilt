@@ -1,15 +1,19 @@
 import { PgClient } from "@effect/sql-pg";
 import { MailquiltApi } from "@repo/contract";
 import {
+  BounceDomain,
   credentialCipherLayer,
   handleQueueMessage,
   PublicUrl,
+  receiveBounce,
   signedTokensLayer,
   SystemMailerConfig,
   SystemMailerLive,
 } from "@repo/core";
 import type {
   BatchDeferred,
+  BounceOutcome,
+  BounceReports,
   BatchStillSending,
   Queue,
   QueueMessage,
@@ -37,6 +41,7 @@ import {
 import { DatabaseLive, DatabasePortsLive } from "@repo/db";
 import { migrateDatabase } from "@repo/db/migrate";
 import type { SignUpPolicy } from "@repo/domain";
+import { BounceReportsLive } from "@repo/providers/bounces";
 import { makeSnsSigner, sesNotificationsFor } from "@repo/providers/testing";
 import { PostgreSqlContainer } from "@testcontainers/postgresql";
 import { Context, Effect, Layer, Option, pipe, Redacted } from "effect";
@@ -67,6 +72,9 @@ const TestAuthConfig = authConfigLayer({
   secret: TEST_AUTH_SECRET,
 });
 
+/** The domain the test install receives bounces at. */
+export const BOUNCE_DOMAIN = "bounces.mailquilt.test";
+
 /** Seals Provider Connection credentials in tests: key 1, 32 bytes of 7s. */
 export const TEST_ENCRYPTION_KEYS = Redacted.make(
   "1:BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc="
@@ -80,6 +88,8 @@ type DatabasePorts =
   | Layer.Success<ReturnType<typeof signedTokensLayer>>;
 
 type Fakes =
+  | BounceDomain
+  | BounceReports
   | SystemMailer
   | SystemMailerOutbox
   | SmtpProvider
@@ -196,6 +206,15 @@ const queueWorker = (ports: Context.Context<DatabasePorts | Fakes>) => {
   return { deliver, deliverAll };
 };
 
+/**
+ * Takes emails sent to the bounce domain, as the Worker's Email Workers
+ * handler does, with the same ports the app's requests use.
+ */
+export const BounceInbox = Context.Service<{
+  /** Handles one email sent to `to`, with `raw` as its whole message. */
+  readonly receive: (to: string, raw: string) => Effect.Effect<BounceOutcome>;
+}>("test/BounceInbox");
+
 /** The signed-in instance admin's session cookie; empty on a fresh install, which has no instance admin. */
 export const InstanceAdminCookie = Context.Service<string>(
   "test/InstanceAdminCookie"
@@ -310,7 +329,11 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
           RecordingSesProviderLive,
           sesNotificationsFor(snsSigner),
           InProcessQueueLive,
-          ScriptedDnsLive
+          ScriptedDnsLive,
+          BounceReportsLive,
+          Layer.succeed(BounceDomain, {
+            domain: Option.some(BOUNCE_DOMAIN),
+          })
         )
       );
 
@@ -351,6 +374,12 @@ export const makeTestApp = (options: TestAppOptions = {}) =>
       const context = Context.make(ApiClient, client).pipe(
         Context.add(AppFetch, fetchInProcess),
         Context.add(SnsSigner, snsSigner),
+        Context.add(BounceInbox, {
+          receive: (to, raw) =>
+            receiveBounce(to, new TextEncoder().encode(raw)).pipe(
+              Effect.provideContext(Context.merge(databasePorts, fakes))
+            ),
+        }),
         Context.add(
           QueueWorker,
           queueWorker(Context.merge(databasePorts, fakes))

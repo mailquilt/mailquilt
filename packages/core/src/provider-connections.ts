@@ -29,6 +29,8 @@ interface NewSmtpTarget {
   readonly provider: "smtp";
   readonly smtp: typeof SmtpServer.Type;
   readonly credentials: Option.Option<typeof SmtpCredentials.Type>;
+  /** Whether its Campaign emails are sent from a signed bounce address (ADR 0021). */
+  readonly usesBounceAddress: boolean;
 }
 
 /** Which SES account a new SES Provider Connection sends through, and its access key. */
@@ -51,11 +53,13 @@ export type NewProviderConnection = (NewSmtpTarget | NewSesTarget) & {
  * Provider. `credentials` is `"keep"` to keep the saved ones, or the new
  * ones; for SMTP, `None` is a server that needs no sign-in.
  * `emailsPerMinute` is `"keep"` to keep the saved sending rate, or the new
- * one, `None` for none.
+ * one, `None` for none. For SMTP, `usesBounceAddress` is `"keep"` to keep
+ * the saved setting.
  */
 export type ProviderConnectionChanges = (
-  | (Omit<NewSmtpTarget, "credentials"> & {
+  | (Omit<NewSmtpTarget, "credentials" | "usesBounceAddress"> & {
       readonly credentials: "keep" | Option.Option<typeof SmtpCredentials.Type>;
+      readonly usesBounceAddress: "keep" | boolean;
     })
   | (Omit<NewSesTarget, "credentials"> & {
       readonly credentials: "keep" | typeof SesCredentials.Type;

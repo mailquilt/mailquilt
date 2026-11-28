@@ -226,6 +226,32 @@ layer(MailpitsLive, { timeout: "2 minutes" })("SMTP Provider", (test) => {
   );
 
   test.effect(
+    "sends from an email's bounce address as its envelope sender, and from its From address without one",
+    () =>
+      Effect.gen(function* envelopeSender() {
+        const { plain } = yield* Mailpits;
+        const smtp = settings(plain, "none");
+        const bounceAddress = `${"0".repeat(78)}-1-${"a".repeat(16)}@bounces.mailquilt.example`;
+
+        yield* sendWith(smtp, {
+          ...emailTo("envelope-bounce@example.com"),
+          bounceAddress,
+        });
+        yield* sendWith(smtp, emailTo("envelope-from@example.com"));
+
+        const [withOne] = yield* plain.received("envelope-bounce@example.com");
+        const [without] = yield* plain.received("envelope-from@example.com");
+
+        assert.deepStrictEqual(withOne?.headers["Return-Path"], [
+          `<${bounceAddress}>`,
+        ]);
+        assert.deepStrictEqual(without?.headers["Return-Path"], [
+          `<${without?.From.Address}>`,
+        ]);
+      })
+  );
+
+  test.effect(
     "checks the certificate of a host written with a trailing dot",
     () =>
       Effect.gen(function* fullyQualifiedHost() {

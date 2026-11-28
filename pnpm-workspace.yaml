@@ -78,6 +78,7 @@ catalog:
   oxfmt: 0.79.0
   oxlint: 1.94.0
   path-to-regexp: 6.3.0
+  postal-mime: 4.2.1
   pg-boss: 12.38.2
   postcss-selector-parser: 6.1.6
   react: 19.3.1

@@ -45,6 +45,7 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
                 name: payload.name,
                 provider: "smtp",
                 smtp: payload.smtp,
+                usesBounceAddress: payload.usesBounceAddress ?? false,
               }
         ).pipe(asMemberOf(params.organizationId), signedIn)
       )
@@ -77,6 +78,7 @@ export const ProviderConnectionsHandlers = HttpApiBuilder.group(
           credentials,
           provider: "smtp",
           smtp: payload.smtp,
+          usesBounceAddress: payload.usesBounceAddress ?? "keep",
         }).pipe(asMemberOf(params.organizationId), signedIn);
       })
       .handle("delete", ({ params }) =>

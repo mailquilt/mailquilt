@@ -6,7 +6,9 @@
   "exports": {
     "./ses": "./src/ses.ts",
     "./sns": "./src/sns.ts",
+    "./bounces": "./src/bounces.ts",
     "./testing": "./test/sns.ts",
+    "./testing/bounces": "./test/bounces.ts",
     "./smtp": "./src/smtp.ts"
   },
   "scripts": {
@@ -18,7 +20,8 @@
     "@repo/domain": "workspace:*",
     "aws4fetch": "catalog:",
     "effect": "catalog:",
-    "nodemailer": "catalog:"
+    "nodemailer": "catalog:",
+    "postal-mime": "catalog:"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

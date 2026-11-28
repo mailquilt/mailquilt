@@ -36,6 +36,7 @@ const POSTMARK = {
   provider: "smtp",
   signsIn: true,
   smtp: { host: "smtp.postmarkapp.com", port: 587, security: "starttls" },
+  usesBounceAddress: false,
 };
 
 const ADDRESS = "https://mail.acme.example/api/webhooks/ses?token=1.abc.def";
